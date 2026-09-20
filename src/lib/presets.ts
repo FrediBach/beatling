@@ -1,6 +1,7 @@
 import { euclidHit } from "@/lib/euclid";
 import { createBlock, createVoices } from "@/lib/patch";
 import { BLOCK_COUNT, type Arrangement, type Machine, type Patch, type SequencerBlock, type Variation, type VoiceBank, type VoiceId } from "@/lib/types";
+import { createEffects } from "@/lib/effects";
 
 interface PresetLane {
   voice: VoiceId;
@@ -229,13 +230,14 @@ export function createPresetPatch(id: string, volume = 72): Patch {
   const voices = createVoices();
   applyPresetCharacter(preset, voices);
   return {
-    format: "euclid-grid.v1",
+    format: "euclid-grid.v2",
     bpm: preset.bpm,
     rate: preset.rate ?? 4,
     swing: preset.swing,
     vol: volume,
     blocks,
     voices,
+    effects: createEffects(),
   };
 }
 
@@ -243,6 +245,14 @@ const clonePatch = (patch: Patch): Patch => ({
   ...patch,
   blocks: patch.blocks.map((block) => ({ ...block, clk: [...block.clk] })),
   voices: Object.fromEntries(Object.entries(patch.voices).map(([id, voice]) => [id, { ...voice, custom: { ...voice.custom } }])) as VoiceBank,
+  effects: {
+    ...patch.effects,
+    distortion: { ...patch.effects.distortion },
+    reverb: { ...patch.effects.reverb },
+    delay: { ...patch.effects.delay },
+    compressor: { ...patch.effects.compressor },
+    sends: Object.fromEntries(Object.entries(patch.effects.sends).map(([id, sends]) => [id, { ...sends }])) as Patch["effects"]["sends"],
+  },
 });
 
 const TEXTURE_VOICES = new Set<VoiceId>(["ch", "oh", "shk", "cym", "cow", "rim"]);
@@ -338,7 +348,7 @@ export function createPresetArrangement(id: string, volume = 72): Arrangement {
     patch,
   }));
   return {
-    format: "euclid-grid.arrangement.v1",
+    format: "euclid-grid.arrangement.v2",
     variations,
     songParts: variations.map((variation, index) => ({ id: `preset-${id}-part-${index + 1}`, variationId: variation.id, bars: repeats[index] })),
     activeIndex: 0,

@@ -25,4 +25,16 @@ describe("variation arrangements", () => {
     expect(changedBlockFields(changedPatch.blocks[0], patch.blocks[0])).toEqual(new Set(["pulses"]));
     expect(variationHasChanges(variation, arrangement.variations[0])).toBe(true);
   });
+
+  it("treats effect and send edits as variation changes", () => {
+    const patch = createEmptyPatch();
+    const changedPatch = {
+      ...patch,
+      effects: {
+        ...patch.effects,
+        sends: { ...patch.effects.sends, kick: { ...patch.effects.sends.kick, reverb: 35 } },
+      },
+    };
+    expect(variationHasChanges({ id: "variation-2", name: "B", patch: changedPatch }, { id: "variation-1", name: "A", patch })).toBe(true);
+  });
 });

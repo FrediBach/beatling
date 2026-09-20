@@ -15,6 +15,7 @@ export type VoiceId =
   | "shk";
 
 export type Machine = "808" | "909" | "custom";
+export type EffectId = "distortion" | "reverb" | "delay" | "compressor";
 export type CustomVoiceSettings = Record<string, number>;
 export type LfoShape = "ramp" | "tri" | "sqr" | "rnd";
 export type ModDestination = "" | "pulses" | "rot" | "prob" | "div" | "tune" | "decay" | "level";
@@ -53,14 +54,55 @@ export interface VoiceState {
 
 export type VoiceBank = Record<VoiceId, VoiceState>;
 
+export interface DistortionSettings {
+  enabled: boolean;
+  drive: number;
+  tone: number;
+  return: number;
+}
+
+export interface ReverbSettings {
+  enabled: boolean;
+  damping: number;
+  return: number;
+}
+
+export interface DelaySettings {
+  enabled: boolean;
+  time: number;
+  feedback: number;
+  tone: number;
+  return: number;
+}
+
+export interface CompressorSettings {
+  enabled: boolean;
+  threshold: number;
+  ratio: number;
+  attack: number;
+  release: number;
+  return: number;
+}
+
+export type VoiceEffectSends = Record<EffectId, number>;
+
+export interface EffectsState {
+  distortion: DistortionSettings;
+  reverb: ReverbSettings;
+  delay: DelaySettings;
+  compressor: CompressorSettings;
+  sends: Record<VoiceId, VoiceEffectSends>;
+}
+
 export interface Patch {
-  format: "euclid-grid.v1";
+  format: "euclid-grid.v2";
   bpm: number;
   rate: number;
   swing: number;
   vol: number;
   blocks: SequencerBlock[];
   voices: VoiceBank;
+  effects: EffectsState;
 }
 
 export interface Variation {
@@ -76,7 +118,7 @@ export interface SongPart {
 }
 
 export interface Arrangement {
-  format: "euclid-grid.arrangement.v1";
+  format: "euclid-grid.arrangement.v2";
   variations: Variation[];
   songParts: SongPart[];
   activeIndex: number;

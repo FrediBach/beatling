@@ -29,6 +29,28 @@ describe("patches", () => {
     expect(patch.voices.kick.custom.clickFrequency).toBe(1800);
   });
 
+  it("migrates v1 patches to silent effect sends and clamps imported effect settings", () => {
+    const legacy = createEmptyPatch() as unknown as Record<string, unknown>;
+    legacy.format = "euclid-grid.v1";
+    delete legacy.effects;
+    const migrated = normalizePatch(legacy)!;
+    expect(migrated.format).toBe("euclid-grid.v2");
+    expect(migrated.effects.distortion.enabled).toBe(false);
+    expect(migrated.effects.sends.kick.reverb).toBe(0);
+
+    const imported = normalizePatch({
+      ...createEmptyPatch(),
+      effects: {
+        distortion: { enabled: true, drive: 200, tone: 5, return: 120 },
+        delay: { enabled: true, time: 900, feedback: 99 },
+        sends: { kick: { distortion: 140, delay: -20 } },
+      },
+    })!;
+    expect(imported.effects.distortion).toMatchObject({ enabled: true, drive: 100, tone: 400, return: 100 });
+    expect(imported.effects.delay).toMatchObject({ enabled: true, time: 750, feedback: 85 });
+    expect(imported.effects.sends.kick).toMatchObject({ distortion: 100, delay: 0, reverb: 0, compressor: 0 });
+  });
+
   it("keeps routing when patterns are shuffled", () => {
     const patch = createDemoPatch();
     const shuffled = shufflePatch(patch, () => 0.5);

@@ -50,7 +50,7 @@ The small components under `src/components/ui/` wrap reusable Radix primitives o
 
 ## State model and data flow
 
-`Patch` is the playable unit. It contains global transport values, 16 fixed sequencer blocks, and the voice bank. A block's array index is also its routing address, which is why slots have stable positional identities even when their contents change.
+`Patch` is the playable unit. It contains global transport values, 16 fixed sequencer blocks, the voice bank, and shared effect configuration with per-voice send levels. A block's array index is also its routing address, which is why slots have stable positional identities even when their contents change.
 
 `Arrangement` owns:
 
@@ -67,16 +67,18 @@ During playback, the engine is authoritative for timing. React requests a lightw
 
 Two versioned local-storage records currently exist:
 
-- `egs.patch.v1` for the latest patch;
-- `egs.arrangement.v1` for variations and song structure.
+- `egs.patch.v2` for the latest patch;
+- `egs.arrangement.v2` for variations and song structure.
 
-All reads are defensive. `normalizePatch` and `normalizeArrangement` supply defaults, constrain values, and migrate the older variation-repeat representation into song parts. Storage access remains wrapped in `try/catch` because privacy settings and quota failures must degrade to an in-memory session.
+All reads are defensive. `normalizePatch` and `normalizeArrangement` supply defaults, constrain values, and migrate v1 patches to silent default effect sends as well as the older variation-repeat representation into song parts. The v2 readers fall back to the v1 storage keys so existing sessions migrate on their next save. Storage access remains wrapped in `try/catch` because privacy settings and quota failures must degrade to an in-memory session.
 
 Changing either serialized shape requires a new format decision, migration coverage, and backward-compatibility tests. Do not silently reinterpret existing fields.
 
 ## Audio lifecycle
 
 `SequencerEngine` exists once per mounted application. The engine delays `AudioContext` creation until playback begins, satisfying browser gesture policies. It uses a short look-ahead scheduler for sound and queues visual events for snapshot consumption. `destroy()` is called when the app unmounts.
+
+Each voice has a persistent dry bus plus gain-controlled sends into four shared returns: distortion, convolution reverb, filtered feedback delay, and parallel compression. The returns feed the existing master compressor. Effect parameter updates are smoothed on the audio timeline and do not depend on React render timing.
 
 Routing can feed block outputs into other block clocks, resets, mutes, and modulation inputs. Queue and per-block guards prevent cyclic patches from producing unbounded work. Any routing change must retain those guards and add focused tests.
 
@@ -102,4 +104,3 @@ Routing can feed block outputs into other block clocks, resets, mutes, and modul
 `SequencerCard` is the second pressure point. Its heading, pattern visualization, parameter list, and routing summary can become focused children with explicit props. Prefer these extractions when touching the card instead of extending its conditional JSX.
 
 The migration should remain incremental: preserve current tests, add coverage around each extracted seam, and keep React Doctor's warning count from increasing.
-

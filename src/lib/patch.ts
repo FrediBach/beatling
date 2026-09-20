@@ -2,8 +2,10 @@ import { BLOCK_COUNT, type BlockParam, type BlockRandomizationLocks, type Patch,
 import { ROW_PARAMS, VOICE_DEFS } from "@/lib/constants";
 import { clamp } from "@/lib/euclid";
 import { createCustomVoiceSettings, normalizeCustomVoiceSettings } from "@/lib/voice-config";
+import { createEffects, normalizeEffects } from "@/lib/effects";
 
-const STORAGE_KEY = "egs.patch.v1";
+const STORAGE_KEY = "egs.patch.v2";
+const LEGACY_STORAGE_KEY = "egs.patch.v1";
 
 export function createBlock(index: number): SequencerBlock {
   return {
@@ -80,18 +82,19 @@ export function createDemoPatch(volume = 72): Patch {
     }
     return block;
   });
-  return { format: "euclid-grid.v1", bpm: 124, rate: 4, swing: 12, vol: volume, blocks, voices: createVoices() };
+  return { format: "euclid-grid.v2", bpm: 124, rate: 4, swing: 12, vol: volume, blocks, voices: createVoices(), effects: createEffects() };
 }
 
 export function createEmptyPatch(volume = 72): Patch {
   return {
-    format: "euclid-grid.v1",
+    format: "euclid-grid.v2",
     bpm: 124,
     rate: 4,
     swing: 0,
     vol: volume,
     blocks: Array.from({ length: BLOCK_COUNT }, (_, index) => createBlock(index)),
     voices: createVoices(),
+    effects: createEffects(),
   };
 }
 
@@ -121,12 +124,13 @@ export function normalizePatch(value: unknown): Patch | null {
       };
     }
   }
+  base.effects = normalizeEffects(input.effects);
   return base;
 }
 
 export function loadStoredPatch(): Patch | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
     return raw ? normalizePatch(JSON.parse(raw)) : null;
   } catch {
     return null;

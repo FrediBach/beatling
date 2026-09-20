@@ -1,6 +1,7 @@
-import { BLOCK_COUNT, type CustomVoiceSettings, type EffectiveBlock, type EngineSnapshot, type Machine, type Patch, type VoiceId } from "@/lib/types";
+import { BLOCK_COUNT, type CustomVoiceSettings, type EffectId, type EffectsState, type EffectiveBlock, type EngineSnapshot, type Machine, type Patch, type VoiceId } from "@/lib/types";
 import { VOICE_DEFS } from "@/lib/constants";
 import { clamp, effectiveBlock, euclidHit, lfoValue, volumeGain } from "@/lib/euclid";
+import { EFFECT_IDS, effectGain } from "@/lib/effects";
 
 interface QueuedVisualEvent {
   time: number;
@@ -38,6 +39,18 @@ export class SequencerEngine {
   private compressor: DynamicsCompressorNode | null = null;
   private noise: AudioBuffer | null = null;
   private busses = new Map<VoiceId, GainNode>();
+  private sendGains = new Map<string, GainNode>();
+  private effectReturns = new Map<EffectId, GainNode>();
+  private distortion: WaveShaperNode | null = null;
+  private distortionTone: BiquadFilterNode | null = null;
+  private reverb: ConvolverNode | null = null;
+  private reverbDamping: BiquadFilterNode | null = null;
+  private delay: DelayNode | null = null;
+  private delayTone: BiquadFilterNode | null = null;
+  private delayFeedback: GainNode | null = null;
+  private parallelCompressor: DynamicsCompressorNode | null = null;
+  private distortionDrive = -1;
+  private appliedEffects: EffectsState | null = null;
   private runtime: RuntimeBlock[] = [];
   private voiceHitAt = new Map<VoiceId, number>();
   private timer: number | null = null;
@@ -98,6 +111,7 @@ export class SequencerEngine {
 
   setPatch(patch: Patch): void {
     this.getPatch = () => patch;
+    this.applyEffects();
   }
 
   setBarCallback(callback: (() => void) | null): void {
@@ -167,6 +181,114 @@ export class SequencerEngine {
       gain.connect(this.compressor!);
       this.busses.set(id, gain);
     });
+    this.initEffects();
+    this.applyEffects();
+  }
+
+  private initEffects(): void {
+    if (!this.context || !this.compressor) return;
+    const createReturn = (id: EffectId) => {
+      const gain = this.context!.createGain();
+      gain.gain.value = 0;
+      gain.connect(this.compressor!);
+      this.effectReturns.set(id, gain);
+      return gain;
+    };
+
+    const distortionInput = this.context.createGain();
+    this.distortion = this.context.createWaveShaper();
+    this.distortion.oversample = "2x";
+    this.distortionTone = this.context.createBiquadFilter();
+    this.distortionTone.type = "lowpass";
+    distortionInput.connect(this.distortion).connect(this.distortionTone).connect(createReturn("distortion"));
+
+    const reverbInput = this.context.createGain();
+    this.reverb = this.context.createConvolver();
+    this.reverb.buffer = this.createReverbImpulse(1.8);
+    this.reverbDamping = this.context.createBiquadFilter();
+    this.reverbDamping.type = "lowpass";
+    reverbInput.connect(this.reverb).connect(this.reverbDamping).connect(createReturn("reverb"));
+
+    const delayInput = this.context.createGain();
+    this.delay = this.context.createDelay(1);
+    this.delayTone = this.context.createBiquadFilter();
+    this.delayTone.type = "lowpass";
+    this.delayFeedback = this.context.createGain();
+    delayInput.connect(this.delay).connect(this.delayTone).connect(createReturn("delay"));
+    this.delayTone.connect(this.delayFeedback).connect(this.delay);
+
+    const compressorInput = this.context.createGain();
+    this.parallelCompressor = this.context.createDynamicsCompressor();
+    compressorInput.connect(this.parallelCompressor).connect(createReturn("compressor"));
+
+    const inputs: Record<EffectId, GainNode> = {
+      distortion: distortionInput,
+      reverb: reverbInput,
+      delay: delayInput,
+      compressor: compressorInput,
+    };
+    for (const { id } of VOICE_DEFS) {
+      const bus = this.busses.get(id)!;
+      for (const effect of EFFECT_IDS) {
+        const send = this.context.createGain();
+        send.gain.value = 0;
+        bus.connect(send).connect(inputs[effect]);
+        this.sendGains.set(`${id}:${effect}`, send);
+      }
+    }
+  }
+
+  private createReverbImpulse(duration: number): AudioBuffer {
+    const length = Math.floor(this.context!.sampleRate * duration);
+    const impulse = this.context!.createBuffer(2, length, this.context!.sampleRate);
+    for (let channel = 0; channel < 2; channel += 1) {
+      const data = impulse.getChannelData(channel);
+      for (let index = 0; index < length; index += 1) {
+        const envelope = (1 - index / length) ** 2.6;
+        data[index] = (Math.random() * 2 - 1) * envelope;
+      }
+    }
+    return impulse;
+  }
+
+  private applyEffects(): void {
+    if (!this.context) return;
+    const effects = this.getPatch().effects;
+    if (effects === this.appliedEffects) return;
+    this.appliedEffects = effects;
+    const now = this.context.currentTime;
+    const smooth = (parameter: AudioParam | undefined, next: number, timeConstant = 0.015) => {
+      parameter?.setTargetAtTime(next, now, timeConstant);
+    };
+    for (const { id } of VOICE_DEFS) {
+      for (const effect of EFFECT_IDS) {
+        const send = this.sendGains.get(`${id}:${effect}`);
+        smooth(send?.gain, effects[effect].enabled ? effectGain(effects.sends[id][effect]) : 0);
+      }
+    }
+    for (const effect of EFFECT_IDS) {
+      smooth(this.effectReturns.get(effect)?.gain, effects[effect].enabled ? effectGain(effects[effect].return) : 0);
+    }
+
+    if (this.distortion && effects.distortion.drive !== this.distortionDrive) {
+      this.distortionDrive = effects.distortion.drive;
+      const amount = 1 + effects.distortion.drive * 4;
+      const curve = new Float32Array(2048);
+      for (let index = 0; index < curve.length; index += 1) {
+        const input = index * 2 / (curve.length - 1) - 1;
+        curve[index] = Math.tanh(input * amount) / Math.tanh(amount);
+      }
+      this.distortion.curve = curve;
+    }
+    smooth(this.distortionTone?.frequency, effects.distortion.tone);
+    smooth(this.reverbDamping?.frequency, effects.reverb.damping);
+    smooth(this.delay?.delayTime, effects.delay.time / 1000);
+    smooth(this.delayFeedback?.gain, effects.delay.feedback / 100);
+    smooth(this.delayTone?.frequency, effects.delay.tone);
+    smooth(this.parallelCompressor?.threshold, effects.compressor.threshold);
+    smooth(this.parallelCompressor?.ratio, effects.compressor.ratio);
+    smooth(this.parallelCompressor?.attack, effects.compressor.attack / 1000);
+    smooth(this.parallelCompressor?.release, effects.compressor.release / 1000);
   }
 
   private resetRuntime(): void {
