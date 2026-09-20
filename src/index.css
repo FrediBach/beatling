@@ -1,0 +1,109 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap");
+@import "tailwindcss";
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-sheet: var(--sheet);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-rule: var(--rule);
+  --color-rule-soft: var(--rule-soft);
+  --color-signal: var(--signal);
+  --color-hot: var(--hot);
+  --font-sans: "Inter Tight", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+:root {
+  --paper: #f2f1eb;
+  --sheet: #faf9f4;
+  --ink: #14150f;
+  --muted: #6a6858;
+  --rule: #d3d0c1;
+  --rule-soft: #e3e0d4;
+  --signal: #1730d8;
+  --hot: #c4321c;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --paper: #0f110d;
+  --sheet: #171a15;
+  --ink: #eeecdf;
+  --muted: #8f8e7e;
+  --rule: #2b2f26;
+  --rule-soft: #232720;
+  --signal: #6f8cff;
+  --hot: #ff6b4d;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { background: var(--paper); }
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.35;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+::selection { background: color-mix(in srgb, var(--signal) 24%, transparent); }
+
+kbd {
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  padding: 0 4px;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 10px;
+}
+
+.control {
+  width: 100%;
+  border: 1px solid var(--rule);
+  border-radius: 2px;
+  background: var(--paper);
+  padding: 3px 4px;
+  font-size: 11px;
+}
+
+.range {
+  height: 14px;
+  width: 100%;
+  margin: 0;
+  appearance: none;
+  background: transparent;
+}
+.range::-webkit-slider-runnable-track { height: 2px; background: var(--rule); }
+.range::-moz-range-track { height: 2px; background: var(--rule); }
+.range::-webkit-slider-thumb {
+  width: 8px;
+  height: 14px;
+  margin-top: -6px;
+  appearance: none;
+  border: 0;
+  border-radius: 1px;
+  background: var(--ink);
+}
+.range::-moz-range-thumb {
+  width: 8px;
+  height: 14px;
+  border: 0;
+  border-radius: 1px;
+  background: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
