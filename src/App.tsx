@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type SetStateAction } from "react";
-import { Dices, Download, ArrowUpRight, Cable, Eraser, Lock, LockOpen, Moon, Play, RotateCcw, Square, Sun } from "lucide-react";
+import { Dices, Download, ArrowUpRight, Cable, Eraser, Lock, LockOpen, Moon, Play, Redo2, RotateCcw, Square, Sun, Undo2, Volume2, VolumeX } from "lucide-react";
 import { SequencerEngine } from "@/audio/engine";
 import { ExportDialog } from "@/components/export-dialog";
 import { PatchPanel } from "@/components/patch-panel";
@@ -7,7 +7,7 @@ import { connectionsFor } from "@/lib/routing";
 import { SequencerCard } from "@/components/sequencer-card";
 import { Button } from "@/components/ui/button";
 import { VoiceBank } from "@/components/voice-bank";
-import { RATE_OPTIONS } from "@/lib/constants";
+import { RATE_OPTIONS, VOICE_DEFS } from "@/lib/constants";
 import { effectiveBlock, volumeGain } from "@/lib/euclid";
 import { createDemoPatch, createEmptyPatch, createRandomizationLocks, loadStoredPatch, randomizeBlock, randomizeBlockParameter, savePatch, shufflePatch } from "@/lib/patch";
 import { createPresetPatch, PRESET_GROUPS } from "@/lib/presets";
@@ -33,12 +33,18 @@ export default function App() {
     return { initialPatch, source, engine: new SequencerEngine(() => source.patch) };
   });
   const { engine } = model;
-  const [patch, setPatchState] = useState<Patch>(model.initialPatch);
+  const [history, setHistory] = useState(() => ({ past: [] as Patch[], present: model.initialPatch, future: [] as Patch[] }));
+  const patch = history.present;
   const setPatch = useCallback((action: SetStateAction<Patch>) => {
-    setPatchState((current) => {
-      const next = typeof action === "function" ? action(current) : action;
+    setHistory((current) => {
+      const next = typeof action === "function" ? action(current.present) : action;
+      if (next === current.present) return current;
       model.source.patch = next;
-      return next;
+      return {
+        past: [...current.past, current.present].slice(-100),
+        present: next,
+        future: [],
+      };
     });
   }, [model]);
   const [snapshot, setSnapshot] = useState(() => emptySnapshot(patch));
@@ -59,6 +65,10 @@ export default function App() {
     const timeout = window.setTimeout(() => savePatch(patch), 250);
     return () => window.clearTimeout(timeout);
   }, [patch]);
+
+  useEffect(() => {
+    engine.setVolume(patch.vol);
+  }, [engine, patch.vol]);
 
   useEffect(() => {
     let animationFrame = 0;
@@ -82,26 +92,64 @@ export default function App() {
     }
   }, [engine]);
 
+  const undo = useCallback(() => {
+    setHistory((current) => {
+      const previous = current.past.at(-1);
+      if (!previous) return current;
+      model.source.patch = previous;
+      return {
+        past: current.past.slice(0, -1),
+        present: previous,
+        future: [current.present, ...current.future].slice(0, 100),
+      };
+    });
+  }, [model]);
+
+  const redo = useCallback(() => {
+    setHistory((current) => {
+      const next = current.future[0];
+      if (!next) return current;
+      model.source.patch = next;
+      return {
+        past: [...current.past, current.present].slice(-100),
+        present: next,
+        future: current.future.slice(1),
+      };
+    });
+  }, [model]);
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null;
+      const editable = target && (["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable);
+      const modifier = event.metaKey || event.ctrlKey;
+      const key = event.key.toLowerCase();
+      if (!editable && modifier && !event.altKey && ((key === "z" && event.shiftKey) || key === "y")) {
+        event.preventDefault();
+        redo();
+        return;
+      }
+      if (!editable && modifier && !event.altKey && key === "z") {
+        event.preventDefault();
+        undo();
+        return;
+      }
       if (event.key === "Escape" && openPatch !== null) {
         document.querySelector<HTMLButtonElement>(`[aria-label="Patch block ${String(openPatch + 1).padStart(2, "0")}"]`)?.focus();
         setOpenPatch(null);
         return;
       }
       if (event.code !== "Space") return;
-      const target = event.target as HTMLElement | null;
       if (target && ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(target.tagName)) return;
       event.preventDefault();
       void togglePlayback();
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [togglePlayback, openPatch]);
+  }, [togglePlayback, openPatch, redo, undo]);
 
   const updateGlobal = <K extends keyof Pick<Patch, "bpm" | "rate" | "swing" | "vol">>(key: K, value: Patch[K]) => {
     setPatch((current) => ({ ...current, [key]: value }));
-    if (key === "vol") engine.setVolume(value);
   };
 
   const updateBlock = (index: number, block: SequencerBlock) => {
@@ -124,6 +172,13 @@ export default function App() {
     setPatch((current) => ({ ...current, voices: { ...current.voices, [id]: voice } }));
   };
 
+  const setAllVoicesMuted = (muted: boolean) => {
+    setPatch((current) => ({
+      ...current,
+      voices: Object.fromEntries(VOICE_DEFS.map(({ id }) => [id, { ...current.voices[id], mute: muted }])) as Patch["voices"],
+    }));
+  };
+
   const applyPatch = (next: Patch) => {
     engine.reset();
     setPatch(next);
@@ -143,6 +198,7 @@ export default function App() {
 
   const connections = connectionsFor(patch.blocks);
   const allSettingsLocked = randomizationLocks.every((blockLocks) => Object.values(blockLocks).every(Boolean));
+  const allVoicesMuted = Object.values(patch.voices).every((voice) => voice.mute);
 
   return (
     <div className="instrument">
@@ -151,6 +207,10 @@ export default function App() {
         <span className="model-label">EG–16 <span>/</span> 808 + 909</span>
         <div className="header-actions">
           <span className={cn("transport-status", playing && "running")}><i />{playing ? "Running" : "Standby"}</span>
+          <div className="history-actions" aria-label="Edit history">
+            <button className="icon-button" onClick={undo} disabled={history.past.length === 0} aria-label="Undo last change" title="Undo · ⌘/Ctrl Z"><Undo2 size={15} /></button>
+            <button className="icon-button" onClick={redo} disabled={history.future.length === 0} aria-label="Redo last change" title="Redo · ⇧⌘/Ctrl Z"><Redo2 size={15} /></button>
+          </div>
           <a href="https://www.luading.dev/" target="_blank" rel="noreferrer">Luading <ArrowUpRight size={12} /></a>
           <button className="icon-button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label={`Use ${theme === "dark" ? "light" : "dark"} theme`}>{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}</button>
         </div>
@@ -190,7 +250,7 @@ export default function App() {
           <div className="grid-legend"><span><i className="legend-dot" /> Hit <i className="legend-dot hollow" /> Rest <i className="legend-dot accent" /> Playhead</span><span><Cable size={12} />{connections.length} block connections · Select Patch to trace a signal</span></div>
         </section>
         <aside className={cn("side-panel", openPatch !== null && "patch-visible")}>
-          {openPatch !== null ? <PatchPanel index={openPatch} blocks={patch.blocks} onChange={(next) => updateBlock(openPatch, next)} onSelect={setOpenPatch} onClose={() => setOpenPatch(null)} /> : <><div className="section-heading"><h2>Voice bank</h2><span className="section-meta">12 voices</span></div><VoiceBank voices={patch.voices} activeVoices={snapshot.activeVoices} onChange={updateVoice} /><div className="voice-bank-note"><span className="jack" />808 / 909 · Select a model to switch</div></>}
+          {openPatch !== null ? <PatchPanel index={openPatch} blocks={patch.blocks} onChange={(next) => updateBlock(openPatch, next)} onSelect={setOpenPatch} onClose={() => setOpenPatch(null)} /> : <><div className="section-heading voice-bank-heading"><div><h2>Voice bank</h2><span className="section-meta">12 voices</span></div><button className="voice-bank-master" aria-pressed={allVoicesMuted} onClick={() => setAllVoicesMuted(!allVoicesMuted)}>{allVoicesMuted ? <Volume2 size={12} /> : <VolumeX size={12} />}{allVoicesMuted ? "Unmute all" : "Mute all"}</button></div><VoiceBank voices={patch.voices} activeVoices={snapshot.activeVoices} onChange={updateVoice} /><div className="voice-bank-note"><span className="jack" />808 / 909 · Select a model to switch</div></>}
         </aside>
       </main>
       <footer className="instrument-footer"><span><kbd>space</kbd> play / stop</span><span><kbd>↑</kbd> <kbd>↓</kbd> or drag to adjust · <kbd>shift</kbd> for larger steps</span><span className="footer-signoff">RHYTHM, BY DESIGN. <span>EG–16</span></span></footer>

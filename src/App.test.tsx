@@ -39,6 +39,34 @@ describe("application shell", () => {
     expect(screen.getByRole("button", { name: "Unlock all" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("button", { name: "Shuffle" })).toBeDisabled();
   });
+
+  it("undoes and redoes edits from controls and keyboard shortcuts", () => {
+    vi.spyOn(window.localStorage.__proto__, "getItem").mockReturnValue(null);
+    render(<App />);
+    const undoButton = screen.getByRole("button", { name: "Undo last change" });
+    const redoButton = screen.getByRole("button", { name: "Redo last change" });
+    expect(undoButton).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Mute block 01" }));
+    expect(undoButton).toBeEnabled();
+    fireEvent.click(undoButton);
+    expect(screen.getByRole("button", { name: "Mute block 01" })).toBeInTheDocument();
+    expect(redoButton).toBeEnabled();
+    fireEvent.keyDown(document, { key: "y", ctrlKey: true });
+    expect(screen.getByRole("button", { name: "Unmute block 01" })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "z", ctrlKey: true });
+    expect(screen.getByRole("button", { name: "Mute block 01" })).toBeInTheDocument();
+  });
+
+  it("mutes and unmutes the whole voice bank as one undoable change", () => {
+    vi.spyOn(window.localStorage.__proto__, "getItem").mockReturnValue(null);
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Mute all" }));
+    expect(screen.getAllByRole("button", { name: /Unmute .+ voice/ })).toHaveLength(12);
+    fireEvent.click(screen.getByRole("button", { name: "Undo last change" }));
+    expect(screen.getAllByRole("button", { name: /Mute .+ voice/ })).toHaveLength(12);
+    fireEvent.click(screen.getByRole("button", { name: "Redo last change" }));
+    expect(screen.getByRole("button", { name: "Unmute all" })).toHaveAttribute("aria-pressed", "true");
+  });
 });
 
 describe("patch bay", () => {
