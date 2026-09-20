@@ -1,0 +1,16 @@
+{
+  "name": "Beatling — Euclidean rhythm instrument",
+  "short_name": "Beatling",
+  "description": "A 16-block Euclidean drum sequencer with 808/909-inspired Web Audio voices.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#eeede7",
+  "theme_color": "#eeede7",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
