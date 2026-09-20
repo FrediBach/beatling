@@ -10,18 +10,18 @@ interface VoiceBankProps {
 
 export function VoiceBank({ voices, activeVoices, onChange }: VoiceBankProps) {
   return (
-    <div>
+    <div className="voice-bank">
       {VOICE_DEFS.map((definition) => {
         const voice = voices[definition.id];
         const update = <K extends keyof VoiceState>(key: K, value: VoiceState[K]) => onChange(definition.id, { ...voice, [key]: value });
         return (
-          <section key={definition.id} className={cn("border-b border-rule-soft py-1.5 transition-opacity", voice.mute && "opacity-45")}>
-            <div className="flex items-center gap-1.5">
-              <span className={cn("size-2 rounded-full bg-ink opacity-15 transition-colors", activeVoices[definition.id] && "bg-signal opacity-100")} />
-              <span className="flex-1 text-xs font-medium">{definition.name}</span>
+          <section key={definition.id} className={cn("voice-row", voice.mute && "opacity-45")}>
+            <div className="voice-heading">
+              <span className={cn("voice-led", activeVoices[definition.id] && "active")} />
+              <span className="voice-name">{definition.name}</span>
               <button
                 type="button"
-                className={cn("rounded-sm border px-1 font-mono text-[9px] text-muted", voice.machine === "909" ? "border-ink bg-ink text-paper" : "border-rule")}
+                className={cn("model-button", voice.machine === "909" && "is-909")}
                 onClick={() => update("machine", voice.machine === "808" ? "909" : "808")}
                 aria-label={`Use ${voice.machine === "808" ? "909" : "808"} ${definition.name}`}
               >
@@ -29,15 +29,16 @@ export function VoiceBank({ voices, activeVoices, onChange }: VoiceBankProps) {
               </button>
               <button
                 type="button"
-                className={cn("rounded-sm border border-rule px-1 font-mono text-[9px] text-muted", voice.mute && "border-hot bg-hot text-white")}
+                className={cn("voice-mute")}
+                aria-label={`${voice.mute ? "Unmute" : "Mute"} ${definition.name} voice`}
                 aria-pressed={voice.mute}
                 onClick={() => update("mute", !voice.mute)}
               >M</button>
             </div>
-            <div className="mt-1 grid grid-cols-3 gap-2">
-              <VoiceRange label="Level" min={0} max={100} value={voice.level} onChange={(value) => update("level", value)} />
-              <VoiceRange label="Tune" min={-12} max={12} value={voice.tune} display={voice.tune > 0 ? `+${voice.tune}` : String(voice.tune)} onChange={(value) => update("tune", value)} />
-              <VoiceRange label="Decay" min={0} max={100} value={voice.decay} onChange={(value) => update("decay", value)} />
+            <div className="voice-ranges">
+              <VoiceRange voiceName={definition.name} label="Level" min={0} max={100} value={voice.level} onChange={(value) => update("level", value)} />
+              <VoiceRange voiceName={definition.name} label="Tune" min={-12} max={12} value={voice.tune} display={voice.tune > 0 ? `+${voice.tune}` : String(voice.tune)} onChange={(value) => update("tune", value)} />
+              <VoiceRange voiceName={definition.name} label="Decay" min={0} max={100} value={voice.decay} onChange={(value) => update("decay", value)} />
             </div>
           </section>
         );
@@ -46,11 +47,11 @@ export function VoiceBank({ voices, activeVoices, onChange }: VoiceBankProps) {
   );
 }
 
-function VoiceRange({ label, min, max, value, display = String(value), onChange }: { label: string; min: number; max: number; value: number; display?: string; onChange: (value: number) => void }) {
+function VoiceRange({ voiceName, label, min, max, value, display = String(value), onChange }: { voiceName: string; label: string; min: number; max: number; value: number; display?: string; onChange: (value: number) => void }) {
   return (
     <label className="grid grid-cols-[1fr_auto] items-center gap-x-1 text-[10px] text-muted">
       {label}<output className="font-mono text-ink">{display}</output>
-      <input className="range col-span-2" type="range" min={min} max={max} value={value} onChange={(event) => onChange(Number(event.target.value))} />
+      <input aria-label={`${voiceName} ${label.toLowerCase()}`} className="range col-span-2" type="range" min={min} max={max} value={value} onChange={(event) => onChange(Number(event.target.value))} />
     </label>
   );
 }

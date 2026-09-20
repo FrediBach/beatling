@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState, type SetStateAction } from "react";
-import { Dices, Download, Eraser, Moon, Play, RotateCcw, Square, Sun } from "lucide-react";
+import { Dices, Download, ArrowUpRight, Cable, Eraser, Moon, Play, RotateCcw, Square, Sun } from "lucide-react";
 import { SequencerEngine } from "@/audio/engine";
 import { ExportDialog } from "@/components/export-dialog";
+import { PatchPanel } from "@/components/patch-panel";
+import { connectionsFor } from "@/lib/routing";
 import { SequencerCard } from "@/components/sequencer-card";
 import { Button } from "@/components/ui/button";
 import { VoiceBank } from "@/components/voice-bank";
@@ -79,6 +81,11 @@ export default function App() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && openPatch !== null) {
+        document.querySelector<HTMLButtonElement>(`[aria-label="Patch block ${String(openPatch + 1).padStart(2, "0")}"]`)?.focus();
+        setOpenPatch(null);
+        return;
+      }
       if (event.code !== "Space") return;
       const target = event.target as HTMLElement | null;
       if (target && ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(target.tagName)) return;
@@ -87,7 +94,7 @@ export default function App() {
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [togglePlayback]);
+  }, [togglePlayback, openPatch]);
 
   const updateGlobal = <K extends keyof Pick<Patch, "bpm" | "rate" | "swing" | "vol">>(key: K, value: Patch[K]) => {
     setPatch((current) => ({ ...current, [key]: value }));
@@ -119,115 +126,52 @@ export default function App() {
     return visual;
   };
 
+  const connections = connectionsFor(patch.blocks);
+
   return (
-    <div className="flex min-h-screen flex-col bg-paper text-ink">
-      <header className="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-rule px-4 py-3">
-        <h1 className="text-[17px] font-semibold tracking-tight">Euclidean Grid Sequencer</h1>
-        <p className="text-xs text-muted">16 clocked blocks, three outputs each, patched into an 808/909 drum voice bank.</p>
-        <span className="flex-1" />
-        <a className="border-b border-rule text-xs text-muted hover:border-ink hover:text-ink" href="https://www.luading.dev/" target="_blank" rel="noreferrer">Luading</a>
-        <Button type="button" variant="outline" size="icon" className="size-7" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label={`Use ${theme === "dark" ? "light" : "dark"} theme`}>
-          {theme === "dark" ? <Sun className="size-3.5" /> : <Moon className="size-3.5" />}
-        </Button>
+    <div className="instrument">
+      <header className="instrument-header">
+        <div className="brand"><span className="brand-mark" aria-hidden="true"><i /><i /><i /><i /></span><h1>beatling<span>Euclidean rhythm instrument</span></h1></div>
+        <span className="model-label">EG–16 <span>/</span> 808 + 909</span>
+        <div className="header-actions">
+          <span className={cn("transport-status", playing && "running")}><i />{playing ? "Running" : "Standby"}</span>
+          <a href="https://www.luading.dev/" target="_blank" rel="noreferrer">Luading <ArrowUpRight size={12} /></a>
+          <button className="icon-button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label={`Use ${theme === "dark" ? "light" : "dark"} theme`}>{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}</button>
+        </div>
       </header>
 
-      <main className="grid flex-1 grid-cols-[214px_minmax(0,1fr)_258px] max-[1180px]:grid-cols-1">
-        <aside className="flex flex-col gap-4 border-r border-rule p-3.5 max-[1180px]:grid max-[1180px]:grid-cols-[repeat(auto-fit,minmax(170px,1fr))] max-[1180px]:items-start max-[1180px]:gap-x-5 max-[1180px]:border-b max-[1180px]:border-r-0">
-          <ControlSection title="Transport">
-            <div className="flex gap-1.5">
-              <Button type="button" className={cn("flex-1", playing && "border-signal bg-signal text-white")} onClick={() => void togglePlayback()}>
-                {playing ? <Square className="size-3" fill="currentColor" /> : <Play className="size-3" fill="currentColor" />}
-                {playing ? "Stop" : "Play"}
-              </Button>
-              <Button type="button" variant="outline" onClick={() => engine.reset()} title="Reset every block to step 1"><RotateCcw className="size-3.5" />Reset</Button>
-            </div>
-          </ControlSection>
+      <section className="transport-bar" aria-label="Transport and global controls">
+        <div className="play-controls"><button aria-label={playing ? "Stop" : "Play"} className={cn("play-button", playing && "playing")} onClick={() => void togglePlayback()}>{playing ? <Square size={15} fill="currentColor" /> : <Play size={15} fill="currentColor" />}{playing ? "Stop" : "Play"}<kbd>space</kbd></button><button className="reset-button" onClick={() => engine.reset()} aria-label="Reset all blocks" title="Reset every block to step 1"><RotateCcw size={16} /></button></div>
+        <div className="tempo-section"><span className="eyebrow">Tempo</span><TempoControl value={patch.bpm} onChange={(value) => updateGlobal("bpm", value)} /></div>
+        <div className="clock-section"><span className="eyebrow">Clock division</span><div className="rate-options">{RATE_OPTIONS.map((option) => <button key={option.value} aria-pressed={patch.rate === option.value} onClick={() => updateGlobal("rate", option.value)}>{option.label}</button>)}</div></div>
+        <div className="global-range"><LabeledRange label="Swing" min={0} max={70} value={patch.swing} display={`${patch.swing}%`} onChange={(value) => updateGlobal("swing", value)} /></div>
+        <div className="global-range master-range"><LabeledRange label="Master" min={0} max={100} value={patch.vol} display={`${patch.vol === 0 ? "−∞" : Math.round(20 * Math.log10(volumeGain(patch.vol)))} dB`} onChange={(value) => updateGlobal("vol", value)} /></div>
+        <div className="session-actions"><Button variant="outline" onClick={() => applyPatch(createDemoPatch(patch.vol))}>Load demo</Button><Button variant="outline" onClick={() => setExportOpen(true)}><Download size={13} />Export</Button></div>
+      </section>
 
-          <ControlSection title="Tempo">
-            <TempoControl value={patch.bpm} onChange={(value) => updateGlobal("bpm", value)} />
-          </ControlSection>
-
-          <ControlSection title="Global clock">
-            <div className="flex overflow-hidden rounded-sm border border-rule">
-              {RATE_OPTIONS.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  className={cn("flex-1 border-r border-rule bg-sheet py-1 font-mono text-[10px] text-muted last:border-r-0", patch.rate === option.value && "bg-ink text-paper")}
-                  aria-pressed={patch.rate === option.value}
-                  onClick={() => updateGlobal("rate", option.value)}
-                >{option.label}</button>
-              ))}
-            </div>
-            <LabeledRange label="Swing" min={0} max={70} value={patch.swing} display={`${patch.swing}%`} onChange={(value) => updateGlobal("swing", value)} />
-          </ControlSection>
-
-          <ControlSection title="Mix">
-            <LabeledRange
-              label="Master"
-              min={0}
-              max={100}
-              value={patch.vol}
-              display={`${patch.vol === 0 ? "-inf" : Math.round(20 * Math.log10(volumeGain(patch.vol)))} dB`}
-              onChange={(value) => updateGlobal("vol", value)}
-            />
-          </ControlSection>
-
-          <div className="h-px bg-rule-soft max-[1180px]:hidden" />
-
-          <ControlSection title="Patch">
-            <div className="flex flex-col gap-1.5">
-              <RailButton label="Load demo" hint="16 blocks" onClick={() => applyPatch(createDemoPatch(patch.vol))} />
-              <RailButton label="Shuffle patterns" hint="keeps routing" icon={<Dices className="size-3" />} onClick={() => applyPatch(shufflePatch(patch))} />
-              <RailButton label="Clear all" hint="start empty" icon={<Eraser className="size-3" />} onClick={() => applyPatch(createEmptyPatch(patch.vol))} />
-              <RailButton label="Export" hint=".lua / .json" icon={<Download className="size-3" />} onClick={() => setExportOpen(true)} />
-            </div>
-          </ControlSection>
-        </aside>
-
-        <section className="min-w-0 p-3.5" aria-label="Sequencer blocks">
-          <div className="grid grid-cols-4 gap-2.5 max-[1460px]:grid-cols-[repeat(auto-fit,minmax(206px,1fr))]">
-            {patch.blocks.map((block, index) => (
-              <SequencerCard
-                key={index}
-                index={index}
-                block={block}
-                blocks={patch.blocks}
-                visual={visualFor(index)}
-                patchOpen={openPatch === index}
-                onPatchOpen={setOpenPatch}
-                onChange={(next) => updateBlock(index, next)}
-              />
-            ))}
+      <main className="workspace">
+        <section className="sequencer-section" aria-label="Sequencer blocks">
+          <div className="section-heading"><div><h2>Pattern grid</h2><span className="section-meta">16 independent sequences</span></div><div className="grid-actions"><button onClick={() => applyPatch(shufflePatch(patch))} title="Shuffle patterns, preserving routing"><Dices size={13} />Shuffle</button><button onClick={() => applyPatch(createEmptyPatch(patch.vol))}><Eraser size={13} />Clear</button></div></div>
+          <div className="sequencer-grid">
+            {patch.blocks.map((block, index) => <SequencerCard key={index} index={index} block={block} blocks={patch.blocks} visual={visualFor(index)} patchOpen={openPatch === index} related={openPatch !== null && connections.some((connection) => (connection.source === openPatch && connection.target === index) || (connection.target === openPatch && connection.source === index))} onPatchOpen={setOpenPatch} onChange={(next) => updateBlock(index, next)} />)}
           </div>
+          <div className="grid-legend"><span><i className="legend-dot" /> Hit <i className="legend-dot hollow" /> Rest <i className="legend-dot accent" /> Playhead</span><span><Cable size={12} />{connections.length} block connections · Select Patch to trace a signal</span></div>
         </section>
-
-        <aside className="border-l border-rule p-3.5 max-[1180px]:border-l-0 max-[1180px]:border-t">
-          <h2 className="mb-2 text-[11px] font-semibold text-muted">Drum voices</h2>
-          <VoiceBank voices={patch.voices} activeVoices={snapshot.activeVoices} onChange={updateVoice} />
+        <aside className={cn("side-panel", openPatch !== null && "patch-visible")}>
+          {openPatch !== null ? <PatchPanel index={openPatch} blocks={patch.blocks} onChange={(next) => updateBlock(openPatch, next)} onSelect={setOpenPatch} onClose={() => setOpenPatch(null)} /> : <><div className="section-heading"><h2>Voice bank</h2><span className="section-meta">12 voices</span></div><VoiceBank voices={patch.voices} activeVoices={snapshot.activeVoices} onChange={updateVoice} /><div className="voice-bank-note"><span className="jack" />808 / 909 · Select a model to switch</div></>}
         </aside>
       </main>
-
-      <footer className="flex flex-wrap gap-4 border-t border-rule px-4 py-2.5 text-[11px] text-muted">
-        <span><kbd>space</kbd> play / stop</span>
-        <span>Drag a parameter row up or down to change it</span>
-        <span>Clock, reset, mute and modulation inputs live under <kbd>patch</kbd></span>
-      </footer>
-
+      <footer className="instrument-footer"><span><kbd>space</kbd> play / stop</span><span><kbd>↑</kbd> <kbd>↓</kbd> or drag to adjust · <kbd>shift</kbd> for larger steps</span><span className="footer-signoff">RHYTHM, BY DESIGN. <span>EG–16</span></span></footer>
       {exportOpen && <ExportDialog open onOpenChange={setExportOpen} patch={patch} onLoad={applyPatch} />}
     </div>
   );
-}
-
-function ControlSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return <section><h2 className="mb-2 text-[11px] font-semibold text-muted">{title}</h2>{children}</section>;
 }
 
 function TempoControl({ value, onChange }: { value: number; onChange: (value: number) => void }) {
   const clampedChange = (next: number) => onChange(Math.min(300, Math.max(20, Math.round(next))));
   const drag = useDragNumber({ value, onChange: clampedChange, sensitivity: 4 });
   return (
-    <div className="flex touch-none cursor-ns-resize items-end gap-1.5 rounded-sm border border-rule bg-sheet px-2.5 py-1.5" {...drag}>
+    <div className="tempo-control" {...drag}>
       <input
         className="min-w-0 flex-1 bg-transparent font-mono text-[29px] leading-none tracking-[-.04em] tabular-nums outline-none"
         type="text"
@@ -247,18 +191,9 @@ function TempoControl({ value, onChange }: { value: number; onChange: (value: nu
 
 function LabeledRange({ label, min, max, value, display, onChange }: { label: string; min: number; max: number; value: number; display: string; onChange: (value: number) => void }) {
   return (
-    <label className="mt-2 grid grid-cols-[1fr_auto] items-center gap-x-2 text-[11px] text-muted">
+    <label className="labeled-range">
       {label}<output className="font-mono text-ink">{display}</output>
       <input className="range col-span-2" type="range" min={min} max={max} value={value} onChange={(event) => onChange(Number(event.target.value))} />
     </label>
-  );
-}
-
-function RailButton({ label, hint, icon, onClick }: { label: string; hint: string; icon?: React.ReactNode; onClick: () => void }) {
-  return (
-    <Button type="button" variant="outline" className="w-full justify-between px-2.5" onClick={onClick}>
-      <span className="inline-flex items-center gap-1.5">{icon}{label}</span>
-      <span className="font-mono text-[9px] font-normal text-muted">{hint}</span>
-    </Button>
   );
 }

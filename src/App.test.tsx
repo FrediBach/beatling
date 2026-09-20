@@ -1,6 +1,8 @@
-import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "@/App";
+
+afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe("application shell", () => {
   it("renders all sequencer blocks and keeps primary controls interactive", () => {
@@ -12,5 +14,23 @@ describe("application shell", () => {
     expect(screen.getByRole("button", { name: /unmute block 01/i })).toHaveAttribute("aria-pressed", "true");
     fireEvent.click(screen.getByRole("button", { name: "Patch block 01" }));
     expect(screen.getByText("Clock in — sources add up")).toBeInTheDocument();
+  });
+});
+
+describe("patch bay", () => {
+  it("highlights connected blocks, edits routing and follows a connection", () => {
+    vi.spyOn(window.localStorage.__proto__, "getItem").mockReturnValue(null);
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Patch block 03" }));
+    expect(screen.getByTestId("block-13")).toHaveClass("is-related");
+    expect(screen.getByLabelText("Modulation source")).toHaveValue("12");
+    fireEvent.change(screen.getByLabelText("Modulation source"), { target: { value: "13" } });
+    expect(screen.getByTestId("block-14")).toHaveClass("is-related");
+    expect(screen.getByTestId("block-13")).not.toHaveClass("is-related");
+    fireEvent.click(screen.getByRole("button", { name: "Block 14 LFO to block 03 chance" }));
+    expect(screen.getByRole("region", { name: "Routing for block 14" })).toBeInTheDocument();
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("region", { name: /Routing for block/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Patch block 14" })).toHaveFocus();
   });
 });
