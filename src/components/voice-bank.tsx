@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { Settings2 } from "lucide-react";
 import { VOICE_DEFS } from "@/lib/constants";
 import { VoiceEditorDialog } from "@/components/voice-editor-dialog";
@@ -73,10 +73,11 @@ export function VoiceBank({ voices, activeVoices, onChange, changedFields = {} }
 }
 
 function VoiceRange({ voiceName, label, min, max, value, display = String(value), changed = false, onChange }: { voiceName: string; label: string; min: number; max: number; value: number; display?: string; changed?: boolean; onChange: (value: number) => void }) {
+  const inputId = useId();
   return (
-    <label className={cn("grid grid-cols-[1fr_auto] items-center gap-x-1 text-[10px] text-muted", changed && "variation-changed")}>
-      {label}<output className="font-mono text-ink">{display}</output>
-      <input aria-label={`${voiceName} ${label.toLowerCase()}`} className="range col-span-2" type="range" min={min} max={max} value={value} onChange={(event) => onChange(Number(event.target.value))} />
-    </label>
+    <div className={cn("voice-range grid grid-cols-[1fr_auto] items-center gap-x-1 text-[10px] text-muted", changed && "variation-changed")}>
+      <label htmlFor={inputId}>{label}</label><output className="font-mono text-ink">{display}</output>
+      <input id={inputId} aria-label={`${voiceName} ${label.toLowerCase()}`} className="range col-span-2" type="range" min={min} max={max} value={value} onChange={(event) => onChange(Number(event.target.value))} />
+    </div>
   );
 }

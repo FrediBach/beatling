@@ -267,7 +267,7 @@ button { transition: background-color 120ms, color 120ms, border-color 120ms; }
 .routing-strip.variation-changed { color: var(--signal); background: color-mix(in srgb,var(--signal) 8%,var(--sheet)); }
 .voice-row.has-variation-change { background: linear-gradient(90deg,color-mix(in srgb,var(--signal) 8%,transparent),transparent 72%); }
 .model-button.variation-changed, .voice-mute.variation-changed { border-color: var(--signal); box-shadow: 0 0 0 1px color-mix(in srgb,var(--signal) 25%,transparent); }
-.voice-ranges label.variation-changed, .voice-ranges label.variation-changed output { color: var(--signal); }
+.voice-ranges .voice-range.variation-changed, .voice-ranges .voice-range.variation-changed output { color: var(--signal); }
 
 @media (max-width:1200px) {
   .variation-toolbar { padding: 0; }

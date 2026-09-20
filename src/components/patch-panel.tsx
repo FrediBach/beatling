@@ -8,6 +8,7 @@ export function PatchPanel({ index, blocks, onChange, onSelect, onClose, embedde
   const block = blocks[index];
   const update = <K extends keyof SequencerBlock>(key: K, value: SequencerBlock[K]) => onChange({ ...block, [key]: value });
   const connections = connectionsFor(blocks).filter((connection) => connection.source === index || connection.target === index);
+  const clockSources = new Set<ClockSource>(block.clk);
   return <section className="patch-panel" aria-label={`Routing for block ${padBlock(index)}`}>
     {!embedded && <div className="panel-heading"><div><span className="eyebrow">Patch bay / {padBlock(index)}</span><h2>{voiceName(block.voice) || "Modulator"}</h2></div><button className="icon-button" aria-label="Close patch bay" onClick={onClose}><X size={16} /></button></div>}
     <div className="patch-target"><span className="jack" /><span>Editing inputs to block <b>{padBlock(index)}</b></span></div>
@@ -15,13 +16,13 @@ export function PatchPanel({ index, blocks, onChange, onSelect, onClose, embedde
           <div>
             <p className="mb-1 text-[10px] text-muted">Clock in — sources add up</p>
             <div className="clock-chips">
-              <ClockChip label="G" title="Global clock" active={block.clk.includes("G")} onClick={() => toggleClock("G", block, onChange)} />
+              <ClockChip label="G" title="Global clock" active={clockSources.has("G")} onClick={() => toggleClock("G", block, onChange)} />
               {blocks.map((_other, sourceIndex) => sourceIndex !== index && (
                 <ClockChip
                   key={sourceIndex}
                   label={padBlock(sourceIndex)}
                   title={`Trigger out of block ${padBlock(sourceIndex)}`}
-                  active={block.clk.includes(String(sourceIndex) as ClockSource)}
+                  active={clockSources.has(String(sourceIndex) as ClockSource)}
                   onClick={() => toggleClock(String(sourceIndex) as ClockSource, block, onChange)}
                 />
               ))}

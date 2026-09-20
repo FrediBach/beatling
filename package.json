@@ -8,7 +8,9 @@
     "build": "tsc -b && vite build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "doctor": "react-doctor . --verbose --no-supply-chain",
+    "quality": "npm run lint && npm test && npm run build && npm run doctor"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "latest",
@@ -35,6 +37,7 @@
     "eslint-plugin-react-refresh": "latest",
     "globals": "latest",
     "jsdom": "latest",
+    "react-doctor": "^0.9.14",
     "tailwindcss": "latest",
     "typescript": "latest",
     "typescript-eslint": "latest",

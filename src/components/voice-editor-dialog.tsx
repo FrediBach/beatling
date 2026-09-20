@@ -63,7 +63,7 @@ function VoiceParameter({ voiceName, definition, value, onChange }: {
 }) {
   const clamp = (next: number) => Math.min(definition.max, Math.max(definition.min, next));
   return (
-    <label className="voice-editor-control">
+    <div className="voice-editor-control">
       <span>{definition.label}<small>{definition.description}</small></span>
       <div>
         <input
@@ -85,13 +85,13 @@ function VoiceParameter({ voiceName, definition, value, onChange }: {
             value={value}
             aria-label={`${voiceName} ${definition.label} value`}
             onChange={(event) => {
-              const next = Number(event.target.value);
+              const next = event.currentTarget.valueAsNumber;
               if (Number.isFinite(next)) onChange(clamp(next));
             }}
           />
           {definition.unit && <i>{definition.unit}</i>}
         </span>
       </div>
-    </label>
+    </div>
   );
 }

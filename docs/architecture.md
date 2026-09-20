@@ -1,0 +1,105 @@
+# Beatling architecture
+
+## System overview
+
+Beatling is a browser-only Euclidean drum instrument. It is a React and TypeScript single-page application built with Vite. There is no application server: patches and arrangements are stored in browser `localStorage`, Web Audio produces sound locally, and export/import happens in the client.
+
+```text
+User input
+    │
+    ▼
+React UI (`src/components`, composed by `src/App.tsx`)
+    │ typed intents                         ▲ render snapshots
+    ├───────────────► Patch/arrangement state ───────────────┐
+    │                         │                               │
+    │                         ├──► localStorage               │
+    │                         └──► export/import              │
+    │                                                         │
+    └────────────────────────► SequencerEngine ────────────────┘
+                                  │
+                                  ▼
+                              Web Audio API
+
+Pure domain modules in `src/lib` support both the UI and audio engine.
+```
+
+## Runtime entry points
+
+- `index.html` provides the Vite page and React mount node.
+- `src/main.tsx` mounts `App` under `StrictMode` and imports global styles.
+- `src/App.tsx` is the composition root and current owner of session, arrangement, selection, history, theme, and engine coordination.
+- `src/audio/engine.ts` is the imperative audio runtime. It schedules clock pulses ahead of playback time, synthesizes voices, and exposes display snapshots to React.
+- `Euclidean Grid Sequencer.html` is a preserved pre-React prototype. It is not imported by the application, included in the production module graph, or a target for new development.
+
+## Module responsibilities
+
+| Area | Responsibility | Constraints |
+| --- | --- | --- |
+| `src/lib/types.ts` | Shared domain contracts and fixed block count | Must remain usable by UI, domain, export, and audio layers |
+| `src/lib/euclid.ts` | Euclidean hit calculation, clamping, modulation, gain conversion | Pure and deterministic |
+| `src/lib/patch.ts` | Patch defaults, normalization, randomization, patch persistence | Normalize untrusted storage/import data at this boundary |
+| `src/lib/variations.ts` | Arrangement defaults, migrations, persistence, change detection | Preserve compatibility with versioned stored formats |
+| `src/lib/routing.ts`, `cables.ts`, `orbit.ts` | Derived routing and visualization data | No React state or side effects |
+| `src/lib/presets.ts`, `voice-config.ts`, `constants.ts` | Curated data and domain configuration | Keep source data separate from rendering |
+| `src/audio/engine.ts` | Clock, routing evaluation, voice synthesis, runtime snapshots | Timing cannot depend on React renders; all loops stay bounded |
+| `src/components/` | Accessible controls and visualizations | Receive data and typed callbacks; no in-place domain mutation |
+| `src/hooks/` | Reusable browser interaction behavior | Own and clean up listeners created by the hook |
+| `src/export/` | Serialization to external formats | Deterministic output with unit coverage |
+
+The small components under `src/components/ui/` wrap reusable Radix primitives or styling variants. Feature components should depend on these primitives rather than reproduce dialog and button mechanics.
+
+## State model and data flow
+
+`Patch` is the playable unit. It contains global transport values, 16 fixed sequencer blocks, and the voice bank. A block's array index is also its routing address, which is why slots have stable positional identities even when their contents change.
+
+`Arrangement` owns:
+
+- variations, each with a complete patch;
+- song parts, which reference variations by ID and define bar counts;
+- the active variation and song part;
+- whether song playback mode is enabled.
+
+`App` keeps declarative state for rendering and mirrors selected values into refs for the engine's long-lived callbacks. Patch edits are immutable and pass through a bounded per-variation undo history. Each accepted patch is sent to `SequencerEngine`, reflected in the active variation, and persisted after a short debounce.
+
+During playback, the engine is authoritative for timing. React requests a lightweight snapshot on each animation frame to draw playheads, firing states, modulation, and active voice LEDs. UI rendering never schedules audio events.
+
+## Persistence and compatibility
+
+Two versioned local-storage records currently exist:
+
+- `egs.patch.v1` for the latest patch;
+- `egs.arrangement.v1` for variations and song structure.
+
+All reads are defensive. `normalizePatch` and `normalizeArrangement` supply defaults, constrain values, and migrate the older variation-repeat representation into song parts. Storage access remains wrapped in `try/catch` because privacy settings and quota failures must degrade to an in-memory session.
+
+Changing either serialized shape requires a new format decision, migration coverage, and backward-compatibility tests. Do not silently reinterpret existing fields.
+
+## Audio lifecycle
+
+`SequencerEngine` exists once per mounted application. The engine delays `AudioContext` creation until playback begins, satisfying browser gesture policies. It uses a short look-ahead scheduler for sound and queues visual events for snapshot consumption. `destroy()` is called when the app unmounts.
+
+Routing can feed block outputs into other block clocks, resets, mutes, and modulation inputs. Queue and per-block guards prevent cyclic patches from producing unbounded work. Any routing change must retain those guards and add focused tests.
+
+## Quality strategy
+
+- ESLint enforces TypeScript, hooks, and refresh-safe module rules.
+- Vitest covers domain logic, export, the audio engine, and user-visible React flows.
+- TypeScript plus the Vite production build checks module boundaries and bundling.
+- React Doctor scans React correctness, accessibility, performance, and maintainability through `npm run doctor`.
+- `npm run quality` runs the complete local gate.
+
+`doctor.config.ts` excludes only the standalone prototype because it is outside the shipped application. Findings in production source should be fixed at their cause rather than hidden in configuration.
+
+## Current pressure points and direction
+
+`App.tsx` still coordinates several distinct workflows and is the largest maintenance risk. New work should gradually extract these seams without changing state semantics:
+
+1. A session hook for patch history, active variation switching, and persistence.
+2. An arrangement hook for song-part selection, ordering, and bar advancement.
+3. Focused header/transport, pattern-toolbar, sequencer-workspace, and inspector components.
+4. A small controller interface between those hooks/components and `SequencerEngine`.
+
+`SequencerCard` is the second pressure point. Its heading, pattern visualization, parameter list, and routing summary can become focused children with explicit props. Prefer these extractions when touching the card instead of extending its conditional JSX.
+
+The migration should remain incremental: preserve current tests, add coverage around each extracted seam, and keep React Doctor's warning count from increasing.
+

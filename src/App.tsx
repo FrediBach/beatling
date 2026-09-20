@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
+import { useCallback, useEffect, useEffectEvent, useId, useMemo, useRef, useState, type SetStateAction } from "react";
 import { Dices, Download, ArrowUpRight, Cable, Eraser, GripVertical, ListMusic, Lock, LockOpen, Minus, Moon, Play, Plus, Redo2, RotateCcw, Square, Sun, Trash2, Undo2, Volume2, VolumeX } from "lucide-react";
 import { SequencerEngine } from "@/audio/engine";
 import { ExportDialog } from "@/components/export-dialog";
@@ -15,7 +15,7 @@ import { effectiveBlock, volumeGain } from "@/lib/euclid";
 import { createDemoPatch, createEmptyPatch, createRandomizationLocks, loadStoredPatch, randomizeBlock, randomizeBlockParameter, savePatch, shufflePatch } from "@/lib/patch";
 import { createPresetArrangement, PRESET_GROUPS } from "@/lib/presets";
 import { changedBlockFields, changedVoiceFields, createArrangement, loadStoredArrangement, MAX_VARIATIONS, saveArrangement, variationHasChanges } from "@/lib/variations";
-import type { Arrangement, BlockParam, BlockRandomizationLocks, BlockVisualState, EngineSnapshot, Patch, SequencerBlock, SongPart, Variation, VoiceId, VoiceState } from "@/lib/types";
+import { BLOCK_COUNT, type Arrangement, type BlockParam, type BlockRandomizationLocks, type BlockVisualState, type EngineSnapshot, type Patch, type SequencerBlock, type SongPart, type Variation, type VoiceId, type VoiceState } from "@/lib/types";
 import { useDragNumber } from "@/hooks/use-drag-number";
 import { cn } from "@/lib/utils";
 
@@ -31,6 +31,13 @@ const emptySnapshot = (patch: Patch): EngineSnapshot => ({
   activeVoices: {},
 });
 
+const BLOCK_SLOTS = Array.from({ length: BLOCK_COUNT }, (_, index) => ({
+  index,
+  key: `block-${index + 1}`,
+}));
+
+type PatchHistory = { past: Patch[]; present: Patch; future: Patch[] };
+
 export default function App() {
   const [initialSetup] = useState(() => {
     const storedPatch = loadStoredPatch() ?? createDemoPatch();
@@ -39,8 +46,7 @@ export default function App() {
     return { initialPatch, initialArrangement };
   });
   const [engine] = useState(() => new SequencerEngine(initialSetup.initialPatch));
-  type PatchHistory = { past: Patch[]; present: Patch; future: Patch[] };
-  const initialHistory: PatchHistory = { past: [], present: initialSetup.initialPatch, future: [] };
+  const [initialHistory] = useState<PatchHistory>(() => ({ past: [], present: initialSetup.initialPatch, future: [] }));
   const [variations, setVariations] = useState<Variation[]>(initialSetup.initialArrangement.variations);
   const variationsRef = useRef(variations);
   const variationSerialRef = useRef(variations.length + 1);
@@ -54,7 +60,8 @@ export default function App() {
   const [songMode, setSongMode] = useState(initialSetup.initialArrangement.songMode);
   const songModeRef = useRef(songMode);
   const songBarsRef = useRef(0);
-  const historiesRef = useRef(new Map<string, PatchHistory>([[variations[activeVariation].id, initialHistory]]));
+  const [initialHistories] = useState(() => new Map<string, PatchHistory>([[variations[activeVariation].id, initialHistory]]));
+  const historiesRef = useRef(initialHistories);
   const historyRef = useRef(initialHistory);
   const [history, setHistory] = useState(initialHistory);
   const patch = history.present;
@@ -355,35 +362,36 @@ export default function App() {
     storeVariations(variationsRef.current.map((variation, index) => index === activeVariationRef.current ? { ...variation, patch: nextPatch } : variation));
   }, [engine, storeHistory, storeVariations]);
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement | null;
-      const editable = target && (["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable);
-      const modifier = event.metaKey || event.ctrlKey;
-      const key = event.key.toLowerCase();
-      if (!editable && modifier && !event.altKey && ((key === "z" && event.shiftKey) || key === "y")) {
-        event.preventDefault();
-        redo();
-        return;
-      }
-      if (!editable && modifier && !event.altKey && key === "z") {
-        event.preventDefault();
-        undo();
-        return;
-      }
-      if (event.key === "Escape" && openPatch !== null) {
-        document.querySelector<HTMLButtonElement>(`[aria-label="Patch block ${String(openPatch + 1).padStart(2, "0")}"]`)?.focus();
-        setOpenPatch(null);
-        return;
-      }
-      if (event.code !== "Space") return;
-      if (target && ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(target.tagName)) return;
+  const handleDocumentKeyDown = useEffectEvent((event: KeyboardEvent) => {
+    const target = event.target as HTMLElement | null;
+    const editable = target && (["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable);
+    const modifier = event.metaKey || event.ctrlKey;
+    const key = event.key.toLowerCase();
+    if (!editable && modifier && !event.altKey && ((key === "z" && event.shiftKey) || key === "y")) {
       event.preventDefault();
-      void togglePlayback();
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [togglePlayback, openPatch, redo, undo]);
+      redo();
+      return;
+    }
+    if (!editable && modifier && !event.altKey && key === "z") {
+      event.preventDefault();
+      undo();
+      return;
+    }
+    if (event.key === "Escape" && openPatch !== null) {
+      document.querySelector<HTMLButtonElement>(`[aria-label="Patch block ${String(openPatch + 1).padStart(2, "0")}"]`)?.focus();
+      setOpenPatch(null);
+      return;
+    }
+    if (event.code !== "Space") return;
+    if (target && ["INPUT", "TEXTAREA", "SELECT", "BUTTON"].includes(target.tagName)) return;
+    event.preventDefault();
+    void togglePlayback();
+  });
+
+  useEffect(() => {
+    document.addEventListener("keydown", handleDocumentKeyDown);
+    return () => document.removeEventListener("keydown", handleDocumentKeyDown);
+  }, []);
 
   const updateGlobal = <K extends keyof Pick<Patch, "bpm" | "rate" | "swing" | "vol">>(key: K, value: Patch[K]) => {
     setPatch((current) => ({ ...current, [key]: value }));
@@ -482,7 +490,7 @@ export default function App() {
     setOpenPatch(null);
   };
 
-  const renderCard = (index: number, showDial = true) => <SequencerCard key={index} showDial={showDial} index={index} block={patch.blocks[index]} blocks={patch.blocks} visual={visualFor(index)} patchOpen={showDial && openPatch === index} related={showDial && openPatch !== null && connections.some((connection) => (connection.source === openPatch && connection.target === index) || (connection.target === openPatch && connection.source === index))} locks={randomizationLocks[index]} changedFields={blockVariationChanges[index]} onPatchOpen={showDial ? setOpenPatch : () => document.getElementById("circle-routing")?.scrollIntoView({ behavior: "instant", block: "nearest" })} onChange={(next) => updateBlock(index, next)} onRandomize={() => updateBlock(index, randomizeBlock(patch.blocks[index], index, randomizationLocks[index]))} onLockToggle={() => setBlockLocks(index, !Object.values(randomizationLocks[index]).every(Boolean))} onParameterRandomize={(parameter) => updateBlock(index, randomizeBlockParameter(patch.blocks[index], index, parameter))} onParameterLockToggle={(parameter) => toggleParameterLock(index, parameter)} />;
+  const renderCard = (index: number, showDial = true, key?: string) => <SequencerCard key={key} showDial={showDial} index={index} block={patch.blocks[index]} blocks={patch.blocks} visual={visualFor(index)} patchOpen={showDial && openPatch === index} related={showDial && openPatch !== null && connections.some((connection) => (connection.source === openPatch && connection.target === index) || (connection.target === openPatch && connection.source === index))} locks={randomizationLocks[index]} changedFields={blockVariationChanges[index]} onPatchOpen={showDial ? setOpenPatch : () => document.getElementById("circle-routing")?.scrollIntoView({ behavior: "instant", block: "nearest" })} onChange={(next) => updateBlock(index, next)} onRandomize={() => updateBlock(index, randomizeBlock(patch.blocks[index], index, randomizationLocks[index]))} onLockToggle={() => setBlockLocks(index, !Object.values(randomizationLocks[index]).every(Boolean))} onParameterRandomize={(parameter) => updateBlock(index, randomizeBlockParameter(patch.blocks[index], index, parameter))} onParameterLockToggle={(parameter) => toggleParameterLock(index, parameter)} />;
 
   return (
     <div className="instrument">
@@ -598,7 +606,7 @@ export default function App() {
             {showCables && <span className="cable-hint">Hover a block to see through cables</span>}
           </div>
           <div className={cn("sequencer-grid", showCables && "cables-visible")}>
-            {patch.blocks.map((_block, index) => renderCard(index))}
+            {BLOCK_SLOTS.map(({ index, key }) => renderCard(index, true, key))}
             {showCables && <PatchCables connections={connections} />}
           </div>
           </> : <OrbitView blocks={patch.blocks} visuals={patch.blocks.map((_block, index) => visualFor(index))} clockPulse={playing ? snapshot.clockPulse : -1} selected={selectedRhythm} onSelect={selectRhythm} />}
@@ -645,10 +653,11 @@ function TempoControl({ value, onChange }: { value: number; onChange: (value: nu
 }
 
 function LabeledRange({ label, min, max, value, display, onChange }: { label: string; min: number; max: number; value: number; display: string; onChange: (value: number) => void }) {
+  const inputId = useId();
   return (
-    <label className="labeled-range">
-      {label}<output className="font-mono text-ink">{display}</output>
-      <input className="range col-span-2" type="range" min={min} max={max} value={value} onChange={(event) => onChange(Number(event.target.value))} />
-    </label>
+    <div className="labeled-range">
+      <label htmlFor={inputId}>{label}</label><output className="font-mono text-ink">{display}</output>
+      <input id={inputId} className="range col-span-2" type="range" min={min} max={max} value={value} onChange={(event) => onChange(Number(event.target.value))} />
+    </div>
   );
 }
