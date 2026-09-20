@@ -15,6 +15,14 @@ describe("application shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Patch block 01" }));
     expect(screen.getByText("Clock in — sources add up")).toBeInTheDocument();
   });
+
+  it("loads a factory preset from the transport dropdown", () => {
+    vi.spyOn(window.localStorage.__proto__, "getItem").mockReturnValue(null);
+    render(<App />);
+    fireEvent.change(screen.getByLabelText("Drum pattern preset"), { target: { value: "boom-bap" } });
+    expect(screen.getByLabelText("Drum pattern preset")).toHaveValue("boom-bap");
+    expect(screen.getByLabelText("Beats per minute")).toHaveValue("90");
+  });
 });
 
 describe("patch bay", () => {

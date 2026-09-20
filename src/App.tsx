@@ -10,6 +10,7 @@ import { VoiceBank } from "@/components/voice-bank";
 import { RATE_OPTIONS } from "@/lib/constants";
 import { effectiveBlock, volumeGain } from "@/lib/euclid";
 import { createDemoPatch, createEmptyPatch, loadStoredPatch, savePatch, shufflePatch } from "@/lib/patch";
+import { createPresetPatch, PRESET_GROUPS } from "@/lib/presets";
 import type { BlockVisualState, EngineSnapshot, Patch, SequencerBlock, VoiceId, VoiceState } from "@/lib/types";
 import { useDragNumber } from "@/hooks/use-drag-number";
 import { cn } from "@/lib/utils";
@@ -44,6 +45,7 @@ export default function App() {
   const [playing, setPlaying] = useState(false);
   const [openPatch, setOpenPatch] = useState<number | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
+  const [presetId, setPresetId] = useState("");
   const [theme, setTheme] = useState<"light" | "dark">(() =>
     window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light",
   );
@@ -146,7 +148,23 @@ export default function App() {
         <div className="clock-section"><span className="eyebrow">Clock division</span><div className="rate-options">{RATE_OPTIONS.map((option) => <button key={option.value} aria-pressed={patch.rate === option.value} onClick={() => updateGlobal("rate", option.value)}>{option.label}</button>)}</div></div>
         <div className="global-range"><LabeledRange label="Swing" min={0} max={70} value={patch.swing} display={`${patch.swing}%`} onChange={(value) => updateGlobal("swing", value)} /></div>
         <div className="global-range master-range"><LabeledRange label="Master" min={0} max={100} value={patch.vol} display={`${patch.vol === 0 ? "−∞" : Math.round(20 * Math.log10(volumeGain(patch.vol)))} dB`} onChange={(value) => updateGlobal("vol", value)} /></div>
-        <div className="session-actions"><Button variant="outline" onClick={() => applyPatch(createDemoPatch(patch.vol))}>Load demo</Button><Button variant="outline" onClick={() => setExportOpen(true)}><Download size={13} />Export</Button></div>
+        <div className="session-actions">
+          <select
+            className="preset-select"
+            aria-label="Drum pattern preset"
+            value={presetId}
+            onChange={(event) => {
+              const nextPreset = event.target.value;
+              setPresetId(nextPreset);
+              applyPatch(createPresetPatch(nextPreset, patch.vol));
+            }}
+          >
+            <option value="" disabled>Presets</option>
+            {PRESET_GROUPS.map((group) => <optgroup key={group.category} label={group.category}>{group.presets.map((preset) => <option key={preset.id} value={preset.id}>{preset.name}</option>)}</optgroup>)}
+          </select>
+          <Button variant="outline" onClick={() => { setPresetId(""); applyPatch(createDemoPatch(patch.vol)); }}>Load demo</Button>
+          <Button variant="outline" onClick={() => setExportOpen(true)}><Download size={13} />Export</Button>
+        </div>
       </section>
 
       <main className="workspace">

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createDemoPatch, createEmptyPatch, normalizePatch, shufflePatch } from "@/lib/patch";
+import { createPresetPatch, DRUM_PRESETS } from "@/lib/presets";
+import { euclidHit } from "@/lib/euclid";
 
 describe("patches", () => {
   it("creates the complete 16-block demo", () => {
@@ -24,5 +26,38 @@ describe("patches", () => {
     expect(normalized?.blocks).toHaveLength(16);
     expect(normalized?.blocks[0].pulses).toBe(7);
     expect(normalized?.blocks[1]).toEqual(createEmptyPatch().blocks[1]);
+  });
+
+  it("builds every documented drum preset within the 16-block system", () => {
+    expect(DRUM_PRESETS).toHaveLength(40);
+    for (const preset of DRUM_PRESETS) {
+      const patch = createPresetPatch(preset.id);
+      expect(patch.blocks).toHaveLength(16);
+      expect(patch.bpm).toBe(preset.bpm);
+      expect(patch.blocks.some((block) => block.pulses > 0)).toBe(true);
+      if (preset.id === "acid-tom-fill") continue;
+      for (const lane of preset.lanes) {
+        const steps = lane.steps ?? 16;
+        const actual = Array.from({ length: steps }, (_, step) => patch.blocks.some((block) => block.voice === lane.voice && block.steps === steps && euclidHit(step, block.steps, block.pulses, block.rot)));
+        const expected = Array.from({ length: steps }, (_, step) => lane.hits.includes(step));
+        expect(actual, `${preset.id}: ${lane.voice}`).toEqual(expected);
+      }
+    }
+  });
+
+  it("builds the two-bar acid fill with Euclidean mute gates", () => {
+    const patch = createPresetPatch("acid-tom-fill");
+    expect(patch.blocks[0]).toMatchObject({ voice: "", steps: 32, pulses: 1, gate: 100 });
+    expect(patch.blocks[1]).toMatchObject({ voice: "", steps: 32, pulses: 1, gate: 800 });
+    expect(patch.blocks[2]).toMatchObject({ voice: "kick", steps: 16, pulses: 4, mut: "0" });
+    expect(patch.blocks[4]).toMatchObject({ voice: "ch", steps: 16, pulses: 16, mut: "1" });
+    expect(patch.blocks.filter((block) => ["lt", "mt", "ht"].includes(block.voice) && block.steps === 32)).toHaveLength(5);
+  });
+
+  it("recreates the electro backbeat with layered Euclidean blocks", () => {
+    const patch = createPresetPatch("electro-backbeat");
+    const hitsFor = (voice: string) => Array.from({ length: 16 }, (_, step) => patch.blocks.some((block) => block.voice === voice && euclidHit(step, block.steps, block.pulses, block.rot)));
+    expect(hitsFor("kick")).toEqual([true, false, false, false, false, false, true, false, true, false, false, false, false, false, true, false]);
+    expect(hitsFor("cow")).toEqual([false, false, true, false, false, false, true, false, false, false, true, false, false, false, true, false]);
   });
 });
