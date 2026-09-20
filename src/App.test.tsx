@@ -46,9 +46,10 @@ describe("application shell", () => {
     fireEvent.change(screen.getByLabelText("Drum pattern preset"), { target: { value: "boom-bap" } });
     expect(screen.getByLabelText("Drum pattern preset")).toHaveValue("boom-bap");
     expect(screen.getByLabelText("Beats per minute")).toHaveValue("90");
-    expect(screen.getAllByRole("tab")).toHaveLength(4);
-    expect(screen.getByRole("tab", { name: "Variation A, 4 bars" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: "Variation D, 2 bars" })).toHaveClass("has-changes");
+    expect(within(screen.getByRole("group", { name: "Song arrangement" })).getAllByRole("button")).toHaveLength(5);
+    expect(screen.getByRole("button", { name: "Song part 1: pattern A, 4 bars" })).toHaveAttribute("aria-current", "true");
+    expect(screen.getByRole("button", { name: "Song part 1: pattern A, 4 bars" })).toHaveStyle({ flexBasis: "60px" });
+    expect(screen.getByRole("button", { name: "Song part 4: pattern D, 2 bars" })).toHaveStyle({ flexBasis: "46px" });
     expect(screen.getByRole("button", { name: "Song" })).toHaveAttribute("aria-pressed", "true");
   });
 
@@ -140,22 +141,43 @@ describe("variations and song mode", () => {
     expect(within(screen.getByTestId("block-1")).getByRole("button", { name: "Steps: 15" })).toBeInTheDocument();
   });
 
-  it("uses repeat counts when song mode advances through variations", () => {
+  it("reuses patterns as independent song parts and advances by each part's length", () => {
     vi.spyOn(window.localStorage.__proto__, "getItem").mockReturnValue(null);
     let onBar: (() => void) | null = null;
     vi.spyOn(SequencerEngine.prototype, "setBarCallback").mockImplementation((callback) => { onBar = callback; });
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Add variation" }));
     fireEvent.click(screen.getByTitle("Variation A"));
-    fireEvent.click(screen.getByRole("button", { name: "Increase repeat count" }));
-    expect(screen.getByLabelText("Repeat count for variation A")).toHaveTextContent("2 bars");
     fireEvent.click(screen.getByRole("button", { name: "Song" }));
     expect(screen.getByRole("button", { name: "Song" })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Lengthen song part" }));
+    expect(screen.getByLabelText("Length for song part 1")).toHaveTextContent("2 bars");
+    fireEvent.click(screen.getByRole("button", { name: "Add pattern A to song" }));
+    expect(screen.getByRole("button", { name: "Song part 2: pattern A, 1 bar" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Song part 3: pattern B, 1 bar" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Song part 1: pattern A, 2 bars" }));
 
     act(() => onBar?.());
-    expect(screen.getByTitle("Variation A")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Song part 1: pattern A, 2 bars" })).toHaveAttribute("aria-current", "true");
     act(() => onBar?.());
-    expect(screen.getByTitle("Variation B")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("button", { name: "Song part 2: pattern A, 1 bar" })).toHaveAttribute("aria-current", "true");
+    act(() => onBar?.());
+    expect(screen.getByRole("button", { name: "Song part 3: pattern B, 1 bar" })).toHaveAttribute("aria-current", "true");
+  });
+
+  it("reorders song parts by drag and keyboard without growing the toolbar", () => {
+    vi.spyOn(window.localStorage.__proto__, "getItem").mockReturnValue(null);
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Add variation" }));
+    fireEvent.click(screen.getByRole("button", { name: "Song" }));
+    const partA = screen.getByRole("button", { name: "Song part 1: pattern A, 1 bar" });
+    const partB = screen.getByRole("button", { name: "Song part 2: pattern B, 1 bar" });
+    const dataTransfer = { effectAllowed: "none", dropEffect: "none", setData: vi.fn(), getData: vi.fn(() => "") };
+    fireEvent.dragStart(partB, { dataTransfer });
+    fireEvent.drop(partA, { dataTransfer });
+    expect(within(screen.getByRole("group", { name: "Song arrangement" })).getAllByRole("button")[0]).toHaveAccessibleName("Song part 1: pattern B, 1 bar");
+    fireEvent.keyDown(screen.getByRole("button", { name: "Song part 1: pattern B, 1 bar" }), { key: "ArrowRight", altKey: true });
+    expect(within(screen.getByRole("group", { name: "Song arrangement" })).getAllByRole("button")[0]).toHaveAccessibleName("Song part 1: pattern A, 1 bar");
   });
 });
 

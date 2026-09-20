@@ -66,14 +66,21 @@ export interface Patch {
 export interface Variation {
   id: string;
   name: string;
-  repeats: number;
   patch: Patch;
+}
+
+export interface SongPart {
+  id: string;
+  variationId: string;
+  bars: number;
 }
 
 export interface Arrangement {
   format: "euclid-grid.arrangement.v1";
   variations: Variation[];
+  songParts: SongPart[];
   activeIndex: number;
+  activeSongPartIndex: number;
   songMode: boolean;
 }
 

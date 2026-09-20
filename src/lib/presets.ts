@@ -335,13 +335,14 @@ export function createPresetArrangement(id: string, volume = 72): Arrangement {
   const variations: Variation[] = patches.map((patch, index) => ({
     id: `preset-${id}-${index + 1}`,
     name: String.fromCharCode(65 + index),
-    repeats: repeats[index],
     patch,
   }));
   return {
     format: "euclid-grid.arrangement.v1",
     variations,
+    songParts: variations.map((variation, index) => ({ id: `preset-${id}-part-${index + 1}`, variationId: variation.id, bars: repeats[index] })),
     activeIndex: 0,
+    activeSongPartIndex: 0,
     songMode: true,
   };
 }

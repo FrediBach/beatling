@@ -250,6 +250,10 @@ button { transition: background-color 120ms, color 120ms, border-color 120ms; }
 .variation-tabs button:last-child { border-right: 0; }.variation-tabs button:hover { color: var(--signal); }.variation-tabs button[aria-selected=true] { background: var(--ink); color: var(--paper); }
 .variation-tabs button.has-changes::before { content: ""; position: absolute; top: 3px; right: 3px; width: 3px; height: 3px; border-radius: 50%; background: var(--signal); }.variation-tabs button[aria-selected=true].has-changes::before { background: var(--hot); box-shadow: 0 0 0 1px var(--ink); }
 .variation-tabs small { font-size: 7px; font-weight: 400; opacity: .65; }.variation-tabs .add-variation { min-width: 25px; padding: 0; }.variation-tabs .add-variation:disabled { opacity: .3; cursor: not-allowed; }
+.song-timeline .song-part { flex-grow: 0; flex-shrink: 0; min-width: 39px; cursor: grab; transition: flex-basis 140ms ease, background-color 100ms ease, color 100ms ease, opacity 100ms ease; }
+.song-timeline .song-part:active { cursor: grabbing; }.song-timeline .song-part.is-selected { background: var(--ink); color: var(--paper); }.song-timeline .song-part.is-dragging { opacity: .35; }
+.song-timeline .song-part svg { flex: 0 0 auto; opacity: .45; }.song-timeline .song-part small::before { content: "×"; }.song-timeline .add-song-part { flex: 0 0 25px; }
+.song-timeline .song-part:focus-visible { z-index: 1; outline: 2px solid var(--signal); outline-offset: -2px; }
 .repeat-control { height: 25px; display: inline-flex !important; align-items: center !important; gap: 0 !important; flex: 0 0 auto; border: 1px solid var(--rule); border-radius: 3px; overflow: hidden; color: var(--muted); }
 .repeat-control button { width: 21px; align-self: stretch; display: grid; place-items: center; }.repeat-control button:hover { color: var(--signal); background: var(--sheet); }.repeat-control button:disabled { opacity: .25; cursor: not-allowed; }
 .repeat-control output { min-width: 39px; padding: 0 3px; text-align: center; font: 8px var(--font-mono); white-space: nowrap; }

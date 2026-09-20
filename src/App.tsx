@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
-import { Dices, Download, ArrowUpRight, Cable, Eraser, ListMusic, Lock, LockOpen, Minus, Moon, Play, Plus, Redo2, RotateCcw, Square, Sun, Trash2, Undo2, Volume2, VolumeX } from "lucide-react";
+import { Dices, Download, ArrowUpRight, Cable, Eraser, GripVertical, ListMusic, Lock, LockOpen, Minus, Moon, Play, Plus, Redo2, RotateCcw, Square, Sun, Trash2, Undo2, Volume2, VolumeX } from "lucide-react";
 import { SequencerEngine } from "@/audio/engine";
 import { ExportDialog } from "@/components/export-dialog";
 import { PatchPanel } from "@/components/patch-panel";
@@ -15,7 +15,7 @@ import { effectiveBlock, volumeGain } from "@/lib/euclid";
 import { createDemoPatch, createEmptyPatch, createRandomizationLocks, loadStoredPatch, randomizeBlock, randomizeBlockParameter, savePatch, shufflePatch } from "@/lib/patch";
 import { createPresetArrangement, PRESET_GROUPS } from "@/lib/presets";
 import { changedBlockFields, changedVoiceFields, createArrangement, loadStoredArrangement, MAX_VARIATIONS, saveArrangement, variationHasChanges } from "@/lib/variations";
-import type { Arrangement, BlockParam, BlockRandomizationLocks, BlockVisualState, EngineSnapshot, Patch, SequencerBlock, Variation, VoiceId, VoiceState } from "@/lib/types";
+import type { Arrangement, BlockParam, BlockRandomizationLocks, BlockVisualState, EngineSnapshot, Patch, SequencerBlock, SongPart, Variation, VoiceId, VoiceState } from "@/lib/types";
 import { useDragNumber } from "@/hooks/use-drag-number";
 import { cn } from "@/lib/utils";
 
@@ -44,8 +44,13 @@ export default function App() {
   const [variations, setVariations] = useState<Variation[]>(initialSetup.initialArrangement.variations);
   const variationsRef = useRef(variations);
   const variationSerialRef = useRef(variations.length + 1);
+  const [songParts, setSongParts] = useState<SongPart[]>(initialSetup.initialArrangement.songParts);
+  const songPartsRef = useRef(songParts);
+  const songPartSerialRef = useRef(songParts.length + 1);
   const [activeVariation, setActiveVariation] = useState(initialSetup.initialArrangement.activeIndex);
   const activeVariationRef = useRef(activeVariation);
+  const [activeSongPart, setActiveSongPart] = useState(initialSetup.initialArrangement.activeSongPartIndex);
+  const activeSongPartRef = useRef(activeSongPart);
   const [songMode, setSongMode] = useState(initialSetup.initialArrangement.songMode);
   const songModeRef = useRef(songMode);
   const songBarsRef = useRef(0);
@@ -57,6 +62,11 @@ export default function App() {
   const storeVariations = useCallback((next: Variation[]) => {
     variationsRef.current = next;
     setVariations(next);
+  }, []);
+
+  const storeSongParts = useCallback((next: SongPart[]) => {
+    songPartsRef.current = next;
+    setSongParts(next);
   }, []);
 
   const storeHistory = useCallback((next: PatchHistory) => {
@@ -91,6 +101,7 @@ export default function App() {
     try { return localStorage.getItem("beatling-show-cables") === "true"; }
     catch { return false; }
   });
+  const [draggedSongPart, setDraggedSongPart] = useState<string | null>(null);
   const [randomizationLocks, setRandomizationLocks] = useState<BlockRandomizationLocks[]>(() => createRandomizationLocks());
   const [theme, setTheme] = useState<"light" | "dark">(() =>
     window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light",
@@ -119,11 +130,13 @@ export default function App() {
     const timeout = window.setTimeout(() => saveArrangement({
       format: "euclid-grid.arrangement.v1",
       variations,
+      songParts,
       activeIndex: activeVariation,
+      activeSongPartIndex: activeSongPart,
       songMode,
     }), 250);
     return () => window.clearTimeout(timeout);
-  }, [activeVariation, songMode, variations]);
+  }, [activeSongPart, activeVariation, songMode, songParts, variations]);
 
   useEffect(() => {
     engine.setVolume(patch.vol);
@@ -163,13 +176,20 @@ export default function App() {
     const variation: Variation = {
       id: `variation-${Date.now()}-${variationSerialRef.current++}`,
       name: String.fromCharCode(65 + nextIndex),
-      repeats: 1,
       patch: historyRef.current.present,
+    };
+    const songPart: SongPart = {
+      id: `song-part-${Date.now()}-${songPartSerialRef.current++}`,
+      variationId: variation.id,
+      bars: 1,
     };
     historiesRef.current.set(variation.id, { past: [], present: variation.patch, future: [] });
     storeVariations([...current, variation]);
+    storeSongParts([...songPartsRef.current, songPart]);
+    activeSongPartRef.current = songPartsRef.current.length - 1;
+    setActiveSongPart(activeSongPartRef.current);
     selectVariation(nextIndex);
-  }, [selectVariation, storeVariations]);
+  }, [selectVariation, storeSongParts, storeVariations]);
 
   const deleteVariation = useCallback(() => {
     const index = activeVariationRef.current;
@@ -179,42 +199,124 @@ export default function App() {
     const next = variationsRef.current
       .filter((_variation, variationIndex) => variationIndex !== index)
       .map((variation, variationIndex) => ({ ...variation, name: String.fromCharCode(65 + variationIndex) }));
+    const nextSongParts = songPartsRef.current.filter((part) => part.variationId !== removed.id);
     storeVariations(next);
+    storeSongParts(nextSongParts);
+    activeSongPartRef.current = Math.min(activeSongPartRef.current, nextSongParts.length - 1);
+    setActiveSongPart(activeSongPartRef.current);
     activeVariationRef.current = -1;
     selectVariation(Math.min(index - 1, next.length - 1));
-  }, [selectVariation, storeVariations]);
+  }, [selectVariation, storeSongParts, storeVariations]);
 
-  const changeVariationRepeats = useCallback((delta: number) => {
-    const index = activeVariationRef.current;
-    const next = variationsRef.current.map((variation, variationIndex) => variationIndex === index
-      ? { ...variation, repeats: Math.min(16, Math.max(1, variation.repeats + delta)) }
-      : variation);
-    storeVariations(next);
+  const selectSongPart = useCallback((index: number, resetPlayback = true) => {
+    const part = songPartsRef.current[index];
+    if (!part) return;
+    activeSongPartRef.current = index;
+    setActiveSongPart(index);
     songBarsRef.current = 0;
-  }, [storeVariations]);
+    const variationIndex = variationsRef.current.findIndex((variation) => variation.id === part.variationId);
+    if (variationIndex < 0) return;
+    if (variationIndex === activeVariationRef.current) {
+      if (resetPlayback) engine.reset();
+      return;
+    }
+    selectVariation(variationIndex, resetPlayback);
+  }, [engine, selectVariation]);
+
+  const selectPattern = useCallback((index: number) => {
+    const variation = variationsRef.current[index];
+    if (!variation) return;
+    const firstPart = songPartsRef.current.findIndex((part) => part.variationId === variation.id);
+    if (firstPart >= 0) {
+      activeSongPartRef.current = firstPart;
+      setActiveSongPart(firstPart);
+    }
+    selectVariation(index);
+  }, [selectVariation]);
+
+  const addSongPart = useCallback(() => {
+    const current = songPartsRef.current;
+    const insertAt = Math.min(current.length, activeSongPartRef.current + 1);
+    const part: SongPart = {
+      id: `song-part-${Date.now()}-${songPartSerialRef.current++}`,
+      variationId: variationsRef.current[activeVariationRef.current].id,
+      bars: 1,
+    };
+    const next = [...current.slice(0, insertAt), part, ...current.slice(insertAt)];
+    storeSongParts(next);
+    activeSongPartRef.current = insertAt;
+    setActiveSongPart(insertAt);
+    songBarsRef.current = 0;
+  }, [storeSongParts]);
+
+  const changeSongPartBars = useCallback((delta: number) => {
+    const index = activeSongPartRef.current;
+    const next = songPartsRef.current.map((part, partIndex) => partIndex === index
+      ? { ...part, bars: Math.min(16, Math.max(1, part.bars + delta)) }
+      : part);
+    storeSongParts(next);
+    songBarsRef.current = 0;
+  }, [storeSongParts]);
+
+  const deleteSongPart = useCallback(() => {
+    if (songPartsRef.current.length <= 1) return;
+    const index = activeSongPartRef.current;
+    const next = songPartsRef.current.filter((_part, partIndex) => partIndex !== index);
+    storeSongParts(next);
+    selectSongPart(Math.min(index, next.length - 1));
+  }, [selectSongPart, storeSongParts]);
+
+  const moveSongPart = useCallback((sourceId: string, targetId: string) => {
+    if (sourceId === targetId) return;
+    const current = songPartsRef.current;
+    const sourceIndex = current.findIndex((part) => part.id === sourceId);
+    const targetIndex = current.findIndex((part) => part.id === targetId);
+    if (sourceIndex < 0 || targetIndex < 0) return;
+    const selectedId = current[activeSongPartRef.current]?.id;
+    const next = [...current];
+    const [moved] = next.splice(sourceIndex, 1);
+    next.splice(targetIndex, 0, moved);
+    storeSongParts(next);
+    const nextSelectedIndex = next.findIndex((part) => part.id === selectedId);
+    activeSongPartRef.current = nextSelectedIndex;
+    setActiveSongPart(nextSelectedIndex);
+  }, [storeSongParts]);
+
+  const moveActiveSongPartBy = useCallback((delta: number) => {
+    const currentIndex = activeSongPartRef.current;
+    const targetIndex = Math.min(songPartsRef.current.length - 1, Math.max(0, currentIndex + delta));
+    if (targetIndex === currentIndex) return;
+    moveSongPart(songPartsRef.current[currentIndex].id, songPartsRef.current[targetIndex].id);
+  }, [moveSongPart]);
 
   const toggleSongMode = useCallback(() => {
     const next = !songModeRef.current;
     songModeRef.current = next;
     songBarsRef.current = 0;
     setSongMode(next);
-  }, []);
+    if (next) selectSongPart(activeSongPartRef.current);
+  }, [selectSongPart]);
 
   useEffect(() => {
     engine.setBarCallback(() => {
-      const current = variationsRef.current;
-      if (!songModeRef.current || current.length < 2) return;
-      const currentIndex = activeVariationRef.current;
+      const current = songPartsRef.current;
+      if (!songModeRef.current || current.length === 0) return;
+      const currentIndex = activeSongPartRef.current;
       songBarsRef.current += 1;
-      if (songBarsRef.current < current[currentIndex].repeats) return;
+      if (songBarsRef.current < current[currentIndex].bars) return;
       songBarsRef.current = 0;
       const nextIndex = (currentIndex + 1) % current.length;
-      const nextVariation = current[nextIndex];
+      const nextPart = current[nextIndex];
+      const variationIndex = variationsRef.current.findIndex((variation) => variation.id === nextPart.variationId);
+      if (variationIndex < 0) return;
+      const nextVariation = variationsRef.current[variationIndex];
       const nextHistory = historiesRef.current.get(nextVariation.id) ?? { past: [], present: nextVariation.patch, future: [] };
-      activeVariationRef.current = nextIndex;
+      activeSongPartRef.current = nextIndex;
+      activeVariationRef.current = variationIndex;
       historyRef.current = nextHistory;
       engine.setPatch(nextHistory.present);
-      setActiveVariation(nextIndex);
+      setActiveSongPart(nextIndex);
+      setActiveVariation(variationIndex);
       setHistory(nextHistory);
       setOpenPatch(null);
       engine.resetPattern();
@@ -327,16 +429,21 @@ export default function App() {
     const nextHistories = new Map<string, PatchHistory>(next.variations.map((variation) => [variation.id, { past: [], present: variation.patch, future: [] }]));
     const nextHistory = nextHistories.get(active.id)!;
     variationsRef.current = next.variations;
+    songPartsRef.current = next.songParts;
     activeVariationRef.current = activeIndex;
+    activeSongPartRef.current = Math.min(next.songParts.length - 1, Math.max(0, next.activeSongPartIndex));
     songModeRef.current = next.songMode;
     songBarsRef.current = 0;
     variationSerialRef.current = next.variations.length + 1;
+    songPartSerialRef.current = next.songParts.length + 1;
     historiesRef.current = nextHistories;
     historyRef.current = nextHistory;
     engine.setPatch(active.patch);
     engine.reset();
     setVariations(next.variations);
+    setSongParts(next.songParts);
     setActiveVariation(activeIndex);
+    setActiveSongPart(activeSongPartRef.current);
     setSongMode(next.songMode);
     setHistory(nextHistory);
     setSnapshot(emptySnapshot(active.patch));
@@ -359,6 +466,7 @@ export default function App() {
   const voiceVariationChanges = useMemo(() => Object.fromEntries(VOICE_DEFS.map(({ id }) => [id, activeVariation === 0 ? new Set<keyof VoiceState>() : changedVoiceFields(patch.voices[id], basePatch.voices[id])])) as Record<VoiceId, Set<keyof VoiceState>>, [activeVariation, basePatch, patch.voices]);
   const allSettingsLocked = randomizationLocks.every((blockLocks) => Object.values(blockLocks).every(Boolean));
   const allVoicesMuted = Object.values(patch.voices).every((voice) => voice.mute);
+  const currentSongPart = songParts[activeSongPart] ?? songParts[0];
 
   const selectRhythm = (index: number) => {
     setSelectedRhythm(index);
@@ -422,20 +530,65 @@ export default function App() {
           <div className="section-heading pattern-heading">
             <div className="pattern-title"><h2>Pattern {view === "grid" ? "grid" : "circle"}</h2><div className="view-switch" role="group" aria-label="Pattern view">{(["grid", "circle"] as const).map((mode) => <button type="button" key={mode} aria-pressed={view === mode} onClick={() => switchPatternView(mode)}>{mode === "grid" ? "Grid" : "Circle"}</button>)}</div><span className="section-meta">16 independent sequences</span></div>
             <div className="variation-toolbar">
-              <button type="button" className="song-mode-button" aria-pressed={songMode} onClick={toggleSongMode} title="Play variations in order"><ListMusic size={12} />Song</button>
-              <div className="variation-tabs" role="tablist" aria-label="Pattern variations">
-                {variations.map((variation, index) => {
-                  const changed = index > 0 && variationHasChanges(variation, variations[0]);
-                  return <button type="button" role="tab" key={variation.id} aria-selected={activeVariation === index} aria-label={`Variation ${variation.name}, ${variation.repeats} ${variation.repeats === 1 ? "bar" : "bars"}`} className={cn(changed && "has-changes")} onClick={() => selectVariation(index)} title={changed ? `Variation ${variation.name} has changes from A` : `Variation ${variation.name}`}><span>{variation.name}</span><small>×{variation.repeats}</small></button>;
-                })}
-                <button type="button" className="add-variation" aria-label="Add variation" onClick={addVariation} disabled={variations.length >= MAX_VARIATIONS} title="Duplicate the current variation"><Plus size={12} /></button>
-              </div>
-              <div className="repeat-control" aria-label={`Repeat count for variation ${variations[activeVariation].name}`}>
-                <button type="button" onClick={() => changeVariationRepeats(-1)} disabled={variations[activeVariation].repeats <= 1} aria-label="Decrease repeat count"><Minus size={10} /></button>
-                <output>{variations[activeVariation].repeats}<span className="repeat-unit"> {variations[activeVariation].repeats === 1 ? "bar" : "bars"}</span></output>
-                <button type="button" onClick={() => changeVariationRepeats(1)} disabled={variations[activeVariation].repeats >= 16} aria-label="Increase repeat count"><Plus size={10} /></button>
-              </div>
-              {activeVariation > 0 && <button type="button" className="delete-variation" aria-label={`Delete variation ${variations[activeVariation].name}`} onClick={deleteVariation} title="Delete selected variation"><Trash2 size={11} /></button>}
+              <button type="button" className="song-mode-button" aria-pressed={songMode} onClick={toggleSongMode} title={songMode ? "Edit patterns" : "Arrange and play the song"}><ListMusic size={12} />Song</button>
+              {songMode ? <>
+                <div className="variation-tabs song-timeline" role="group" aria-label="Song arrangement">
+                  {songParts.map((part, index) => {
+                    const variation = variations.find((candidate) => candidate.id === part.variationId);
+                    if (!variation) return null;
+                    const selected = activeSongPart === index;
+                    return <button
+                      type="button"
+                      draggable
+                      key={part.id}
+                      aria-current={selected ? "true" : undefined}
+                      aria-label={`Song part ${index + 1}: pattern ${variation.name}, ${part.bars} ${part.bars === 1 ? "bar" : "bars"}`}
+                      aria-keyshortcuts="Alt+ArrowLeft Alt+ArrowRight"
+                      className={cn("song-part", selected && "is-selected", draggedSongPart === part.id && "is-dragging")}
+                      style={{ flexBasis: `${32 + part.bars * 7}px` }}
+                      onClick={() => selectSongPart(index)}
+                      onKeyDown={(event) => {
+                        if (!event.altKey || (event.key !== "ArrowLeft" && event.key !== "ArrowRight")) return;
+                        event.preventDefault();
+                        selectSongPart(index, false);
+                        moveActiveSongPartBy(event.key === "ArrowLeft" ? -1 : 1);
+                      }}
+                      onDragStart={(event) => {
+                        setDraggedSongPart(part.id);
+                        event.dataTransfer.effectAllowed = "move";
+                        event.dataTransfer.setData("text/plain", part.id);
+                      }}
+                      onDragOver={(event) => {
+                        event.preventDefault();
+                        event.dataTransfer.dropEffect = "move";
+                      }}
+                      onDrop={(event) => {
+                        event.preventDefault();
+                        moveSongPart(draggedSongPart ?? event.dataTransfer.getData("text/plain"), part.id);
+                        setDraggedSongPart(null);
+                      }}
+                      onDragEnd={() => setDraggedSongPart(null)}
+                      title="Drag to arrange · Alt + arrow keys to move"
+                    ><GripVertical size={9} aria-hidden="true" /><span>{variation.name}</span><small>{part.bars}</small></button>;
+                  })}
+                  <button type="button" className="add-variation add-song-part" aria-label={`Add pattern ${variations[activeVariation].name} to song`} onClick={addSongPart} title="Add the selected pattern again"><Plus size={12} /></button>
+                </div>
+                <div className="repeat-control" aria-label={`Length for song part ${activeSongPart + 1}`}>
+                  <button type="button" onClick={() => changeSongPartBars(-1)} disabled={currentSongPart.bars <= 1} aria-label="Shorten song part"><Minus size={10} /></button>
+                  <output>{currentSongPart.bars}<span className="repeat-unit"> {currentSongPart.bars === 1 ? "bar" : "bars"}</span></output>
+                  <button type="button" onClick={() => changeSongPartBars(1)} disabled={currentSongPart.bars >= 16} aria-label="Lengthen song part"><Plus size={10} /></button>
+                </div>
+                {songParts.length > 1 && <button type="button" className="delete-variation" aria-label={`Delete song part ${activeSongPart + 1}`} onClick={deleteSongPart} title="Remove this part from the song"><Trash2 size={11} /></button>}
+              </> : <>
+                <div className="variation-tabs" role="tablist" aria-label="Pattern variations">
+                  {variations.map((variation, index) => {
+                    const changed = index > 0 && variationHasChanges(variation, variations[0]);
+                    return <button type="button" role="tab" key={variation.id} aria-selected={activeVariation === index} aria-label={`Variation ${variation.name}`} className={cn(changed && "has-changes")} onClick={() => selectPattern(index)} title={changed ? `Variation ${variation.name} has changes from A` : `Variation ${variation.name}`}><span>{variation.name}</span></button>;
+                  })}
+                  <button type="button" className="add-variation" aria-label="Add variation" onClick={addVariation} disabled={variations.length >= MAX_VARIATIONS} title="Duplicate the current variation"><Plus size={12} /></button>
+                </div>
+                {activeVariation > 0 && <button type="button" className="delete-variation" aria-label={`Delete variation ${variations[activeVariation].name}`} onClick={deleteVariation} title="Delete selected variation"><Trash2 size={11} /></button>}
+              </>}
             </div>
             <div className="grid-actions"><button onClick={() => applyPatch(shufflePatch(patch, Math.random, randomizationLocks))} title="Shuffle unlocked settings, preserving routing" disabled={allSettingsLocked}><Dices size={13} />Shuffle</button><button className="lock-all-button" aria-pressed={allSettingsLocked} onClick={() => setRandomizationLocks(createRandomizationLocks(!allSettingsLocked))} title={allSettingsLocked ? "Unlock every pattern setting" : "Lock every pattern setting"}>{allSettingsLocked ? <Lock size={12} /> : <LockOpen size={12} />}{allSettingsLocked ? "Unlock all" : "Lock all"}</button><button onClick={() => applyPatch(createEmptyPatch(patch.vol))}><Eraser size={13} />Clear</button></div>
           </div>

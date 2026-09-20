@@ -1,5 +1,5 @@
 import { normalizePatch } from "@/lib/patch";
-import type { Arrangement, Patch, SequencerBlock, Variation, VoiceId, VoiceState } from "@/lib/types";
+import type { Arrangement, Patch, SequencerBlock, SongPart, Variation, VoiceId, VoiceState } from "@/lib/types";
 
 const STORAGE_KEY = "egs.arrangement.v1";
 export const MAX_VARIATIONS = 8;
@@ -7,8 +7,10 @@ export const MAX_VARIATIONS = 8;
 export function createArrangement(patch: Patch): Arrangement {
   return {
     format: "euclid-grid.arrangement.v1",
-    variations: [{ id: "variation-1", name: "A", repeats: 1, patch }],
+    variations: [{ id: "variation-1", name: "A", patch }],
+    songParts: [{ id: "song-part-1", variationId: "variation-1", bars: 1 }],
     activeIndex: 0,
+    activeSongPartIndex: 0,
     songMode: false,
   };
 }
@@ -23,15 +25,35 @@ export function normalizeArrangement(value: unknown, fallback: Patch): Arrangeme
     return [{
       id: typeof source.id === "string" && source.id ? source.id : `variation-${index + 1}`,
       name: String.fromCharCode(65 + index),
-      repeats: Math.min(16, Math.max(1, Math.round(Number(source.repeats) || 1))),
       patch,
     }];
   });
   if (variations.length === 0) return createArrangement(fallback);
+  const variationIds = new Set(variations.map(({ id }) => id));
+  const rawSongParts = Array.isArray(input.songParts) ? input.songParts : [];
+  const songParts = rawSongParts.flatMap((source, index) => {
+    if (!source || typeof source !== "object") return [];
+    const candidate = source as Partial<SongPart>;
+    if (typeof candidate.variationId !== "string" || !variationIds.has(candidate.variationId)) return [];
+    return [{
+      id: typeof candidate.id === "string" && candidate.id ? candidate.id : `song-part-${index + 1}`,
+      variationId: candidate.variationId,
+      bars: Math.min(16, Math.max(1, Math.round(Number(candidate.bars) || 1))),
+    }];
+  });
+  // Older saved arrangements stored length directly on each variation. Turn
+  // those entries into independent song parts so existing songs keep playing.
+  const migratedSongParts = songParts.length > 0 ? songParts : variations.map((variation, index) => ({
+    id: `song-part-${index + 1}`,
+    variationId: variation.id,
+    bars: Math.min(16, Math.max(1, Math.round(Number((input.variations?.[index] as { repeats?: number } | undefined)?.repeats) || 1))),
+  }));
   return {
     format: "euclid-grid.arrangement.v1",
     variations,
+    songParts: migratedSongParts,
     activeIndex: Math.min(variations.length - 1, Math.max(0, Math.round(Number(input.activeIndex) || 0))),
+    activeSongPartIndex: Math.min(migratedSongParts.length - 1, Math.max(0, Math.round(Number(input.activeSongPartIndex) || 0))),
     songMode: Boolean(input.songMode),
   };
 }

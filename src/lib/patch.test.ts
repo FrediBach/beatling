@@ -84,7 +84,8 @@ describe("patches", () => {
       expect(arrangement.songMode, preset.id).toBe(true);
       expect(arrangement.activeIndex).toBe(0);
       expect(arrangement.variations.map((variation) => variation.name)).toEqual(["A", "B", "C", "D"]);
-      expect(arrangement.variations.map((variation) => variation.repeats)).toEqual([4, 4, 2, 2]);
+      expect(arrangement.songParts.map((part) => part.bars)).toEqual([4, 4, 2, 2]);
+      expect(arrangement.songParts.map((part) => part.variationId)).toEqual(arrangement.variations.map((variation) => variation.id));
       expect(arrangement.variations.every((variation) => variation.patch.blocks.length === 16)).toBe(true);
       for (const variation of arrangement.variations.slice(1)) {
         expect(variationHasChanges(variation, arrangement.variations[0]), `${preset.id}: ${variation.name}`).toBe(true);
