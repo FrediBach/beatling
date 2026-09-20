@@ -5,6 +5,26 @@ import App from "@/App";
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe("application shell", () => {
+  it("toggles optional cables without changing routing or blocking block controls", () => {
+    vi.spyOn(window.localStorage.__proto__, "getItem").mockReturnValue(null);
+    const save = vi.spyOn(window.localStorage.__proto__, "setItem");
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue(null);
+    render(<App />);
+    const toggle = screen.getByRole("switch", { name: "Patch cables" });
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    expect(screen.queryByTestId("patch-cables")).not.toBeInTheDocument();
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByTestId("patch-cables")).toHaveStyle({ pointerEvents: "none" });
+    expect(save).toHaveBeenCalledWith("beatling-show-cables", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Mute block 01" }));
+    expect(screen.getByRole("button", { name: "Unmute block 01" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Patch block 03" }));
+    expect(screen.getByLabelText("Modulation source")).toHaveValue("12");
+    fireEvent.click(toggle);
+    expect(screen.queryByTestId("patch-cables")).not.toBeInTheDocument();
+  });
+
   it("renders all sequencer blocks and keeps primary controls interactive", () => {
     vi.spyOn(window.localStorage.__proto__, "getItem").mockReturnValue(null);
     render(<App />);

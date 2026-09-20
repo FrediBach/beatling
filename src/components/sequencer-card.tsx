@@ -31,7 +31,9 @@ export function SequencerCard({ index, block, blocks, visual, patchOpen, related
   const sources = [...new Set(incoming.map((connection) => padBlock(connection.source)))];
   const blockLocked = ROW_PARAMS.every((parameter) => locks[parameter]);
   return (
-    <article className={cn("sequencer-card", patchOpen && "is-selected", related && "is-related", visual.muted && "is-muted", visual.fire && "is-firing")} data-testid={`block-${index + 1}`}>
+    <article className={cn("sequencer-card", patchOpen && "is-selected", related && "is-related", visual.muted && "is-muted", visual.fire && "is-firing")} data-testid={`block-${index + 1}`} data-block-index={index}>
+      <span className="cable-ports cable-inputs" aria-hidden="true">{["Clock", "Reset", "Mute", "Mod"].map((input) => <i key={input} data-cable-port={`in-${input}`} />)}</span>
+      <span className="cable-ports cable-outputs" aria-hidden="true">{["Trigger", "Gate", "LFO"].map((output) => <i key={output} data-cable-port={`out-${output}`} />)}</span>
       <header className="card-heading">
         <span className="block-number">{padBlock(index)}</span>
         <div className="voice-select">
