@@ -12,6 +12,21 @@ describe("patches", () => {
     expect(patch.blocks[2]).toMatchObject({ modSrc: "12", modDst: "prob", modAmt: -0.5 });
     expect(patch.voices.kick.machine).toBe("909");
     expect(patch.voices.clap.machine).toBe("808");
+    expect(patch.voices.kick.custom.bodyFrequency).toBe(50);
+  });
+
+  it("migrates old voices and clamps imported custom synthesis settings", () => {
+    const source = createEmptyPatch() as unknown as { voices: Record<string, Record<string, unknown>> };
+    delete source.voices.snare.custom;
+    source.voices.kick.machine = "custom";
+    source.voices.kick.custom = { bodyFrequency: 500, pitchAmount: 7 };
+
+    const patch = normalizePatch(source)!;
+    expect(patch.voices.snare.custom.toneFrequency).toBe(185);
+    expect(patch.voices.kick.machine).toBe("custom");
+    expect(patch.voices.kick.custom.bodyFrequency).toBe(100);
+    expect(patch.voices.kick.custom.pitchAmount).toBe(7);
+    expect(patch.voices.kick.custom.clickFrequency).toBe(1800);
   });
 
   it("keeps routing when patterns are shuffled", () => {

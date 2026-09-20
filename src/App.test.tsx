@@ -92,6 +92,31 @@ describe("application shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Redo last change" }));
     expect(screen.getByRole("button", { name: "Unmute all" })).toHaveAttribute("aria-pressed", "true");
   });
+
+  it("enables a specialized custom voice editor from the third model option", () => {
+    vi.spyOn(window.localStorage.__proto__, "getItem").mockReturnValue(null);
+    render(<App />);
+
+    fireEvent.click(screen.getByRole("button", { name: "Use custom Kick" }));
+    const settings = screen.getByRole("button", { name: "Configure custom Kick" });
+    expect(settings).toBeInTheDocument();
+    fireEvent.click(settings);
+
+    expect(screen.getByRole("dialog")).toHaveTextContent("Kick synthesizer");
+    expect(screen.getByLabelText("Kick Body frequency")).toHaveValue("50");
+    expect(screen.getByLabelText("Kick Pitch sweep")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Kick Tone spread")).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText("Kick Body frequency"), { target: { value: "64" } });
+    expect(screen.getByLabelText("Kick Body frequency value")).toHaveValue(64);
+
+    fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
+    fireEvent.click(screen.getByRole("button", { name: "Use 808 Kick" }));
+    expect(screen.queryByRole("button", { name: "Configure custom Kick" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Use 909 Kick" }));
+    fireEvent.click(screen.getByRole("button", { name: "Use custom Kick" }));
+    fireEvent.click(screen.getByRole("button", { name: "Configure custom Kick" }));
+    expect(screen.getByLabelText("Kick Body frequency")).toHaveValue("64");
+  });
 });
 
 describe("variations and song mode", () => {

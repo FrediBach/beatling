@@ -14,7 +14,8 @@ export type VoiceId =
   | "cym"
   | "shk";
 
-export type Machine = "808" | "909";
+export type Machine = "808" | "909" | "custom";
+export type CustomVoiceSettings = Record<string, number>;
 export type LfoShape = "ramp" | "tri" | "sqr" | "rnd";
 export type ModDestination = "" | "pulses" | "rot" | "prob" | "div" | "tune" | "decay" | "level";
 export type ClockSource = "G" | `${number}`;
@@ -47,6 +48,7 @@ export interface VoiceState {
   tune: number;
   decay: number;
   mute: boolean;
+  custom: CustomVoiceSettings;
 }
 
 export type VoiceBank = Record<VoiceId, VoiceState>;

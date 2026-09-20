@@ -242,7 +242,7 @@ export function createPresetPatch(id: string, volume = 72): Patch {
 const clonePatch = (patch: Patch): Patch => ({
   ...patch,
   blocks: patch.blocks.map((block) => ({ ...block, clk: [...block.clk] })),
-  voices: Object.fromEntries(Object.entries(patch.voices).map(([id, voice]) => [id, { ...voice }])) as VoiceBank,
+  voices: Object.fromEntries(Object.entries(patch.voices).map(([id, voice]) => [id, { ...voice, custom: { ...voice.custom } }])) as VoiceBank,
 });
 
 const TEXTURE_VOICES = new Set<VoiceId>(["ch", "oh", "shk", "cym", "cow", "rim"]);

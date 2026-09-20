@@ -1,6 +1,7 @@
 import { BLOCK_COUNT, type BlockParam, type BlockRandomizationLocks, type Patch, type SequencerBlock, type VoiceBank, type VoiceId, type VoiceState } from "@/lib/types";
 import { ROW_PARAMS, VOICE_DEFS } from "@/lib/constants";
 import { clamp } from "@/lib/euclid";
+import { createCustomVoiceSettings, normalizeCustomVoiceSettings } from "@/lib/voice-config";
 
 const STORAGE_KEY = "egs.patch.v1";
 
@@ -31,6 +32,7 @@ export function createVoice(id: VoiceId): VoiceState {
     tune: 0,
     decay: 50,
     mute: false,
+    custom: createCustomVoiceSettings(id),
   };
 }
 
@@ -109,7 +111,14 @@ export function normalizePatch(value: unknown): Patch | null {
   });
   if (input.voices) {
     for (const { id } of VOICE_DEFS) {
-      if (input.voices[id]) base.voices[id] = { ...base.voices[id], ...input.voices[id] };
+      const source = input.voices[id];
+      if (!source) continue;
+      base.voices[id] = {
+        ...base.voices[id],
+        ...source,
+        machine: ["808", "909", "custom"].includes(source.machine) ? source.machine : base.voices[id].machine,
+        custom: normalizeCustomVoiceSettings(id, source.custom),
+      };
     }
   }
   return base;

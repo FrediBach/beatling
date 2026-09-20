@@ -61,7 +61,10 @@ export function changedBlockFields(block: SequencerBlock, base: SequencerBlock):
 }
 
 export function changedVoiceFields(voice: VoiceState, base: VoiceState): Set<keyof VoiceState> {
-  return new Set((Object.keys(voice) as Array<keyof VoiceState>).filter((key) => voice[key] !== base[key]));
+  return new Set((Object.keys(voice) as Array<keyof VoiceState>).filter((key) => {
+    if (key === "custom") return JSON.stringify(voice.custom) !== JSON.stringify(base.custom);
+    return voice[key] !== base[key];
+  }));
 }
 
 export function variationHasChanges(variation: Variation, base: Variation): boolean {

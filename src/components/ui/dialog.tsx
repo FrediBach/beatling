@@ -18,7 +18,7 @@ export function DialogContent({ className, children, ...props }: DialogPrimitive
         {...props}
       >
         {children}
-        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm text-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal" aria-label="Close export">
+        <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm text-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal" aria-label="Close dialog">
           <X className="size-4" />
         </DialogPrimitive.Close>
       </DialogPrimitive.Content>
