@@ -48,6 +48,8 @@ Pure domain modules in `src/lib` support both the UI and audio engine.
 
 The small components under `src/components/ui/` wrap reusable Radix primitives or styling variants. Feature components should depend on these primitives rather than reproduce dialog and button mechanics.
 
+`EffectsDialog` owns only the selected processor tab. Its editor and per-voice send controls emit immutable effect updates through the existing patch history. `EffectControl` owns transient numeric-entry drafts and pointer gestures (vertical dial dragging, Shift fine adjustment, and reset); committed values remain in the patch. Bypass preserves parameters and sends. These controls do not create audio resources or change routing semantics.
+
 ## State model and data flow
 
 `Patch` is the playable unit. It contains global transport values, 16 fixed sequencer blocks, the voice bank, and shared effect configuration with per-voice send levels. A block's array index is also its routing address, which is why slots have stable positional identities even when their contents change.
