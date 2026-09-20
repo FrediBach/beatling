@@ -51,8 +51,10 @@ body {
   line-height: 1.35;
   -webkit-font-smoothing: antialiased;
 }
-button, input, select, textarea { font: inherit; color: inherit; }
-button { cursor: pointer; }
+@layer base {
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+}
 ::selection { background: color-mix(in srgb, var(--signal) 24%, transparent); }
 
 kbd {
