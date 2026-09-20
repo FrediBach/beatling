@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createDemoPatch, createEmptyPatch, normalizePatch, shufflePatch } from "@/lib/patch";
+import { createDemoPatch, createEmptyPatch, createRandomizationLocks, normalizePatch, randomizeBlockParameter, shufflePatch } from "@/lib/patch";
 import { createPresetPatch, DRUM_PRESETS } from "@/lib/presets";
 import { euclidHit } from "@/lib/euclid";
 
@@ -18,6 +18,22 @@ describe("patches", () => {
     const shuffled = shufflePatch(patch, () => 0.5);
     expect(shuffled.blocks[9].clk).toEqual(["G", "1"]);
     expect(shuffled.blocks[0]).toMatchObject({ steps: 16, pulses: 4, rot: 0 });
+  });
+
+  it("keeps locked settings unchanged while shuffling the rest", () => {
+    const patch = createDemoPatch();
+    const locks = createRandomizationLocks();
+    locks[1].steps = true;
+    locks[1].prob = true;
+    const shuffled = shufflePatch(patch, () => 0, locks);
+    expect(shuffled.blocks[1]).toMatchObject({ steps: 16, prob: 100, pulses: 0, rot: 0, div: 1 });
+    expect(shuffled.blocks[1].clk).toEqual(patch.blocks[1].clk);
+  });
+
+  it("randomizes one setting without changing its neighbours", () => {
+    const block = createDemoPatch().blocks[2];
+    const randomized = randomizeBlockParameter(block, 2, "prob", () => 0);
+    expect(randomized).toMatchObject({ steps: block.steps, pulses: block.pulses, rot: block.rot, div: block.div, prob: 40 });
   });
 
   it("normalizes partial imported patches without sharing defaults", () => {

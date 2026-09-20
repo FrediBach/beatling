@@ -23,6 +23,19 @@ describe("application shell", () => {
     expect(screen.getByLabelText("Drum pattern preset")).toHaveValue("boom-bap");
     expect(screen.getByLabelText("Beats per minute")).toHaveValue("90");
   });
+
+  it("locks individual, block and global randomization controls", () => {
+    vi.spyOn(window.localStorage.__proto__, "getItem").mockReturnValue(null);
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Lock Steps in block 01" }));
+    expect(screen.getByRole("button", { name: "Unlock Steps in block 01" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Randomize Steps in block 01" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Lock all settings in block 01" }));
+    expect(screen.getByRole("button", { name: "Randomize block 01" })).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", { name: "Lock all" }));
+    expect(screen.getByRole("button", { name: "Unlock all" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Shuffle" })).toBeDisabled();
+  });
 });
 
 describe("patch bay", () => {

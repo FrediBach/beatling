@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type SetStateAction } from "react";
-import { Dices, Download, ArrowUpRight, Cable, Eraser, Moon, Play, RotateCcw, Square, Sun } from "lucide-react";
+import { Dices, Download, ArrowUpRight, Cable, Eraser, Lock, LockOpen, Moon, Play, RotateCcw, Square, Sun } from "lucide-react";
 import { SequencerEngine } from "@/audio/engine";
 import { ExportDialog } from "@/components/export-dialog";
 import { PatchPanel } from "@/components/patch-panel";
@@ -9,9 +9,9 @@ import { Button } from "@/components/ui/button";
 import { VoiceBank } from "@/components/voice-bank";
 import { RATE_OPTIONS } from "@/lib/constants";
 import { effectiveBlock, volumeGain } from "@/lib/euclid";
-import { createDemoPatch, createEmptyPatch, loadStoredPatch, savePatch, shufflePatch } from "@/lib/patch";
+import { createDemoPatch, createEmptyPatch, createRandomizationLocks, loadStoredPatch, randomizeBlock, randomizeBlockParameter, savePatch, shufflePatch } from "@/lib/patch";
 import { createPresetPatch, PRESET_GROUPS } from "@/lib/presets";
-import type { BlockVisualState, EngineSnapshot, Patch, SequencerBlock, VoiceId, VoiceState } from "@/lib/types";
+import type { BlockParam, BlockRandomizationLocks, BlockVisualState, EngineSnapshot, Patch, SequencerBlock, VoiceId, VoiceState } from "@/lib/types";
 import { useDragNumber } from "@/hooks/use-drag-number";
 import { cn } from "@/lib/utils";
 
@@ -46,6 +46,7 @@ export default function App() {
   const [openPatch, setOpenPatch] = useState<number | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [presetId, setPresetId] = useState("");
+  const [randomizationLocks, setRandomizationLocks] = useState<BlockRandomizationLocks[]>(() => createRandomizationLocks());
   const [theme, setTheme] = useState<"light" | "dark">(() =>
     window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light",
   );
@@ -107,6 +108,18 @@ export default function App() {
     setPatch((current) => ({ ...current, blocks: current.blocks.map((item, itemIndex) => itemIndex === index ? block : item) }));
   };
 
+  const setBlockLocks = (index: number, locked: boolean) => {
+    setRandomizationLocks((current) => current.map((blockLocks, blockIndex) => blockIndex === index
+      ? Object.fromEntries(Object.keys(blockLocks).map((parameter) => [parameter, locked])) as BlockRandomizationLocks
+      : blockLocks));
+  };
+
+  const toggleParameterLock = (index: number, parameter: BlockParam) => {
+    setRandomizationLocks((current) => current.map((blockLocks, blockIndex) => blockIndex === index
+      ? { ...blockLocks, [parameter]: !blockLocks[parameter] }
+      : blockLocks));
+  };
+
   const updateVoice = (id: VoiceId, voice: VoiceState) => {
     setPatch((current) => ({ ...current, voices: { ...current.voices, [id]: voice } }));
   };
@@ -129,6 +142,7 @@ export default function App() {
   };
 
   const connections = connectionsFor(patch.blocks);
+  const allSettingsLocked = randomizationLocks.every((blockLocks) => Object.values(blockLocks).every(Boolean));
 
   return (
     <div className="instrument">
@@ -169,9 +183,9 @@ export default function App() {
 
       <main className="workspace">
         <section className="sequencer-section" aria-label="Sequencer blocks">
-          <div className="section-heading"><div><h2>Pattern grid</h2><span className="section-meta">16 independent sequences</span></div><div className="grid-actions"><button onClick={() => applyPatch(shufflePatch(patch))} title="Shuffle patterns, preserving routing"><Dices size={13} />Shuffle</button><button onClick={() => applyPatch(createEmptyPatch(patch.vol))}><Eraser size={13} />Clear</button></div></div>
+          <div className="section-heading"><div><h2>Pattern grid</h2><span className="section-meta">16 independent sequences</span></div><div className="grid-actions"><button onClick={() => applyPatch(shufflePatch(patch, Math.random, randomizationLocks))} title="Shuffle unlocked settings, preserving routing" disabled={allSettingsLocked}><Dices size={13} />Shuffle</button><button className="lock-all-button" aria-pressed={allSettingsLocked} onClick={() => setRandomizationLocks(createRandomizationLocks(!allSettingsLocked))} title={allSettingsLocked ? "Unlock every pattern setting" : "Lock every pattern setting"}>{allSettingsLocked ? <Lock size={12} /> : <LockOpen size={12} />}{allSettingsLocked ? "Unlock all" : "Lock all"}</button><button onClick={() => applyPatch(createEmptyPatch(patch.vol))}><Eraser size={13} />Clear</button></div></div>
           <div className="sequencer-grid">
-            {patch.blocks.map((block, index) => <SequencerCard key={index} index={index} block={block} blocks={patch.blocks} visual={visualFor(index)} patchOpen={openPatch === index} related={openPatch !== null && connections.some((connection) => (connection.source === openPatch && connection.target === index) || (connection.target === openPatch && connection.source === index))} onPatchOpen={setOpenPatch} onChange={(next) => updateBlock(index, next)} />)}
+            {patch.blocks.map((block, index) => <SequencerCard key={index} index={index} block={block} blocks={patch.blocks} visual={visualFor(index)} patchOpen={openPatch === index} related={openPatch !== null && connections.some((connection) => (connection.source === openPatch && connection.target === index) || (connection.target === openPatch && connection.source === index))} locks={randomizationLocks[index]} onPatchOpen={setOpenPatch} onChange={(next) => updateBlock(index, next)} onRandomize={() => updateBlock(index, randomizeBlock(block, index, randomizationLocks[index]))} onLockToggle={() => setBlockLocks(index, !Object.values(randomizationLocks[index]).every(Boolean))} onParameterRandomize={(parameter) => updateBlock(index, randomizeBlockParameter(block, index, parameter))} onParameterLockToggle={(parameter) => toggleParameterLock(index, parameter)} />)}
           </div>
           <div className="grid-legend"><span><i className="legend-dot" /> Hit <i className="legend-dot hollow" /> Rest <i className="legend-dot accent" /> Playhead</span><span><Cable size={12} />{connections.length} block connections · Select Patch to trace a signal</span></div>
         </section>

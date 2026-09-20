@@ -1,5 +1,5 @@
-import { BLOCK_COUNT, type Patch, type SequencerBlock, type VoiceBank, type VoiceId, type VoiceState } from "@/lib/types";
-import { VOICE_DEFS } from "@/lib/constants";
+import { BLOCK_COUNT, type BlockParam, type BlockRandomizationLocks, type Patch, type SequencerBlock, type VoiceBank, type VoiceId, type VoiceState } from "@/lib/types";
+import { ROW_PARAMS, VOICE_DEFS } from "@/lib/constants";
 import { clamp } from "@/lib/euclid";
 
 const STORAGE_KEY = "egs.patch.v1";
@@ -132,16 +132,44 @@ export function savePatch(patch: Patch): void {
   }
 }
 
-export function shufflePatch(patch: Patch, random = Math.random): Patch {
-  const sizes = [8, 12, 16, 16, 16, 10, 14, 16];
+export function createRandomizationLocks(locked = false): BlockRandomizationLocks[] {
+  return Array.from({ length: BLOCK_COUNT }, () => Object.fromEntries(ROW_PARAMS.map((parameter) => [parameter, locked])) as BlockRandomizationLocks);
+}
+
+const STEP_SIZES = [8, 10, 12, 14, 16, 16, 16, 16];
+const DIVISIONS = [1, 1, 1, 1, 2, 2, 3, 4, 8];
+
+export function randomizeBlock(block: SequencerBlock, index: number, locks: BlockRandomizationLocks, random = Math.random): SequencerBlock {
+  const next = { ...block, clk: [...block.clk] };
+  if (!locks.steps) {
+    const sizes = locks.pulses ? STEP_SIZES.filter((size) => size >= block.pulses) : STEP_SIZES;
+    if (sizes.length > 0) next.steps = sizes[Math.floor(random() * sizes.length)];
+  }
+  if (!locks.pulses) {
+    next.pulses = Math.floor(random() * (next.steps * 0.7)) + (index === 0 ? 3 : 0);
+    next.pulses = clamp(next.pulses, 0, next.steps);
+  }
+  if (!locks.rot) next.rot = Math.floor(random() * next.steps);
+  if (!locks.div) next.div = DIVISIONS[Math.floor(random() * DIVISIONS.length)];
+  if (!locks.prob) next.prob = 40 + Math.floor(random() * 61);
+  return next;
+}
+
+export function randomizeBlockParameter(block: SequencerBlock, index: number, parameter: BlockParam, random = Math.random): SequencerBlock {
+  const locks = Object.fromEntries(ROW_PARAMS.map((item) => [item, item !== parameter])) as BlockRandomizationLocks;
+  return randomizeBlock(block, index, locks, random);
+}
+
+export function shufflePatch(patch: Patch, random = Math.random, locks = createRandomizationLocks()): Patch {
   const blocks = patch.blocks.map((source, index) => {
-    const block = { ...source, clk: [...source.clk] };
-    block.steps = sizes[Math.floor(random() * sizes.length)];
-    block.pulses = Math.floor(random() * (block.steps * 0.7)) + (index === 0 ? 3 : 0);
-    block.pulses = clamp(block.pulses, 0, block.steps);
-    block.rot = Math.floor(random() * block.steps);
-    block.prob = 40 + Math.floor(random() * 61);
-    if (index === 0) Object.assign(block, { steps: 16, pulses: 4, rot: 0 });
+    const blockLocks = locks[index] ?? createRandomizationLocks()[0];
+    const block = randomizeBlock(source, index, blockLocks, random);
+    // Keep the first lane as a dependable four-on-the-floor anchor during a full shuffle.
+    if (index === 0) {
+      if (!blockLocks.steps) block.steps = 16;
+      if (!blockLocks.pulses) block.pulses = 4;
+      if (!blockLocks.rot) block.rot = 0;
+    }
     return block;
   });
   return { ...patch, blocks };

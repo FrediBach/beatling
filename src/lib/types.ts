@@ -21,6 +21,7 @@ export type ClockSource = "G" | `${number}`;
 export type ResetSource = "" | "G" | "BAR" | `${number}`;
 export type BlockSource = "" | `${number}`;
 export type BlockParam = "steps" | "pulses" | "rot" | "div" | "prob";
+export type BlockRandomizationLocks = Record<BlockParam, boolean>;
 
 export interface SequencerBlock {
   voice: VoiceId | "";
