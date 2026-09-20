@@ -9,6 +9,9 @@ describe("application shell", () => {
     vi.spyOn(window.localStorage.__proto__, "getItem").mockReturnValue(null);
     render(<App />);
     expect(screen.getAllByTestId(/^block-/)).toHaveLength(16);
+    expect(screen.getAllByTitle("Roland voice code for Kick")).toHaveLength(2);
+    expect(screen.getAllByTitle("Roland voice code for Shaker")).toHaveLength(2);
+    expect(screen.getAllByTitle("Roland voice code for Shaker")[0]).toHaveTextContent("MA");
     expect(screen.getByLabelText("Beats per minute")).toHaveValue("124");
     fireEvent.click(screen.getByRole("button", { name: /mute block 01/i }));
     expect(screen.getByRole("button", { name: /unmute block 01/i })).toHaveAttribute("aria-pressed", "true");

@@ -18,6 +18,7 @@ export function VoiceBank({ voices, activeVoices, onChange }: VoiceBankProps) {
           <section key={definition.id} className={cn("voice-row", voice.mute && "opacity-45")}>
             <div className="voice-heading">
               <span className={cn("voice-led", activeVoices[definition.id] && "active")} />
+              <abbr className="voice-tag-badge" title={`Roland voice code for ${definition.name}`}>{definition.tag}</abbr>
               <span className="voice-name">{definition.name}</span>
               <button
                 type="button"

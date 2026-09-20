@@ -39,6 +39,7 @@ export function SequencerCard({ index, block, blocks, visual, patchOpen, related
             <option value="">Modulator</option>
             {VOICE_DEFS.map((voice) => <option key={voice.id} value={voice.id}>{voice.name}</option>)}
           </select>
+          {block.voice && <abbr className="voice-tag-badge" title={`Roland voice code for ${VOICE_DEFS.find((voice) => voice.id === block.voice)?.name}`}>{voiceTag(block.voice)}</abbr>}
           <ChevronDown size={11} />
         </div>
         <div className="card-tools">

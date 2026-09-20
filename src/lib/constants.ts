@@ -18,7 +18,7 @@ export const VOICE_DEFS: VoiceDefinition[] = [
   { id: "ht", name: "Hi tom", tag: "HT" },
   { id: "cow", name: "Cowbell", tag: "CB" },
   { id: "cym", name: "Cymbal", tag: "CY" },
-  { id: "shk", name: "Shaker", tag: "SH" },
+  { id: "shk", name: "Shaker", tag: "MA" },
 ];
 
 export const PARAMS: Record<BlockParam | "gate", { label: string; min: number; max: number; suffix?: string }> = {
