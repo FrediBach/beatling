@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { createDemoPatch, createEmptyPatch, createRandomizationLocks, normalizePatch, randomizeBlockParameter, shufflePatch } from "@/lib/patch";
-import { createPresetPatch, DRUM_PRESETS } from "@/lib/presets";
+import { createPresetArrangement, createPresetPatch, DRUM_PRESETS } from "@/lib/presets";
 import { euclidHit } from "@/lib/euclid";
+import { variationHasChanges } from "@/lib/variations";
 
 describe("patches", () => {
   it("creates the complete 16-block demo", () => {
@@ -59,6 +60,29 @@ describe("patches", () => {
         expect(actual, `${preset.id}: ${lane.voice}`).toEqual(expected);
       }
     }
+  });
+
+  it("turns every existing preset into an arranged four-part song", () => {
+    expect(DRUM_PRESETS).toHaveLength(40);
+    for (const preset of DRUM_PRESETS) {
+      const arrangement = createPresetArrangement(preset.id);
+      expect(arrangement.songMode, preset.id).toBe(true);
+      expect(arrangement.activeIndex).toBe(0);
+      expect(arrangement.variations.map((variation) => variation.name)).toEqual(["A", "B", "C", "D"]);
+      expect(arrangement.variations.map((variation) => variation.repeats)).toEqual([4, 4, 2, 2]);
+      expect(arrangement.variations.every((variation) => variation.patch.blocks.length === 16)).toBe(true);
+      for (const variation of arrangement.variations.slice(1)) {
+        expect(variationHasChanges(variation, arrangement.variations[0]), `${preset.id}: ${variation.name}`).toBe(true);
+      }
+    }
+  });
+
+  it("uses a genre-aware four-hit ending for preset fill variations", () => {
+    const house = createPresetArrangement("basic-house").variations[3].patch;
+    const hipHop = createPresetArrangement("boom-bap").variations[3].patch;
+    const endingHits = (patch: typeof house, voices: string[]) => Array.from({ length: 4 }, (_, offset) => patch.blocks.some((block) => voices.includes(block.voice) && euclidHit(12 + offset, block.steps, block.pulses, block.rot)));
+    expect(endingHits(house, ["ht", "mt", "lt", "snare"])).toEqual([true, true, true, true]);
+    expect(endingHits(hipHop, ["rim", "snare", "lt"])).toEqual([true, true, true, true]);
   });
 
   it("builds the two-bar acid fill with Euclidean mute gates", () => {

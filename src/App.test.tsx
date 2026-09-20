@@ -46,6 +46,10 @@ describe("application shell", () => {
     fireEvent.change(screen.getByLabelText("Drum pattern preset"), { target: { value: "boom-bap" } });
     expect(screen.getByLabelText("Drum pattern preset")).toHaveValue("boom-bap");
     expect(screen.getByLabelText("Beats per minute")).toHaveValue("90");
+    expect(screen.getAllByRole("tab")).toHaveLength(4);
+    expect(screen.getByRole("tab", { name: "Variation A, 4 bars" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Variation D, 2 bars" })).toHaveClass("has-changes");
+    expect(screen.getByRole("button", { name: "Song" })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("locks individual, block and global randomization controls", () => {

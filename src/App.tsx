@@ -13,9 +13,9 @@ import { VoiceBank } from "@/components/voice-bank";
 import { RATE_OPTIONS, VOICE_DEFS } from "@/lib/constants";
 import { effectiveBlock, volumeGain } from "@/lib/euclid";
 import { createDemoPatch, createEmptyPatch, createRandomizationLocks, loadStoredPatch, randomizeBlock, randomizeBlockParameter, savePatch, shufflePatch } from "@/lib/patch";
-import { createPresetPatch, PRESET_GROUPS } from "@/lib/presets";
-import { changedBlockFields, changedVoiceFields, loadStoredArrangement, MAX_VARIATIONS, saveArrangement, variationHasChanges } from "@/lib/variations";
-import type { BlockParam, BlockRandomizationLocks, BlockVisualState, EngineSnapshot, Patch, SequencerBlock, Variation, VoiceId, VoiceState } from "@/lib/types";
+import { createPresetArrangement, PRESET_GROUPS } from "@/lib/presets";
+import { changedBlockFields, changedVoiceFields, createArrangement, loadStoredArrangement, MAX_VARIATIONS, saveArrangement, variationHasChanges } from "@/lib/variations";
+import type { Arrangement, BlockParam, BlockRandomizationLocks, BlockVisualState, EngineSnapshot, Patch, SequencerBlock, Variation, VoiceId, VoiceState } from "@/lib/types";
 import { useDragNumber } from "@/hooks/use-drag-number";
 import { cn } from "@/lib/utils";
 
@@ -315,9 +315,31 @@ export default function App() {
   };
 
   const applyPatch = (next: Patch) => {
-    engine.reset();
     setPatch(next);
+    engine.reset();
     setSnapshot(emptySnapshot(next));
+    setOpenPatch(null);
+  };
+
+  const applyArrangement = (next: Arrangement) => {
+    const activeIndex = Math.min(next.variations.length - 1, Math.max(0, next.activeIndex));
+    const active = next.variations[activeIndex];
+    const nextHistories = new Map<string, PatchHistory>(next.variations.map((variation) => [variation.id, { past: [], present: variation.patch, future: [] }]));
+    const nextHistory = nextHistories.get(active.id)!;
+    variationsRef.current = next.variations;
+    activeVariationRef.current = activeIndex;
+    songModeRef.current = next.songMode;
+    songBarsRef.current = 0;
+    variationSerialRef.current = next.variations.length + 1;
+    historiesRef.current = nextHistories;
+    historyRef.current = nextHistory;
+    engine.setPatch(active.patch);
+    engine.reset();
+    setVariations(next.variations);
+    setActiveVariation(activeIndex);
+    setSongMode(next.songMode);
+    setHistory(nextHistory);
+    setSnapshot(emptySnapshot(active.patch));
     setOpenPatch(null);
   };
 
@@ -384,13 +406,13 @@ export default function App() {
             onChange={(event) => {
               const nextPreset = event.target.value;
               setPresetId(nextPreset);
-              applyPatch(createPresetPatch(nextPreset, patch.vol));
+              applyArrangement(createPresetArrangement(nextPreset, patch.vol));
             }}
           >
             <option value="" disabled>Presets</option>
             {PRESET_GROUPS.map((group) => <optgroup key={group.category} label={group.category}>{group.presets.map((preset) => <option key={preset.id} value={preset.id}>{preset.name}</option>)}</optgroup>)}
           </select>
-          <Button variant="outline" onClick={() => { setPresetId(""); applyPatch(createDemoPatch(patch.vol)); }}>Load demo</Button>
+          <Button variant="outline" onClick={() => { setPresetId(""); applyArrangement(createArrangement(createDemoPatch(patch.vol))); }}>Load demo</Button>
           <Button variant="outline" onClick={() => setExportOpen(true)}><Download size={13} />Export</Button>
         </div>
       </section>

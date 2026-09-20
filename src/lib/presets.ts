@@ -1,6 +1,6 @@
 import { euclidHit } from "@/lib/euclid";
 import { createBlock, createVoices } from "@/lib/patch";
-import { BLOCK_COUNT, type Machine, type Patch, type SequencerBlock, type VoiceBank, type VoiceId } from "@/lib/types";
+import { BLOCK_COUNT, type Arrangement, type Machine, type Patch, type SequencerBlock, type Variation, type VoiceBank, type VoiceId } from "@/lib/types";
 
 interface PresetLane {
   voice: VoiceId;
@@ -236,5 +236,112 @@ export function createPresetPatch(id: string, volume = 72): Patch {
     vol: volume,
     blocks,
     voices,
+  };
+}
+
+const clonePatch = (patch: Patch): Patch => ({
+  ...patch,
+  blocks: patch.blocks.map((block) => ({ ...block, clk: [...block.clk] })),
+  voices: Object.fromEntries(Object.entries(patch.voices).map(([id, voice]) => [id, { ...voice }])) as VoiceBank,
+});
+
+const TEXTURE_VOICES = new Set<VoiceId>(["ch", "oh", "shk", "cym", "cow", "rim"]);
+
+function createLiftVariation(base: Patch): Patch {
+  const patch = clonePatch(base);
+  let changed = false;
+  for (const block of patch.blocks) {
+    if (!block.voice || block.pulses === 0 || !TEXTURE_VOICES.has(block.voice)) continue;
+    const nextPulses = Math.min(block.steps, block.pulses + Math.max(1, Math.round(block.steps / 16)));
+    if (nextPulses !== block.pulses) {
+      block.pulses = nextPulses;
+      block.rot = (block.rot + 1) % block.steps;
+      changed = true;
+    }
+  }
+  const kick = patch.blocks.find((block) => block.voice === "kick" && block.pulses > 0 && block.pulses < block.steps);
+  if (kick) {
+    kick.pulses += 1;
+    changed = true;
+  }
+  for (const id of ["ch", "oh", "shk", "cym"] as VoiceId[]) {
+    patch.voices[id].level = Math.min(100, patch.voices[id].level + 6);
+  }
+  if (!changed) {
+    const active = patch.blocks.find((block) => block.pulses > 0 && block.pulses < block.steps);
+    if (active) active.rot = (active.rot + 1) % active.steps;
+  }
+  return patch;
+}
+
+function createBreakVariation(base: Patch): Patch {
+  const patch = clonePatch(base);
+  const kicks = patch.blocks.filter((block) => block.voice === "kick" && block.pulses > 0);
+  kicks.forEach((block, index) => {
+    block.pulses = index === 0 ? Math.max(1, Math.ceil(block.pulses / 2)) : 0;
+  });
+  patch.blocks.forEach((block, index) => {
+    if (block.voice === "ch" || block.voice === "shk" || block.voice === "cym") {
+      if (index % 2 === 0) block.pulses = Math.max(1, Math.ceil(block.pulses / 2));
+      else block.mute = true;
+    }
+    if (block.voice === "clap" || block.voice === "snare") block.prob = Math.min(block.prob, 78);
+  });
+  patch.voices.kick.decay = Math.max(20, patch.voices.kick.decay - 18);
+  patch.voices.oh.level = Math.max(30, patch.voices.oh.level - 18);
+  return patch;
+}
+
+function fillVoicesFor(category: string): VoiceId[] {
+  if (["Chicago House", "Acid House", "Detroit Techno", "Rave & Hard Techno"].includes(category)) return ["ht", "mt", "lt", "snare"];
+  if (["Hip Hop", "Miami Bass", "Trap & Drill"].includes(category)) return ["rim", "snare", "lt", "snare"];
+  if (category === "Dancehall & Reggaeton") return ["lt", "mt", "rim", "snare"];
+  if (["UK Garage", "Breakbeat"].includes(category)) return ["snare", "rim", "snare", "clap"];
+  if (category === "R&B & Synth-Pop") return ["rim", "mt", "lt", "clap"];
+  return ["cow", "mt", "lt", "clap"];
+}
+
+function createFillVariation(base: Patch, preset: DrumPreset): Patch {
+  const patch = clonePatch(base);
+  const referenced = new Set<number>();
+  patch.blocks.forEach((block) => {
+    block.clk.forEach((source) => { if (source !== "G") referenced.add(Number(source)); });
+    for (const source of [block.rst, block.mut, block.modSrc]) {
+      if (source !== "" && source !== "G" && source !== "BAR") referenced.add(Number(source));
+    }
+  });
+  const empty = patch.blocks.map((block, index) => ({ block, index })).filter(({ block, index }) => block.pulses === 0 && !referenced.has(index));
+  const replaceable = patch.blocks.map((block, index) => ({ block, index })).filter(({ block, index }) => block.pulses > 0 && block.voice !== "kick" && !referenced.has(index));
+  const fallback = patch.blocks.map((block, index) => ({ block, index })).filter(({ block, index }) => block.voice !== "" && !referenced.has(index));
+  const slots = [...empty, ...replaceable, ...fallback].filter(({ index }, position, items) => items.findIndex((item) => item.index === index) === position).slice(0, 4);
+  const steps = patch.rate * 4;
+  const voices = fillVoicesFor(preset.category);
+  slots.forEach(({ index }, fillIndex) => {
+    patch.blocks[index] = patternedBlock(index, voices[fillIndex], steps, [steps - 4 + fillIndex]);
+  });
+  patch.voices.ht.level = Math.max(patch.voices.ht.level, 82);
+  patch.voices.mt.level = Math.max(patch.voices.mt.level, 82);
+  patch.voices.lt.level = Math.max(patch.voices.lt.level, 82);
+  patch.voices.snare.level = Math.max(patch.voices.snare.level, 86);
+  return patch;
+}
+
+export function createPresetArrangement(id: string, volume = 72): Arrangement {
+  const preset = DRUM_PRESETS.find((candidate) => candidate.id === id);
+  if (!preset) throw new Error(`Unknown preset: ${id}`);
+  const base = createPresetPatch(id, volume);
+  const patches = [base, createLiftVariation(base), createBreakVariation(base), createFillVariation(base, preset)];
+  const repeats = [4, 4, 2, 2];
+  const variations: Variation[] = patches.map((patch, index) => ({
+    id: `preset-${id}-${index + 1}`,
+    name: String.fromCharCode(65 + index),
+    repeats: repeats[index],
+    patch,
+  }));
+  return {
+    format: "euclid-grid.arrangement.v1",
+    variations,
+    activeIndex: 0,
+    songMode: true,
   };
 }
