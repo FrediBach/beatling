@@ -25,6 +25,8 @@ it("shows audible clock pulses and effective divisions, respecting lookahead, sw
   patch.blocks[1].div = 2;
   const engine = new SequencerEngine(() => patch);
   try {
+    const onBar = vi.fn();
+    engine.setBarCallback(onBar);
     await engine.start();
     expect(engine.snapshot().clockPulse).toBe(-1);
     now = 0.081;
@@ -37,6 +39,9 @@ it("shows audible clock pulses and effective divisions, respecting lookahead, sw
     now = 0.237;
     expect(engine.snapshot().clockPulse).toBe(1);
     expect(engine.snapshot().blocks[1]).toMatchObject({ position: 0, effective: { div: 2 } });
+    now = 1.96;
+    vi.advanceTimersByTime(20);
+    expect(onBar).toHaveBeenCalledTimes(1);
     engine.reset();
     expect(engine.snapshot().clockPulse).toBe(-1);
     expect(engine.snapshot().blocks.every((block) => block.position === -1)).toBe(true);

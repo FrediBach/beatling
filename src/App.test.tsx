@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "@/App";
 import { SequencerEngine } from "@/audio/engine";
@@ -87,6 +87,46 @@ describe("application shell", () => {
     expect(screen.getAllByRole("button", { name: /Mute .+ voice/ })).toHaveLength(12);
     fireEvent.click(screen.getByRole("button", { name: "Redo last change" }));
     expect(screen.getByRole("button", { name: "Unmute all" })).toHaveAttribute("aria-pressed", "true");
+  });
+});
+
+describe("variations and song mode", () => {
+  it("duplicates a variation, keeps edits isolated and highlights changes from A", () => {
+    vi.spyOn(window.localStorage.__proto__, "getItem").mockReturnValue(null);
+    render(<App />);
+    expect(screen.getByTitle("Variation A")).toHaveAttribute("aria-selected", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Add variation" }));
+    const variationB = screen.getByTitle("Variation B");
+    expect(variationB).toHaveAttribute("aria-selected", "true");
+
+    fireEvent.keyDown(within(screen.getByTestId("block-1")).getByRole("button", { name: "Steps: 16" }), { key: "ArrowDown" });
+    expect(screen.getByTestId("block-1")).toHaveClass("has-variation-change");
+    expect(within(screen.getByTestId("block-1")).getByRole("button", { name: "Steps: 15" }).closest(".parameter-row")).toHaveClass("variation-changed");
+    expect(variationB).toHaveClass("has-changes");
+
+    fireEvent.click(screen.getByTitle("Variation A"));
+    expect(within(screen.getByTestId("block-1")).getByRole("button", { name: "Steps: 16" })).toBeInTheDocument();
+    expect(screen.getByTestId("block-1")).not.toHaveClass("has-variation-change");
+    fireEvent.click(screen.getByTitle("Variation B has changes from A"));
+    expect(within(screen.getByTestId("block-1")).getByRole("button", { name: "Steps: 15" })).toBeInTheDocument();
+  });
+
+  it("uses repeat counts when song mode advances through variations", () => {
+    vi.spyOn(window.localStorage.__proto__, "getItem").mockReturnValue(null);
+    let onBar: (() => void) | null = null;
+    vi.spyOn(SequencerEngine.prototype, "setBarCallback").mockImplementation((callback) => { onBar = callback; });
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Add variation" }));
+    fireEvent.click(screen.getByTitle("Variation A"));
+    fireEvent.click(screen.getByRole("button", { name: "Increase repeat count" }));
+    expect(screen.getByLabelText("Repeat count for variation A")).toHaveTextContent("2 bars");
+    fireEvent.click(screen.getByRole("button", { name: "Song" }));
+    expect(screen.getByRole("button", { name: "Song" })).toHaveAttribute("aria-pressed", "true");
+
+    act(() => onBar?.());
+    expect(screen.getByTitle("Variation A")).toHaveAttribute("aria-selected", "true");
+    act(() => onBar?.());
+    expect(screen.getByTitle("Variation B")).toHaveAttribute("aria-selected", "true");
   });
 });
 

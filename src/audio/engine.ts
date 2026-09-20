@@ -43,11 +43,15 @@ export class SequencerEngine {
   private timer: number | null = null;
   private nextPulse = 0;
   private pulseIndex = 0;
+  private pulsesIntoBar = 0;
   private clockQueue: Array<{ time: number; pulse: number }> = [];
   private displayClockPulse = -1;
   private _running = false;
+  private barCallback: (() => void) | null = null;
+  private getPatch: () => Patch;
 
-  constructor(private readonly getPatch: () => Patch) {
+  constructor(source: Patch | (() => Patch)) {
+    this.getPatch = typeof source === "function" ? source : () => source;
     this.resetRuntime();
     VOICE_DEFS.forEach(({ id }) => this.voiceHitAt.set(id, -1));
   }
@@ -62,6 +66,7 @@ export class SequencerEngine {
     if (this.context.state === "suspended") await this.context.resume();
     this.resetRuntime();
     this.pulseIndex = 0;
+    this.pulsesIntoBar = 0;
     this.nextPulse = this.context.currentTime + 0.08;
     this._running = true;
     if (this.timer !== null) window.clearInterval(this.timer);
@@ -80,6 +85,7 @@ export class SequencerEngine {
     this.resetRuntime();
     if (this._running && this.context) {
       this.pulseIndex = 0;
+      this.pulsesIntoBar = 0;
       this.nextPulse = this.context.currentTime + 0.03;
     }
   }
@@ -88,6 +94,18 @@ export class SequencerEngine {
     if (this.master && this.context) {
       this.master.gain.setTargetAtTime(volumeGain(value), this.context.currentTime, 0.02);
     }
+  }
+
+  setPatch(patch: Patch): void {
+    this.getPatch = () => patch;
+  }
+
+  setBarCallback(callback: (() => void) | null): void {
+    this.barCallback = callback;
+  }
+
+  resetPattern(): void {
+    this.resetRuntime();
   }
 
   destroy(): void {
@@ -194,10 +212,16 @@ export class SequencerEngine {
   }
 
   private tick(time: number, pulseIndex: number): void {
+    const patchBeforeBoundary = this.getPatch();
+    if (this.pulsesIntoBar >= patchBeforeBoundary.rate * 4) {
+      this.pulsesIntoBar = 0;
+      this.barCallback?.();
+    }
     this.clockQueue.push({ time, pulse: pulseIndex });
     const patch = this.getPatch();
     const queue: Array<{ source: string; time: number }> = [{ source: "G", time }];
-    if (pulseIndex % (patch.rate * 4) === 0) queue.push({ source: "BAR", time });
+    if (this.pulsesIntoBar === 0) queue.push({ source: "BAR", time });
+    this.pulsesIntoBar += 1;
     const counts = new Array(BLOCK_COUNT).fill(0) as number[];
     let guard = 0;
     let head = 0;

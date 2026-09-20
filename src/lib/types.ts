@@ -61,6 +61,20 @@ export interface Patch {
   voices: VoiceBank;
 }
 
+export interface Variation {
+  id: string;
+  name: string;
+  repeats: number;
+  patch: Patch;
+}
+
+export interface Arrangement {
+  format: "euclid-grid.arrangement.v1";
+  variations: Variation[];
+  activeIndex: number;
+  songMode: boolean;
+}
+
 export interface EffectiveBlock {
   steps: number;
   pulses: number;

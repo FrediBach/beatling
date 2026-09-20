@@ -233,6 +233,38 @@ button { transition: background-color 120ms, color 120ms, border-color 120ms; }
 .circle-inspector .sequencer-card { min-height: 200px; margin-bottom: 16px; }
 .circle-inspector .card-body { padding: 6px 10px; }.circle-inspector .parameters { max-width: none; }.circle-inspector .parameter-value { font-size: 12px; padding: 6px 3px; }.circle-inspector .parameter-value > b { font-size: 12px; }.circle-inspector .parameter-action { width: 24px; flex-basis: 24px; }
 .circle-inspector .patch-panel { height: auto; }.circle-inspector .connection-list { min-height: 0; overflow: visible; }.circle-inspector .patch-help { margin-top: 8px; }
+
+/* Variations and song arrangement. */
+.pattern-title { flex: 0 0 auto; }
+.variation-toolbar { display: flex !important; align-items: center !important; gap: 5px !important; flex: 1 1 auto; min-width: 0; padding: 0 7px; }
+.song-mode-button { height: 25px; display: inline-flex; align-items: center; gap: 4px; flex: 0 0 auto; padding: 0 7px; border: 1px solid var(--rule); border-radius: 3px; color: var(--muted); font-size: 9px; font-weight: 600; }
+.song-mode-button:hover { border-color: var(--ink); color: var(--ink); }.song-mode-button[aria-pressed=true] { border-color: var(--signal); background: var(--signal); color: white; }
+.variation-tabs { display: flex !important; align-items: stretch !important; gap: 0 !important; flex: 1 1 auto; min-width: 0; height: 25px; border: 1px solid var(--rule); border-radius: 3px; overflow-x: auto; scrollbar-width: none; }
+.variation-tabs::-webkit-scrollbar { display: none; }
+.variation-tabs button { position: relative; min-width: 34px; padding: 0 5px; display: inline-flex; align-items: center; justify-content: center; gap: 3px; border-right: 1px solid var(--rule); color: var(--muted); font: 600 9px var(--font-mono); background: var(--sheet); }
+.variation-tabs button:last-child { border-right: 0; }.variation-tabs button:hover { color: var(--signal); }.variation-tabs button[aria-selected=true] { background: var(--ink); color: var(--paper); }
+.variation-tabs button.has-changes::before { content: ""; position: absolute; top: 3px; right: 3px; width: 3px; height: 3px; border-radius: 50%; background: var(--signal); }.variation-tabs button[aria-selected=true].has-changes::before { background: var(--hot); box-shadow: 0 0 0 1px var(--ink); }
+.variation-tabs small { font-size: 7px; font-weight: 400; opacity: .65; }.variation-tabs .add-variation { min-width: 25px; padding: 0; }.variation-tabs .add-variation:disabled { opacity: .3; cursor: not-allowed; }
+.repeat-control { height: 25px; display: inline-flex !important; align-items: center !important; gap: 0 !important; flex: 0 0 auto; border: 1px solid var(--rule); border-radius: 3px; overflow: hidden; color: var(--muted); }
+.repeat-control button { width: 21px; align-self: stretch; display: grid; place-items: center; }.repeat-control button:hover { color: var(--signal); background: var(--sheet); }.repeat-control button:disabled { opacity: .25; cursor: not-allowed; }
+.repeat-control output { min-width: 39px; padding: 0 3px; text-align: center; font: 8px var(--font-mono); white-space: nowrap; }
+.delete-variation { width: 22px; height: 25px; flex: 0 0 auto; display: grid; place-items: center; color: var(--muted); border-radius: 3px; }.delete-variation:hover { color: var(--signal); background: color-mix(in srgb,var(--signal) 7%,transparent); }
+
+/* Variation A is the reference; changed settings use the instrument accent. */
+.sequencer-card.has-variation-change { border-color: color-mix(in srgb,var(--signal) 52%,var(--rule)); box-shadow: inset 3px 0 0 color-mix(in srgb,var(--signal) 75%,transparent); }
+.voice-select.variation-changed, .mute-button.variation-changed { color: var(--signal); background: color-mix(in srgb,var(--signal) 9%,transparent); border-radius: 2px; }
+.parameter-row.variation-changed { background: color-mix(in srgb,var(--signal) 9%,transparent); }
+.parameter-row.variation-changed .parameter-value > span, .parameter-row.variation-changed .parameter-value > b { color: var(--signal); }
+.routing-strip.variation-changed { color: var(--signal); background: color-mix(in srgb,var(--signal) 8%,var(--sheet)); }
+.voice-row.has-variation-change { background: linear-gradient(90deg,color-mix(in srgb,var(--signal) 8%,transparent),transparent 72%); }
+.model-button.variation-changed, .voice-mute.variation-changed { border-color: var(--signal); box-shadow: 0 0 0 1px color-mix(in srgb,var(--signal) 25%,transparent); }
+.voice-ranges label.variation-changed, .voice-ranges label.variation-changed output { color: var(--signal); }
+
+@media (max-width:1200px) {
+  .variation-toolbar { padding: 0; }
+  .repeat-control output { min-width: 27px; }
+  .repeat-control .repeat-unit { display: none; }
+}
 @media (max-width:1400px) { .pattern-heading .section-meta { display: none; } }
 @media (max-width:1000px) { .orbit-stage { flex: none; aspect-ratio: 1; width: 100%; }.orbit-selector { grid-template-columns: repeat(2,minmax(0,1fr)); }.orbit-cycle-note { display: none !important; } }
 @media (max-width:620px) { .pattern-heading { flex-wrap: wrap; height: auto; padding: 12px 0; }.pattern-heading > div { gap: 10px; }.circle-side-panel { height: auto; min-height: 600px; margin-top: 16px; border-top: 1px solid var(--rule); }.circle-inspector { overflow: visible; }.orbit-selector button { min-height: 38px; }.orbit-clock-legend { gap: 8px; } }
