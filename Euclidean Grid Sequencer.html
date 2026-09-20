@@ -1,0 +1,1787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Euclidean Grid Sequencer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#f2f1eb;
+  --sheet:#faf9f4;
+  --ink:#14150f;
+  --ink-2:#6a6858;
+  --rule:#d3d0c1;
+  --rule-2:#e3e0d4;
+  --sig:#1730d8;
+  --hot:#c4321c;
+  --shadow:0 12px 32px rgba(20,21,15,.14);
+  --font:"Inter Tight",-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --paper:#0f110d;
+    --sheet:#171a15;
+    --ink:#eeecdf;
+    --ink-2:#8f8e7e;
+    --rule:#2b2f26;
+    --rule-2:#232720;
+    --sig:#6f8cff;
+    --hot:#ff6b4d;
+    --shadow:0 12px 32px rgba(0,0,0,.5);
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#0f110d;
+  --sheet:#171a15;
+  --ink:#eeecdf;
+  --ink-2:#8f8e7e;
+  --rule:#2b2f26;
+  --rule-2:#232720;
+  --sig:#6f8cff;
+  --hot:#ff6b4d;
+  --shadow:0 12px 32px rgba(0,0,0,.5);
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper);
+  color:var(--ink);
+  font-family:var(--font);
+  font-size:14px;
+  line-height:1.35;
+  -webkit-font-smoothing:antialiased;
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+}
+button,select,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer;background:none;border:none;padding:0}
+:focus-visible{outline:2px solid var(--sig);outline-offset:1px}
+@media (prefers-reduced-motion: reduce){*{transition:none !important;animation:none !important}}
+
+/* ---------- top bar ---------- */
+.topbar{
+  display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;
+  padding:12px 18px 11px;
+  border-bottom:1px solid var(--rule);
+}
+.wordmark{font-size:17px;font-weight:600;letter-spacing:-.02em;margin:0}
+.tagline{color:var(--ink-2);font-size:12.5px;margin:0}
+.topbar .spacer{flex:1}
+.linkish{color:var(--ink-2);font-size:12px;text-decoration:none;border-bottom:1px solid var(--rule)}
+.linkish:hover{color:var(--ink);border-color:var(--ink)}
+.theme-btn{font-family:var(--mono);font-size:11px;color:var(--ink-2);border:1px solid var(--rule);padding:3px 7px;border-radius:2px}
+.theme-btn:hover{color:var(--ink);border-color:var(--ink)}
+
+/* ---------- shell ---------- */
+.shell{
+  flex:1;display:grid;
+  grid-template-columns:214px minmax(0,1fr) 258px;
+  align-items:stretch;
+}
+.rail{padding:14px 14px 28px;display:flex;flex-direction:column;gap:14px}
+.rail-l{border-right:1px solid var(--rule)}
+.rail-r{border-left:1px solid var(--rule)}
+.stage{padding:14px;min-width:0}
+
+h2.sect{
+  font-size:11.5px;font-weight:600;color:var(--ink-2);margin:0 0 7px;
+  letter-spacing:.01em;
+}
+.hr{height:1px;background:var(--rule-2);margin:2px 0}
+
+/* ---------- transport ---------- */
+.transport{display:flex;gap:6px}
+.play{
+  flex:1;border:1px solid var(--ink);border-radius:2px;background:var(--ink);color:var(--paper);
+  padding:9px 10px;font-weight:600;font-size:13px;display:flex;align-items:center;gap:8px;justify-content:center;
+}
+.play[data-on="1"]{background:var(--sig);border-color:var(--sig);color:#fff}
+.play .glyph{font-family:var(--mono);font-size:11px}
+.btn{
+  border:1px solid var(--rule);border-radius:2px;padding:7px 9px;font-size:12.5px;background:var(--sheet);
+}
+.btn:hover{border-color:var(--ink)}
+.btn.wide{width:100%;text-align:left;display:flex;justify-content:space-between;align-items:center}
+.btn .k{font-family:var(--mono);font-size:10.5px;color:var(--ink-2)}
+
+/* big numeric readout */
+.bignum{
+  display:flex;align-items:flex-end;gap:6px;border:1px solid var(--rule);border-radius:2px;
+  background:var(--sheet);padding:7px 10px 6px;cursor:ns-resize;touch-action:none;user-select:none;
+}
+.bignum input{
+  font-family:var(--mono);font-size:29px;font-weight:500;letter-spacing:-.03em;
+  border:none;background:none;width:100%;padding:0;font-variant-numeric:tabular-nums;
+}
+.bignum input:focus{outline:none}
+.bignum .unit{font-family:var(--mono);font-size:10.5px;color:var(--ink-2);padding-bottom:5px}
+
+.seg{display:flex;border:1px solid var(--rule);border-radius:2px;overflow:hidden}
+.seg button{flex:1;padding:5px 0;font-family:var(--mono);font-size:11px;color:var(--ink-2);background:var(--sheet)}
+.seg button+button{border-left:1px solid var(--rule)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:var(--paper)}
+
+.slider{display:grid;grid-template-columns:1fr auto;gap:4px 8px;align-items:center}
+.slider label{font-size:11.5px;color:var(--ink-2)}
+.slider output{font-family:var(--mono);font-size:11px;color:var(--ink);font-variant-numeric:tabular-nums}
+input[type=range]{
+  grid-column:1/-1;-webkit-appearance:none;appearance:none;width:100%;height:14px;background:none;margin:0;
+}
+input[type=range]::-webkit-slider-runnable-track{height:2px;background:var(--rule)}
+input[type=range]::-moz-range-track{height:2px;background:var(--rule)}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:8px;height:14px;background:var(--ink);border:none;border-radius:1px;margin-top:-6px;
+}
+input[type=range]::-moz-range-thumb{width:8px;height:14px;background:var(--ink);border:none;border-radius:1px}
+
+/* ---------- grid of blocks ---------- */
+.grid{
+  display:grid;gap:10px;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+}
+@media (max-width:1460px){.grid{grid-template-columns:repeat(auto-fit,minmax(206px,1fr))}}
+
+.blk{
+  position:relative;border:1px solid var(--rule);border-radius:2px;background:var(--sheet);
+  padding:7px 8px 8px;min-width:0;
+}
+.blk[data-fire="1"]{border-color:var(--sig)}
+.blk[data-muted="1"]{opacity:.5}
+.blk-hd{display:flex;align-items:center;gap:5px;margin-bottom:5px}
+.blk-hd .idx{font-family:var(--mono);font-size:10.5px;color:var(--ink-2);width:16px;font-variant-numeric:tabular-nums}
+.vsel{
+  flex:1;min-width:0;border:none;background:none;font-size:12.5px;font-weight:500;padding:1px 2px;
+  border-bottom:1px solid transparent;border-radius:0;
+}
+.vsel:hover{border-bottom-color:var(--rule)}
+.mini{
+  font-family:var(--mono);font-size:10px;border:1px solid var(--rule);border-radius:2px;
+  padding:2px 4px;color:var(--ink-2);line-height:1.1;
+}
+.mini:hover{border-color:var(--ink);color:var(--ink)}
+.mini[aria-pressed="true"]{background:var(--hot);border-color:var(--hot);color:#fff}
+.mini.patch[aria-expanded="true"]{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+
+.blk-body{display:flex;gap:7px;align-items:center}
+.dial{width:88px;height:88px;flex:0 0 88px;overflow:visible}
+.dial-bg{fill:none;stroke:var(--rule-2);stroke-width:1}
+.dial-lfo{
+  fill:none;stroke:var(--sig);stroke-width:2.4;opacity:.42;
+  transform:rotate(-90deg);transform-origin:50px 50px;stroke-linecap:butt;
+}
+.dot{fill:none;stroke:var(--ink);stroke-width:1;opacity:.35}
+.dot.on{fill:var(--ink);opacity:.9}
+.dot.head{stroke:var(--sig);fill:none;opacity:1;stroke-width:1.6}
+.dot.on.head{fill:var(--sig);stroke:var(--sig)}
+.dot.hit{fill:var(--sig);stroke:var(--sig);opacity:1}
+.dial-txt{
+  font-family:var(--mono);font-size:13px;fill:var(--ink);text-anchor:middle;
+  font-variant-numeric:tabular-nums;letter-spacing:-.04em;
+}
+.dial-sub{font-family:var(--mono);font-size:6.5px;fill:var(--ink-2);text-anchor:middle}
+
+.rows{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.row{
+  display:flex;justify-content:space-between;align-items:baseline;gap:4px;width:100%;
+  padding:2px 3px;border-radius:2px;cursor:ns-resize;touch-action:none;
+  border-bottom:1px solid var(--rule-2);
+}
+.row:hover{background:var(--paper)}
+.row span{font-size:11px;color:var(--ink-2);white-space:nowrap}
+.row b{font-family:var(--mono);font-size:12px;font-weight:500;font-variant-numeric:tabular-nums}
+.row[data-mod="1"] b{color:var(--sig)}
+
+/* ---------- patch popover ---------- */
+.patchbay{
+  position:absolute;left:-1px;right:-1px;top:100%;z-index:30;margin-top:3px;
+  border:1px solid var(--ink);border-radius:2px;background:var(--sheet);box-shadow:var(--shadow);
+  padding:9px 9px 10px;display:flex;flex-direction:column;gap:8px;
+}
+.patchbay[hidden]{display:none}
+.pb-t{font-size:10.5px;color:var(--ink-2);margin-bottom:3px}
+.chips{display:flex;flex-wrap:wrap;gap:2px}
+.chip{
+  font-family:var(--mono);font-size:9.5px;border:1px solid var(--rule);border-radius:2px;
+  width:19px;height:17px;color:var(--ink-2);display:flex;align-items:center;justify-content:center;
+}
+.chip:hover{border-color:var(--ink)}
+.chip[aria-pressed="true"]{background:var(--sig);border-color:var(--sig);color:#fff}
+.pb-grid{display:grid;grid-template-columns:auto 1fr;gap:5px 7px;align-items:center}
+.pb-grid label{font-size:11px;color:var(--ink-2)}
+select.sel,input.txt{
+  width:100%;border:1px solid var(--rule);border-radius:2px;background:var(--paper);
+  padding:3px 4px;font-size:11.5px;
+}
+.amt{display:flex;align-items:center;gap:6px}
+.amt input[type=range]{grid-column:auto}
+.amt output{font-family:var(--mono);font-size:10.5px;color:var(--ink-2);width:30px;text-align:right}
+
+/* ---------- voices ---------- */
+.voice{border-bottom:1px solid var(--rule-2);padding:6px 0 7px}
+.voice-hd{display:flex;align-items:center;gap:6px}
+.led{
+  width:7px;height:7px;border-radius:50%;background:var(--ink);opacity:.14;flex:0 0 7px;
+  transition:opacity .09s linear;
+}
+.led.on{opacity:1;background:var(--sig)}
+.voice-hd .nm{flex:1;font-size:12.5px;font-weight:500}
+.voice-hd .mach{font-family:var(--mono);font-size:9.5px;border:1px solid var(--rule);border-radius:2px;padding:1px 4px;color:var(--ink-2)}
+.voice-hd .mach[data-m="909"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.knobs{display:grid;grid-template-columns:repeat(3,1fr);gap:0 8px;margin-top:2px}
+.knobs .slider label{font-size:10px}
+.knobs .slider output{font-size:10px}
+
+/* ---------- export drawer ---------- */
+.drawer{
+  position:fixed;left:0;right:0;bottom:0;z-index:60;background:var(--sheet);
+  border-top:1px solid var(--ink);box-shadow:var(--shadow);
+  padding:12px 16px 16px;max-height:72vh;display:flex;flex-direction:column;gap:9px;
+}
+.drawer[hidden]{display:none}
+.drawer-hd{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.drawer-hd h3{margin:0;font-size:14px;font-weight:600}
+.drawer-hd p{margin:0;font-size:12px;color:var(--ink-2);flex:1;min-width:180px}
+.tabs{display:flex;gap:4px}
+.tab{border:1px solid var(--rule);border-radius:2px;padding:4px 9px;font-size:12px;background:var(--paper)}
+.tab[aria-selected="true"]{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.drawer textarea{
+  width:100%;flex:1;min-height:200px;resize:vertical;border:1px solid var(--rule);border-radius:2px;
+  background:var(--paper);padding:9px 10px;font-family:var(--mono);font-size:11.5px;line-height:1.5;
+  white-space:pre;overflow:auto;
+}
+.msg{font-size:11.5px;color:var(--sig);min-height:15px}
+
+.foot{
+  border-top:1px solid var(--rule);padding:10px 18px 14px;color:var(--ink-2);font-size:11.5px;
+  display:flex;gap:14px;flex-wrap:wrap;
+}
+.foot kbd{
+  font-family:var(--mono);font-size:10.5px;border:1px solid var(--rule);border-radius:2px;padding:0 4px;color:var(--ink);
+}
+
+@media (max-width:1180px){
+  .shell{grid-template-columns:1fr}
+  .rail-l{border-right:none;border-bottom:1px solid var(--rule)}
+  .rail-r{border-left:none;border-top:1px solid var(--rule)}
+  .rail-l{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px 18px;align-items:start}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <h1 class="wordmark">Euclidean Grid Sequencer</h1>
+  <p class="tagline">16 clocked blocks, three outputs each, patched into an 808/909 drum voice bank.</p>
+  <span class="spacer"></span>
+  <a class="linkish" href="https://www.luading.dev/" target="_blank" rel="noopener">Luading</a>
+  <button class="theme-btn" id="themeBtn" type="button">dark</button>
+</header>
+
+<main class="shell">
+  <aside class="rail rail-l">
+    <div>
+      <h2 class="sect">Transport</h2>
+      <div class="transport">
+        <button class="play" id="playBtn" data-on="0" type="button"><span class="glyph">&#9654;</span><span id="playLbl">Play</span></button>
+        <button class="btn" id="resetBtn" type="button" title="Reset every block to step 1">Reset</button>
+      </div>
+    </div>
+
+    <div>
+      <h2 class="sect">Tempo</h2>
+      <div class="bignum" id="bpmWrap">
+        <input id="bpm" type="text" inputmode="numeric" value="124" aria-label="Beats per minute">
+        <span class="unit">bpm</span>
+      </div>
+    </div>
+
+    <div>
+      <h2 class="sect">Global clock</h2>
+      <div class="seg" id="rateSeg">
+        <button type="button" data-rate="2" aria-pressed="false">1/8</button>
+        <button type="button" data-rate="4" aria-pressed="true">1/16</button>
+        <button type="button" data-rate="6" aria-pressed="false">1/8T</button>
+        <button type="button" data-rate="8" aria-pressed="false">1/32</button>
+      </div>
+      <div class="slider" style="margin-top:8px">
+        <label for="swing">Swing</label><output id="swingOut">0%</output>
+        <input id="swing" type="range" min="0" max="70" value="0">
+      </div>
+    </div>
+
+    <div>
+      <h2 class="sect">Mix</h2>
+      <div class="slider">
+        <label for="vol">Master</label><output id="volOut">-6 dB</output>
+        <input id="vol" type="range" min="0" max="100" value="72">
+      </div>
+    </div>
+
+    <div class="hr"></div>
+
+    <div>
+      <h2 class="sect">Patch</h2>
+      <div style="display:flex;flex-direction:column;gap:5px">
+        <button class="btn wide" id="demoBtn" type="button">Load demo<span class="k">16 blocks</span></button>
+        <button class="btn wide" id="diceBtn" type="button">Shuffle patterns<span class="k">keeps routing</span></button>
+        <button class="btn wide" id="clearBtn" type="button">Clear all<span class="k">start empty</span></button>
+        <button class="btn wide" id="exportBtn" type="button">Export<span class="k">.lua / .json</span></button>
+      </div>
+    </div>
+  </aside>
+
+  <section class="stage">
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <aside class="rail rail-r">
+    <div>
+      <h2 class="sect">Drum voices</h2>
+      <div id="voices"></div>
+    </div>
+  </aside>
+</main>
+
+<div class="drawer" id="drawer" hidden>
+  <div class="drawer-hd">
+    <h3>Export</h3>
+    <p id="drawerNote">A Disting NT Lua script: input 1 is the clock, input 2 is reset, each block gets a trigger output. Paste it into Luading to run it.</p>
+    <div class="tabs" role="tablist">
+      <button class="tab" id="tabLua" role="tab" aria-selected="true" type="button">Lua</button>
+      <button class="tab" id="tabJson" role="tab" aria-selected="false" type="button">JSON</button>
+    </div>
+    <button class="btn" id="copyBtn" type="button">Copy</button>
+    <button class="btn" id="loadBtn" type="button" hidden>Load JSON</button>
+    <button class="btn" id="closeDrawer" type="button">Close</button>
+  </div>
+  <textarea id="exportText" spellcheck="false" aria-label="Export text"></textarea>
+  <div class="msg" id="msg"></div>
+</div>
+
+<footer class="foot">
+  <span><kbd>space</kbd> play / stop</span>
+  <span>Drag a parameter row up or down to change it</span>
+  <span>Clock, reset, mute and modulation inputs live under <kbd>patch</kbd></span>
+</footer>
+
+<script>
+"use strict";
+/* ============================================================
+   Euclidean Grid Sequencer — Web Audio POC
+   ============================================================ */
+
+const N = 16;
+
+const VOICE_DEFS = [
+  { id: "kick",  name: "Kick",       tag: "BD" },
+  { id: "snare", name: "Snare",      tag: "SD" },
+  { id: "clap",  name: "Clap",       tag: "CP" },
+  { id: "rim",   name: "Rim",        tag: "RS" },
+  { id: "ch",    name: "Closed hat", tag: "CH" },
+  { id: "oh",    name: "Open hat",   tag: "OH" },
+  { id: "lt",    name: "Low tom",    tag: "LT" },
+  { id: "mt",    name: "Mid tom",    tag: "MT" },
+  { id: "ht",    name: "Hi tom",     tag: "HT" },
+  { id: "cow",   name: "Cowbell",    tag: "CB" },
+  { id: "cym",   name: "Cymbal",     tag: "CY" },
+  { id: "shk",   name: "Shaker",     tag: "SH" }
+];
+
+const PARAMS = {
+  steps:  { label: "Steps",  min: 1,   max: 32,  def: 16 },
+  pulses: { label: "Fill",   min: 0,   max: 32,  def: 4  },
+  rot:    { label: "Rotate", min: -31, max: 31,  def: 0  },
+  div:    { label: "Divide", min: 1,   max: 16,  def: 1  },
+  prob:   { label: "Chance", min: 0,   max: 100, def: 100, suffix: "%" },
+  gate:   { label: "Gate",   min: 5,   max: 200, def: 50,  suffix: "%" }
+};
+const ROW_PARAMS = ["steps", "pulses", "rot", "div", "prob"];
+
+const MOD_DESTS = [
+  ["",       "none"],
+  ["pulses", "fill"],
+  ["rot",    "rotate"],
+  ["prob",   "chance"],
+  ["div",    "divide"],
+  ["tune",   "voice tune"],
+  ["decay",  "voice decay"],
+  ["level",  "voice level"]
+];
+const LFO_SHAPES = [["ramp", "ramp"], ["tri", "triangle"], ["sqr", "square"], ["rnd", "random"]];
+
+/* ---------- patch state ---------- */
+
+function newBlock(i) {
+  return {
+    voice:  VOICE_DEFS[i] ? VOICE_DEFS[i].id : "",
+    steps:  16, pulses: 0, rot: 0, div: 1, prob: 100, gate: 50,
+    clk:    ["G"],      // "G" = global clock, "0".."15" = trigger out of that block
+    rst:    "",         // "" none, "G", "BAR", or block index
+    mut:    "",         // block index — muted while that block's gate is high
+    mute:   false,      // manual mute
+    modSrc: "",         // block index — its LFO out
+    modDst: "",
+    modAmt: 0,
+    shape:  "ramp"
+  };
+}
+
+function newVoiceState(id) {
+  const m909 = ["kick", "snare", "ch", "oh"];
+  return { machine: m909.indexOf(id) >= 0 ? "909" : "808", level: 78, tune: 0, decay: 50, mute: false };
+}
+
+const blocks = [];
+for (let i = 0; i < N; i++) blocks.push(newBlock(i));
+
+const voices = {};
+VOICE_DEFS.forEach(function (v) { voices[v.id] = newVoiceState(v.id); });
+
+const state = [];
+for (let i = 0; i < N; i++) {
+  state.push({
+    pos: -1, cnt: 0, lfo: 0, rnd: Math.random(),
+    gateFrom: -1, gateTo: -1, lastClock: null,
+    q: [], dispPos: -1, dispLfo: 0, patKey: ""
+  });
+}
+
+function resetRuntime() {
+  for (let i = 0; i < N; i++) {
+    const s = state[i];
+    s.pos = -1; s.cnt = 0; s.gateFrom = -1; s.gateTo = -1; s.lastClock = null;
+    s.q.length = 0; s.dispPos = -1;
+  }
+}
+
+/* ---------- euclid ---------- */
+
+function euclidHit(i, steps, pulses, rot) {
+  if (pulses <= 0) return false;
+  if (pulses >= steps) return true;
+  let k = (i + rot) % steps;
+  if (k < 0) k += steps;
+  return (k * pulses) % steps < pulses;
+}
+
+function clamp(v, a, b) { return v < a ? a : (v > b ? b : v); }
+
+/* ---------- audio engine ---------- */
+
+const E = {
+  ctx: null, master: null, comp: null, noise: null,
+  busses: {},
+  running: false,
+  bpm: 124, swing: 0, rate: 4, vol: 72,
+  nextPulse: 0, pulseIdx: 0, timer: null
+};
+
+const LOOKAHEAD = 0.14;
+
+function pulseInterval() { return 60 / E.bpm / E.rate; }
+
+function initAudio() {
+  if (E.ctx) return;
+  const AC = window.AudioContext || window.webkitAudioContext;
+  E.ctx = new AC();
+  E.comp = E.ctx.createDynamicsCompressor();
+  E.comp.threshold.value = -10;
+  E.comp.ratio.value = 4;
+  E.comp.attack.value = 0.003;
+  E.comp.release.value = 0.12;
+  E.master = E.ctx.createGain();
+  E.master.gain.value = volGain(E.vol);
+  E.comp.connect(E.master);
+  E.master.connect(E.ctx.destination);
+
+  const len = Math.floor(E.ctx.sampleRate * 2);
+  const buf = E.ctx.createBuffer(1, len, E.ctx.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  E.noise = buf;
+
+  VOICE_DEFS.forEach(function (v) {
+    const g = E.ctx.createGain();
+    g.gain.value = 1;
+    g.connect(E.comp);
+    E.busses[v.id] = g;
+  });
+}
+
+function volGain(v) { return Math.pow(v / 100, 1.7) * 1.1; }
+
+function ctxOsc(type, freq, t) {
+  const o = E.ctx.createOscillator();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, t);
+  return o;
+}
+function ctxGain(v, t) {
+  const g = E.ctx.createGain();
+  g.gain.setValueAtTime(v, t);
+  return g;
+}
+function decayTo(param, t, peak, dur) {
+  param.setValueAtTime(Math.max(0.0001, peak), t);
+  param.exponentialRampToValueAtTime(0.0001, t + Math.max(0.01, dur));
+}
+function noiseSrc(t, dur) {
+  const s = E.ctx.createBufferSource();
+  s.buffer = E.noise;
+  s.playbackRate.value = 1;
+  const off = Math.random() * 1.5;
+  s.start(t, off, dur + 0.05);
+  return s;
+}
+function filt(type, freq, q, t) {
+  const f = E.ctx.createBiquadFilter();
+  f.type = type;
+  f.frequency.setValueAtTime(freq, t);
+  if (q != null) f.Q.setValueAtTime(q, t);
+  return f;
+}
+
+/* Each voice: (t, p) where p = {machine, tune (semitones), dec (multiplier), amp} */
+
+function vKick(t, p) {
+  const bus = E.busses.kick;
+  const f0 = 50 * Math.pow(2, p.tune / 12);
+  const dur = (p.machine === "909" ? 0.42 : 0.85) * p.dec;
+  const o = ctxOsc("sine", f0, t);
+  o.frequency.setValueAtTime(f0 * (p.machine === "909" ? 7 : 4.4), t);
+  o.frequency.exponentialRampToValueAtTime(f0, t + (p.machine === "909" ? 0.035 : 0.07));
+  const g = ctxGain(0, t);
+  decayTo(g.gain, t, p.amp, dur);
+  o.connect(g); g.connect(bus);
+  o.start(t); o.stop(t + dur + 0.05);
+  const cs = noiseSrc(t, 0.02);
+  const hp = filt("highpass", 1400, 0.7, t);
+  const cg = ctxGain(0, t);
+  decayTo(cg.gain, t, p.amp * (p.machine === "909" ? 0.45 : 0.18), 0.016);
+  cs.connect(hp); hp.connect(cg); cg.connect(bus);
+}
+
+function vSnare(t, p) {
+  const bus = E.busses.snare;
+  const nd = (p.machine === "909" ? 0.28 : 0.2) * p.dec;
+  const ns = noiseSrc(t, nd);
+  const nf = filt(p.machine === "909" ? "highpass" : "bandpass", p.machine === "909" ? 900 : 2200, 0.9, t);
+  const ng = ctxGain(0, t);
+  decayTo(ng.gain, t, p.amp * 0.8, nd);
+  ns.connect(nf); nf.connect(ng); ng.connect(bus);
+  const base = 185 * Math.pow(2, p.tune / 12);
+  [1, 1.62].forEach(function (r, i) {
+    const o = ctxOsc("triangle", base * r, t);
+    const g = ctxGain(0, t);
+    decayTo(g.gain, t, p.amp * (i ? 0.28 : 0.42), 0.13 * p.dec);
+    o.connect(g); g.connect(bus);
+    o.start(t); o.stop(t + 0.2 * p.dec + 0.03);
+  });
+}
+
+function vClap(t, p) {
+  const bus = E.busses.clap;
+  const bp = filt("bandpass", 1080 * Math.pow(2, p.tune / 24), 1.1, t);
+  bp.connect(bus);
+  const spread = p.machine === "909" ? 0.009 : 0.013;
+  for (let i = 0; i < 3; i++) {
+    const st = t + i * spread;
+    const g = ctxGain(0, st);
+    const s = noiseSrc(st, 0.03);
+    decayTo(g.gain, st, p.amp * 0.55, 0.018);
+    s.connect(g); g.connect(bp);
+  }
+  const tl = ctxGain(0, t);
+  const ts = noiseSrc(t + spread * 2, 0.3);
+  decayTo(tl.gain, t + spread * 2, p.amp * 0.5, 0.22 * p.dec);
+  ts.connect(tl); tl.connect(bp);
+}
+
+function vRim(t, p) {
+  const bus = E.busses.rim;
+  const g = ctxGain(0, t);
+  const hp = filt("bandpass", 1750 * Math.pow(2, p.tune / 12), 3.5, t);
+  decayTo(g.gain, t, p.amp * 0.7, 0.035 * p.dec);
+  [1670, 2350].forEach(function (f) {
+    const o = ctxOsc("square", f * Math.pow(2, p.tune / 12), t);
+    o.connect(hp);
+    o.start(t); o.stop(t + 0.05);
+  });
+  const s = noiseSrc(t, 0.02);
+  const sg = ctxGain(p.amp * 0.25, t);
+  decayTo(sg.gain, t, p.amp * 0.25, 0.012);
+  s.connect(sg); sg.connect(hp);
+  hp.connect(g); g.connect(bus);
+}
+
+function metallic(t, dur, tune, amp, dest, hpFreq) {
+  const ratios = [2, 3, 4.16, 5.43, 6.79, 8.21];
+  const base = 40 * Math.pow(2, tune / 12);
+  const hp = filt("highpass", hpFreq, 0.8, t);
+  const bp = filt("bandpass", 9000, 0.9, t);
+  const g = ctxGain(0, t);
+  decayTo(g.gain, t, amp, dur);
+  ratios.forEach(function (r) {
+    const o = ctxOsc("square", base * r, t);
+    o.connect(hp);
+    o.start(t); o.stop(t + dur + 0.03);
+  });
+  hp.connect(bp); bp.connect(g); g.connect(dest);
+}
+
+function vHat(t, p, open) {
+  const bus = open ? E.busses.oh : E.busses.ch;
+  const dur = (open ? 0.42 : 0.058) * p.dec;
+  if (p.machine === "909") {
+    const s = noiseSrc(t, dur);
+    const hp = filt("highpass", 7800 * Math.pow(2, p.tune / 24), 0.8, t);
+    const g = ctxGain(0, t);
+    decayTo(g.gain, t, p.amp * 0.55, dur);
+    s.connect(hp); hp.connect(g); g.connect(bus);
+    metallic(t, dur * 0.7, p.tune, p.amp * 0.2, bus, 7000);
+  } else {
+    metallic(t, dur, p.tune, p.amp * 0.5, bus, 7400);
+  }
+}
+
+function vTom(t, p, which) {
+  const bus = E.busses[which];
+  const base = ({ lt: 92, mt: 138, ht: 196 })[which] * Math.pow(2, p.tune / 12);
+  const dur = (p.machine === "909" ? 0.3 : 0.45) * p.dec;
+  const o = ctxOsc("sine", base, t);
+  o.frequency.setValueAtTime(base * 1.7, t);
+  o.frequency.exponentialRampToValueAtTime(base, t + 0.07);
+  const g = ctxGain(0, t);
+  decayTo(g.gain, t, p.amp * 0.9, dur);
+  o.connect(g); g.connect(bus);
+  o.start(t); o.stop(t + dur + 0.05);
+  const s = noiseSrc(t, 0.04);
+  const bp = filt("bandpass", base * 4, 1.2, t);
+  const ng = ctxGain(0, t);
+  decayTo(ng.gain, t, p.amp * 0.18, 0.05);
+  s.connect(bp); bp.connect(ng); ng.connect(bus);
+}
+
+function vCow(t, p) {
+  const bus = E.busses.cow;
+  const dur = 0.36 * p.dec;
+  const bp = filt("bandpass", 2640, 1.4, t);
+  const g = ctxGain(0, t);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(p.amp * 0.55, t + 0.003);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  [540, 800].forEach(function (f) {
+    const o = ctxOsc("square", f * Math.pow(2, p.tune / 12), t);
+    o.connect(bp);
+    o.start(t); o.stop(t + dur + 0.03);
+  });
+  bp.connect(g); g.connect(bus);
+}
+
+function vCym(t, p) {
+  const bus = E.busses.cym;
+  const dur = (p.machine === "909" ? 1.6 : 1.15) * p.dec;
+  metallic(t, dur, p.tune - 2, p.amp * 0.4, bus, 4200);
+  const s = noiseSrc(t, dur);
+  const hp = filt("highpass", 5200, 0.7, t);
+  const g = ctxGain(0, t);
+  decayTo(g.gain, t, p.amp * (p.machine === "909" ? 0.4 : 0.22), dur);
+  s.connect(hp); hp.connect(g); g.connect(bus);
+}
+
+function vShk(t, p) {
+  const bus = E.busses.shk;
+  const dur = 0.075 * p.dec;
+  const s = noiseSrc(t, dur);
+  const bp = filt("bandpass", 6200 * Math.pow(2, p.tune / 24), 1.6, t);
+  const g = ctxGain(0, t);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.linearRampToValueAtTime(p.amp * 0.5, t + 0.006);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  s.connect(bp); bp.connect(g); g.connect(bus);
+}
+
+const hitAt = {};
+VOICE_DEFS.forEach(function (v) { hitAt[v.id] = -1; });
+
+function playVoice(id, t, mod) {
+  if (!E.ctx || !id) return;
+  const v = voices[id];
+  if (!v || v.mute) return;
+  const p = {
+    machine: v.machine,
+    tune: clamp(v.tune + (mod.tune || 0) * 12, -24, 24),
+    dec: clamp(0.25 + (v.decay + (mod.decay || 0) * 50) / 100 * 1.6, 0.15, 2.4),
+    amp: clamp(v.level / 100 * (1 + (mod.level || 0) * 0.6), 0, 1.4)
+  };
+  if (p.amp <= 0.001) return;
+  switch (id) {
+    case "kick":  vKick(t, p); break;
+    case "snare": vSnare(t, p); break;
+    case "clap":  vClap(t, p); break;
+    case "rim":   vRim(t, p); break;
+    case "ch":    vHat(t, p, false); break;
+    case "oh":    vHat(t, p, true); break;
+    case "lt":    vTom(t, p, "lt"); break;
+    case "mt":    vTom(t, p, "mt"); break;
+    case "ht":    vTom(t, p, "ht"); break;
+    case "cow":   vCow(t, p); break;
+    case "cym":   vCym(t, p); break;
+    case "shk":   vShk(t, p); break;
+  }
+  hitAt[id] = t;
+}
+
+/* ---------- sequencing ---------- */
+
+function lfoValue(shape, ph, rnd) {
+  if (shape === "tri") { const v = ph * 2; return v > 1 ? 2 - v : v; }
+  if (shape === "sqr") return ph < 0.5 ? 1 : 0;
+  if (shape === "rnd") return rnd;
+  return ph;
+}
+
+function effective(i) {
+  const b = blocks[i];
+  const e = { steps: b.steps, pulses: b.pulses, rot: b.rot, div: b.div, prob: b.prob, tune: 0, decay: 0, level: 0, mod: 0 };
+  if (b.modSrc !== "" && b.modAmt !== 0) {
+    const src = state[+b.modSrc];
+    if (src) e.mod = (src.lfo * 2 - 1) * b.modAmt;
+  }
+  const m = e.mod;
+  switch (b.modDst) {
+    case "pulses": e.pulses = Math.round(b.pulses + m * 8); break;
+    case "rot":    e.rot = Math.round(b.rot + m * e.steps); break;
+    case "prob":   e.prob = b.prob + m * 100; break;
+    case "div":    e.div = Math.round(b.div + m * 4); break;
+    case "tune":   e.tune = m; break;
+    case "decay":  e.decay = m; break;
+    case "level":  e.level = m; break;
+  }
+  e.pulses = clamp(e.pulses, 0, e.steps);
+  e.div = clamp(e.div, 1, 16);
+  e.prob = clamp(e.prob, 0, 100);
+  return e;
+}
+
+function gateHigh(i, t) {
+  const s = state[i];
+  return s.gateFrom <= t && t < s.gateTo;
+}
+
+function isMuted(i, t) {
+  const b = blocks[i];
+  if (b.mute) return true;
+  if (b.mut !== "" && gateHigh(+b.mut, t)) return true;
+  return false;
+}
+
+function doReset(i) {
+  const s = state[i];
+  s.pos = -1; s.cnt = 0;
+}
+
+function advance(i, t) {
+  const b = blocks[i], s = state[i];
+  const iv = s.lastClock == null ? pulseInterval() : Math.max(0.008, t - s.lastClock);
+  s.lastClock = t;
+  s.cnt++;
+  const e = effective(i);
+  if (s.cnt % e.div !== 0) return false;
+  s.pos = (s.pos + 1) % e.steps;
+  if (s.pos === 0) s.rnd = Math.random();
+  s.lfo = lfoValue(b.shape, s.pos / e.steps, s.rnd);
+
+  const ev = { t: t, pos: s.pos, steps: e.steps, pulses: e.pulses, rot: e.rot,
+               lfo: s.lfo, fire: false, muted: false };
+  const hit = euclidHit(s.pos, e.steps, e.pulses, e.rot);
+  if (!hit) { s.q.push(ev); return false; }
+  if (isMuted(i, t)) { ev.muted = true; s.q.push(ev); return false; }
+  if (Math.random() * 100 >= e.prob) { s.q.push(ev); return false; }
+
+  s.gateFrom = t;
+  s.gateTo = t + Math.max(0.005, iv * b.gate / 100);
+  ev.fire = true;
+  s.q.push(ev);
+  if (b.voice) playVoice(b.voice, t, e);
+  return true;
+}
+
+function tick(t, idx) {
+  const queue = [{ s: "G", t: t }];
+  if (idx % (E.rate * 4) === 0) queue.push({ s: "BAR", t: t });
+  const count = new Array(N).fill(0);
+  let guard = 0, head = 0;
+  while (head < queue.length && guard++ < 400) {
+    const ev = queue[head++];
+    for (let i = 0; i < N; i++) if (blocks[i].rst === ev.s) doReset(i);
+    for (let i = 0; i < N; i++) {
+      const b = blocks[i];
+      if (b.clk.indexOf(ev.s) < 0) continue;
+      if (count[i]++ >= 8) continue;
+      if (advance(i, ev.t)) queue.push({ s: String(i), t: ev.t });
+    }
+  }
+}
+
+function scheduler() {
+  if (!E.running) return;
+  const now = E.ctx.currentTime;
+  let guard = 0;
+  while (E.nextPulse < now + LOOKAHEAD && guard++ < 64) {
+    const iv = pulseInterval();
+    const sw = (E.pulseIdx % 2 === 1) ? (E.swing / 100) * iv * 0.5 : 0;
+    tick(E.nextPulse + sw, E.pulseIdx);
+    E.pulseIdx++;
+    E.nextPulse += iv;
+  }
+}
+
+function transport(on) {
+  initAudio();
+  if (on) {
+    if (E.ctx.state === "suspended") E.ctx.resume();
+    resetRuntime();
+    E.pulseIdx = 0;
+    E.nextPulse = E.ctx.currentTime + 0.08;
+    E.running = true;
+    if (E.timer) clearInterval(E.timer);
+    E.timer = setInterval(scheduler, 20);
+    scheduler();
+  } else {
+    E.running = false;
+    if (E.timer) { clearInterval(E.timer); E.timer = null; }
+    resetRuntime();
+  }
+  const btn = document.getElementById("playBtn");
+  btn.dataset.on = on ? "1" : "0";
+  btn.querySelector(".glyph").innerHTML = on ? "&#9632;" : "&#9654;";
+  document.getElementById("playLbl").textContent = on ? "Stop" : "Play";
+}
+
+/* ============================================================
+   UI
+   ============================================================ */
+
+const SVGNS = "http://www.w3.org/2000/svg";
+const ui = [];
+const $ = function (id) { return document.getElementById(id); };
+
+function voiceName(id) {
+  for (let i = 0; i < VOICE_DEFS.length; i++) if (VOICE_DEFS[i].id === id) return VOICE_DEFS[i].name;
+  return "";
+}
+function voiceTag(id) {
+  for (let i = 0; i < VOICE_DEFS.length; i++) if (VOICE_DEFS[i].id === id) return VOICE_DEFS[i].tag;
+  return "lfo";
+}
+function pad2(n) { return (n < 9 ? "0" : "") + (n + 1); }
+
+function blockOptions(sel, self, noneLabel) {
+  let h = '<option value="">' + noneLabel + "</option>";
+  for (let i = 0; i < N; i++) {
+    if (i === self) continue;
+    h += '<option value="' + i + '"' + (sel === String(i) ? " selected" : "") + ">" +
+         pad2(i) + " " + (blocks[i].voice ? voiceName(blocks[i].voice) : "block") + "</option>";
+  }
+  return h;
+}
+
+function cardHTML(i) {
+  const b = blocks[i];
+  let vopts = '<option value="">no voice</option>';
+  VOICE_DEFS.forEach(function (v) {
+    vopts += '<option value="' + v.id + '"' + (b.voice === v.id ? " selected" : "") + ">" + v.name + "</option>";
+  });
+  let rows = "";
+  ROW_PARAMS.forEach(function (p) {
+    rows += '<button class="row" type="button" data-p="' + p + '"><span>' + PARAMS[p].label + "</span><b>0</b></button>";
+  });
+  let chips = '<button class="chip" type="button" data-clk="G" title="Global clock">G</button>';
+  for (let k = 0; k < N; k++) {
+    if (k === i) continue;
+    chips += '<button class="chip" type="button" data-clk="' + k + '" title="Trigger out of block ' + pad2(k) + '">' + pad2(k) + "</button>";
+  }
+  let dests = "";
+  MOD_DESTS.forEach(function (d) { dests += '<option value="' + d[0] + '">' + d[1] + "</option>"; });
+  let shapes = "";
+  LFO_SHAPES.forEach(function (s) { shapes += '<option value="' + s[0] + '">' + s[1] + "</option>"; });
+
+  return '' +
+  '<header class="blk-hd">' +
+    '<span class="idx">' + pad2(i) + "</span>" +
+    '<select class="vsel" aria-label="Voice for block ' + pad2(i) + '">' + vopts + "</select>" +
+    '<button class="mini mute" type="button" aria-pressed="false" title="Mute block">M</button>' +
+    '<button class="mini patch" type="button" aria-expanded="false">patch</button>' +
+  "</header>" +
+  '<div class="blk-body">' +
+    '<svg class="dial" viewBox="0 0 100 100">' +
+      '<circle class="dial-bg" cx="50" cy="50" r="45"></circle>' +
+      '<circle class="dial-lfo" cx="50" cy="50" r="45" pathLength="100" stroke-dasharray="100 100" stroke-dashoffset="100"></circle>' +
+      '<g class="dots"></g>' +
+      '<text class="dial-txt" x="50" y="51">0/16</text>' +
+      '<text class="dial-sub" x="50" y="61">--</text>' +
+    "</svg>" +
+    '<div class="rows">' + rows + "</div>" +
+  "</div>" +
+  '<div class="patchbay" hidden>' +
+    '<div><div class="pb-t">Clock in — sources add up</div><div class="chips">' + chips + "</div></div>" +
+    '<div class="pb-grid">' +
+      "<label>Reset in</label><select class=\"sel\" data-f=\"rst\">" +
+        '<option value="">none</option><option value="BAR">every bar</option>' +
+        blockOptions("", i, "").replace('<option value=""></option>', "") +
+      "</select>" +
+      "<label>Mute in</label><select class=\"sel\" data-f=\"mut\">" + blockOptions("", i, "none") + "</select>" +
+      "<label>Gate</label><div class=\"amt\"><input type=\"range\" data-f=\"gate\" min=\"5\" max=\"200\" step=\"5\"><output data-o=\"gate\"></output></div>" +
+      "<label>LFO out</label><select class=\"sel\" data-f=\"shape\">" + shapes + "</select>" +
+      "<label>Mod from</label><select class=\"sel\" data-f=\"modSrc\">" + blockOptions("", i, "none") + "</select>" +
+      "<label>Mod to</label><select class=\"sel\" data-f=\"modDst\">" + dests + "</select>" +
+      "<label>Amount</label><div class=\"amt\"><input type=\"range\" data-f=\"modAmt\" min=\"-100\" max=\"100\" step=\"1\"><output data-o=\"modAmt\"></output></div>" +
+    "</div>" +
+    '<div class="pb-t">This block sends a trigger, a gate and an LFO to every other block.</div>' +
+  "</div>";
+}
+
+function buildGrid() {
+  const grid = $("grid");
+  grid.innerHTML = "";
+  ui.length = 0;
+  for (let i = 0; i < N; i++) {
+    const el = document.createElement("article");
+    el.className = "blk";
+    el.dataset.i = String(i);
+    el.innerHTML = cardHTML(i);
+    grid.appendChild(el);
+    ui.push({
+      el: el,
+      dots: el.querySelector(".dots"),
+      dotEls: [],
+      nSteps: -1,
+      lfoArc: el.querySelector(".dial-lfo"),
+      txt: el.querySelector(".dial-txt"),
+      sub: el.querySelector(".dial-sub"),
+      rows: el.querySelectorAll(".row"),
+      patch: el.querySelector(".patchbay"),
+      head: -1,
+      key: ""
+    });
+  }
+  for (let i = 0; i < N; i++) {
+    const u = ui[i];
+    for (let k = 0; k < u.rows.length; k++) {
+      (function (row, bi) {
+        const p = row.dataset.p;
+        attachDrag(row, function () { return blocks[bi][p]; }, function (v) { setParam(bi, p, v); }, 6);
+      })(u.rows[k], i);
+    }
+    refreshCard(i);
+  }
+}
+
+function paintPattern(i, steps, pulses, rot) {
+  const u = ui[i];
+  const key = steps + ":" + pulses + ":" + rot;
+  if (u.key === key) return;
+  u.key = key;
+  if (u.nSteps !== steps) {
+    while (u.dots.firstChild) u.dots.removeChild(u.dots.firstChild);
+    u.dotEls = [];
+    const r = 35;
+    const dr = steps > 24 ? 2.0 : (steps > 16 ? 2.5 : (steps > 10 ? 3.1 : 3.8));
+    for (let k = 0; k < steps; k++) {
+      const a = (-90 + k * 360 / steps) * Math.PI / 180;
+      const c = document.createElementNS(SVGNS, "circle");
+      c.setAttribute("cx", (50 + Math.cos(a) * r).toFixed(2));
+      c.setAttribute("cy", (50 + Math.sin(a) * r).toFixed(2));
+      c.setAttribute("r", String(dr));
+      c.setAttribute("class", "dot");
+      u.dots.appendChild(c);
+      u.dotEls.push(c);
+    }
+    u.nSteps = steps;
+    u.head = -1;
+  }
+  for (let k = 0; k < steps; k++) {
+    u.dotEls[k].classList.toggle("on", euclidHit(k, steps, pulses, rot));
+  }
+  u.txt.textContent = pulses + "/" + steps;
+}
+
+function refreshCard(i) {
+  const b = blocks[i], u = ui[i];
+  const e = effective(i);
+  paintPattern(i, e.steps, e.pulses, e.rot);
+  u.sub.textContent = (b.voice ? voiceTag(b.voice) : "lfo") + (b.div > 1 ? " \u00f7" + b.div : "");
+  for (let k = 0; k < u.rows.length; k++) {
+    const row = u.rows[k], p = row.dataset.p;
+    const def = PARAMS[p];
+    row.querySelector("b").textContent = b[p] + (def.suffix || "");
+    row.dataset.mod = (b.modDst === p && b.modSrc !== "" && b.modAmt !== 0) ? "1" : "0";
+  }
+  u.el.querySelector(".vsel").value = b.voice;
+  const mb = u.el.querySelector(".mute");
+  mb.setAttribute("aria-pressed", b.mute ? "true" : "false");
+  u.el.dataset.muted = b.mute ? "1" : "0";
+  const chips = u.el.querySelectorAll(".chip");
+  for (let k = 0; k < chips.length; k++) {
+    chips[k].setAttribute("aria-pressed", b.clk.indexOf(chips[k].dataset.clk) >= 0 ? "true" : "false");
+  }
+  const p = u.patch;
+  p.querySelector('[data-f="rst"]').value = b.rst;
+  p.querySelector('[data-f="mut"]').value = b.mut;
+  p.querySelector('[data-f="shape"]').value = b.shape;
+  p.querySelector('[data-f="modSrc"]').value = b.modSrc;
+  p.querySelector('[data-f="modDst"]').value = b.modDst;
+  p.querySelector('[data-f="gate"]').value = b.gate;
+  p.querySelector('[data-o="gate"]').textContent = b.gate + "%";
+  p.querySelector('[data-f="modAmt"]').value = Math.round(b.modAmt * 100);
+  p.querySelector('[data-o="modAmt"]').textContent = Math.round(b.modAmt * 100) + "%";
+}
+
+function refreshAll() { for (let i = 0; i < N; i++) refreshCard(i); }
+
+/* ---------- drum voice rail ---------- */
+
+const ledEls = {};
+
+function buildVoices() {
+  const wrap = $("voices");
+  wrap.innerHTML = "";
+  VOICE_DEFS.forEach(function (v) {
+    const s = voices[v.id];
+    const el = document.createElement("div");
+    el.className = "voice";
+    el.dataset.v = v.id;
+    el.innerHTML =
+      '<div class="voice-hd">' +
+        '<span class="led"></span>' +
+        '<span class="nm">' + v.name + "</span>" +
+        '<button class="mach" type="button" data-m="' + s.machine + '">' + s.machine + "</button>" +
+        '<button class="mini vmute" type="button" aria-pressed="' + (s.mute ? "true" : "false") + '">M</button>' +
+      "</div>" +
+      '<div class="knobs">' +
+        '<div class="slider"><label>Level</label><output data-o="level"></output><input type="range" data-k="level" min="0" max="100"></div>' +
+        '<div class="slider"><label>Tune</label><output data-o="tune"></output><input type="range" data-k="tune" min="-12" max="12"></div>' +
+        '<div class="slider"><label>Decay</label><output data-o="decay"></output><input type="range" data-k="decay" min="0" max="100"></div>' +
+      "</div>";
+    wrap.appendChild(el);
+    ledEls[v.id] = el.querySelector(".led");
+    refreshVoice(v.id);
+  });
+}
+
+function refreshVoice(id) {
+  const el = $("voices").querySelector('[data-v="' + id + '"]');
+  if (!el) return;
+  const s = voices[id];
+  el.querySelector(".mach").dataset.m = s.machine;
+  el.querySelector(".mach").textContent = s.machine;
+  el.querySelector(".vmute").setAttribute("aria-pressed", s.mute ? "true" : "false");
+  ["level", "tune", "decay"].forEach(function (k) {
+    el.querySelector('[data-k="' + k + '"]').value = s[k];
+    el.querySelector('[data-o="' + k + '"]').textContent = k === "tune" ? (s[k] > 0 ? "+" + s[k] : String(s[k])) : s[k];
+  });
+  el.style.opacity = s.mute ? ".45" : "1";
+}
+
+/* ---------- drag-to-edit ---------- */
+
+function attachDrag(el, getV, setV, sens) {
+  let startY = 0, startV = 0, active = false, moved = false;
+  el.addEventListener("pointerdown", function (ev) {
+    if (ev.button !== 0) return;
+    active = true; moved = false;
+    startY = ev.clientY; startV = getV();
+    el.setPointerCapture(ev.pointerId);
+    ev.preventDefault();
+  });
+  el.addEventListener("pointermove", function (ev) {
+    if (!active) return;
+    const d = Math.round((startY - ev.clientY) / (sens || 6));
+    if (d !== 0) moved = true;
+    setV(startV + d);
+  });
+  function stop(ev) {
+    if (!active) return;
+    active = false;
+    try { el.releasePointerCapture(ev.pointerId); } catch (e) {}
+  }
+  el.addEventListener("pointerup", stop);
+  el.addEventListener("pointercancel", stop);
+  el.addEventListener("wheel", function (ev) {
+    ev.preventDefault();
+    setV(getV() + (ev.deltaY < 0 ? 1 : -1));
+  }, { passive: false });
+  el.addEventListener("keydown", function (ev) {
+    let d = 0;
+    if (ev.key === "ArrowUp" || ev.key === "ArrowRight") d = 1;
+    if (ev.key === "ArrowDown" || ev.key === "ArrowLeft") d = -1;
+    if (ev.shiftKey) d *= 4;
+    if (d) { ev.preventDefault(); setV(getV() + d); }
+  });
+}
+
+function setParam(i, p, v) {
+  const def = PARAMS[p];
+  const b = blocks[i];
+  b[p] = clamp(Math.round(v), def.min, def.max);
+  if (p === "steps") b.pulses = Math.min(b.pulses, b.steps);
+  if (p === "pulses") b.pulses = Math.min(b.pulses, b.steps);
+  ui[i].key = "";
+  refreshCard(i);
+  save();
+}
+
+/* ---------- events ---------- */
+
+function closePatches(except) {
+  for (let i = 0; i < N; i++) {
+    if (i === except) continue;
+    ui[i].patch.hidden = true;
+    ui[i].el.querySelector(".patch").setAttribute("aria-expanded", "false");
+  }
+}
+
+function wireGridDelegates() {
+  const grid = $("grid");
+
+  grid.addEventListener("click", function (ev) {
+    const card = ev.target.closest(".blk");
+    if (!card) return;
+    const i = +card.dataset.i;
+    const chip = ev.target.closest(".chip");
+    if (chip) {
+      const src = chip.dataset.clk;
+      const at = blocks[i].clk.indexOf(src);
+      if (at >= 0) blocks[i].clk.splice(at, 1); else blocks[i].clk.push(src);
+      refreshCard(i); save(); return;
+    }
+    if (ev.target.closest(".mute")) {
+      blocks[i].mute = !blocks[i].mute;
+      refreshCard(i); save(); return;
+    }
+    const pb = ev.target.closest(".patch");
+    if (pb) {
+      const open = ui[i].patch.hidden;
+      closePatches(open ? i : -1);
+      ui[i].patch.hidden = !open;
+      pb.setAttribute("aria-expanded", open ? "true" : "false");
+      return;
+    }
+  });
+
+  grid.addEventListener("change", function (ev) {
+    const card = ev.target.closest(".blk");
+    if (!card) return;
+    const i = +card.dataset.i;
+    if (ev.target.classList.contains("vsel")) {
+      blocks[i].voice = ev.target.value;
+      refreshCard(i); save(); return;
+    }
+    const f = ev.target.dataset.f;
+    if (!f) return;
+    if (f === "modAmt") blocks[i].modAmt = (+ev.target.value) / 100;
+    else if (f === "gate") blocks[i].gate = +ev.target.value;
+    else blocks[i][f] = ev.target.value;
+    ui[i].key = "";
+    refreshCard(i); save();
+  });
+
+  grid.addEventListener("input", function (ev) {
+    const card = ev.target.closest(".blk");
+    if (!card) return;
+    const i = +card.dataset.i;
+    const f = ev.target.dataset.f;
+    if (f === "modAmt" || f === "gate") {
+      if (f === "modAmt") blocks[i].modAmt = (+ev.target.value) / 100;
+      else blocks[i].gate = +ev.target.value;
+      refreshCard(i);
+    }
+  });
+
+  document.addEventListener("pointerdown", function (ev) {
+    if (ev.target.closest(".patchbay") || ev.target.closest(".mini.patch")) return;
+    closePatches(-1);
+  });
+}
+
+function wireVoices() {
+  const wrap = $("voices");
+  wrap.addEventListener("click", function (ev) {
+    const row = ev.target.closest(".voice");
+    if (!row) return;
+    const id = row.dataset.v;
+    if (ev.target.closest(".mach")) {
+      voices[id].machine = voices[id].machine === "808" ? "909" : "808";
+      refreshVoice(id); save(); return;
+    }
+    if (ev.target.closest(".vmute")) {
+      voices[id].mute = !voices[id].mute;
+      refreshVoice(id); save(); return;
+    }
+  });
+  wrap.addEventListener("input", function (ev) {
+    const row = ev.target.closest(".voice");
+    if (!row || !ev.target.dataset.k) return;
+    const id = row.dataset.v, k = ev.target.dataset.k;
+    voices[id][k] = +ev.target.value;
+    refreshVoice(id);
+  });
+  wrap.addEventListener("change", function () { save(); });
+}
+
+function wireTransport() {
+  $("playBtn").addEventListener("click", function () { transport(!E.running); });
+  $("resetBtn").addEventListener("click", function () {
+    resetRuntime();
+    if (E.running && E.ctx) { E.pulseIdx = 0; E.nextPulse = E.ctx.currentTime + 0.03; }
+  });
+
+  const bpmIn = $("bpm");
+  function setBpm(v) {
+    E.bpm = clamp(Math.round(v), 20, 300);
+    bpmIn.value = String(E.bpm);
+    save();
+  }
+  attachDrag($("bpmWrap"), function () { return E.bpm; }, setBpm, 4);
+  bpmIn.addEventListener("change", function () { setBpm(parseFloat(bpmIn.value) || 120); });
+  bpmIn.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
+
+  $("rateSeg").addEventListener("click", function (ev) {
+    const b = ev.target.closest("button");
+    if (!b) return;
+    E.rate = +b.dataset.rate;
+    const all = $("rateSeg").querySelectorAll("button");
+    for (let i = 0; i < all.length; i++) all[i].setAttribute("aria-pressed", all[i] === b ? "true" : "false");
+    save();
+  });
+
+  const sw = $("swing");
+  sw.addEventListener("input", function () {
+    E.swing = +sw.value;
+    $("swingOut").textContent = E.swing + "%";
+  });
+  sw.addEventListener("change", save);
+
+  const vol = $("vol");
+  vol.addEventListener("input", function () {
+    E.vol = +vol.value;
+    $("volOut").textContent = (E.vol === 0 ? "-inf" : Math.round(20 * Math.log10(volGain(E.vol)))) + " dB";
+    if (E.master) E.master.gain.setTargetAtTime(volGain(E.vol), E.ctx.currentTime, 0.02);
+  });
+  vol.addEventListener("change", save);
+
+  $("themeBtn").addEventListener("click", function () {
+    const cur = document.documentElement.getAttribute("data-theme");
+    const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    const next = cur ? (cur === "dark" ? "light" : "dark") : (dark ? "light" : "dark");
+    document.documentElement.setAttribute("data-theme", next);
+    $("themeBtn").textContent = next === "dark" ? "light" : "dark";
+  });
+
+  document.addEventListener("keydown", function (ev) {
+    if (ev.code !== "Space") return;
+    const t = ev.target;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT")) return;
+    ev.preventDefault();
+    transport(!E.running);
+  });
+}
+
+/* ---------- animation ---------- */
+
+function frame() {
+  const now = E.ctx ? E.ctx.currentTime : 0;
+  for (let i = 0; i < N; i++) {
+    const s = state[i], u = ui[i];
+    while (s.q.length && s.q[0].t <= now) {
+      const ev = s.q.shift();
+      paintPattern(i, ev.steps, ev.pulses, ev.rot);
+      if (u.head >= 0 && u.dotEls[u.head]) u.dotEls[u.head].classList.remove("head");
+      const dot = u.dotEls[ev.pos];
+      if (dot) {
+        dot.classList.add("head");
+        u.head = ev.pos;
+        if (ev.fire) {
+          dot.classList.add("hit");
+          u.el.dataset.fire = "1";
+          (function (d, card) {
+            setTimeout(function () { d.classList.remove("hit"); card.dataset.fire = "0"; }, 110);
+          })(dot, u.el);
+        }
+      }
+      u.lfoArc.setAttribute("stroke-dashoffset", String(100 - ev.lfo * 100));
+    }
+    const b = blocks[i];
+    u.el.dataset.muted = (b.mute || (b.mut !== "" && gateHigh(+b.mut, now))) ? "1" : "0";
+  }
+  VOICE_DEFS.forEach(function (v) {
+    const led = ledEls[v.id];
+    if (led) led.classList.toggle("on", hitAt[v.id] > 0 && now - hitAt[v.id] < 0.1);
+  });
+  requestAnimationFrame(frame);
+}
+
+/* ---------- patches ---------- */
+
+function applyPatch(p) {
+  if (!p) return;
+  if (typeof p.bpm === "number") E.bpm = clamp(p.bpm, 20, 300);
+  if (typeof p.rate === "number") E.rate = p.rate;
+  if (typeof p.swing === "number") E.swing = p.swing;
+  if (typeof p.vol === "number") E.vol = p.vol;
+  if (p.blocks) {
+    for (let i = 0; i < N; i++) {
+      const src = p.blocks[i];
+      if (!src) continue;
+      const b = blocks[i];
+      Object.keys(newBlock(i)).forEach(function (k) {
+        if (src[k] === undefined) return;
+        b[k] = (k === "clk") ? src[k].slice() : src[k];
+      });
+    }
+  }
+  if (p.voices) {
+    VOICE_DEFS.forEach(function (v) {
+      if (!p.voices[v.id]) return;
+      Object.keys(voices[v.id]).forEach(function (k) {
+        if (p.voices[v.id][k] !== undefined) voices[v.id][k] = p.voices[v.id][k];
+      });
+    });
+  }
+  syncGlobals();
+  buildGrid();
+  buildVoices();
+}
+
+function syncGlobals() {
+  $("bpm").value = String(E.bpm);
+  $("swing").value = String(E.swing);
+  $("swingOut").textContent = E.swing + "%";
+  $("vol").value = String(E.vol);
+  $("volOut").textContent = (E.vol === 0 ? "-inf" : Math.round(20 * Math.log10(volGain(E.vol)))) + " dB";
+  const all = $("rateSeg").querySelectorAll("button");
+  for (let i = 0; i < all.length; i++) all[i].setAttribute("aria-pressed", +all[i].dataset.rate === E.rate ? "true" : "false");
+}
+
+function patchObject() {
+  const bs = blocks.map(function (b) {
+    return {
+      voice: b.voice, steps: b.steps, pulses: b.pulses, rot: b.rot, div: b.div,
+      prob: b.prob, gate: b.gate, clk: b.clk.slice(), rst: b.rst, mut: b.mut,
+      mute: b.mute, modSrc: b.modSrc, modDst: b.modDst, modAmt: b.modAmt, shape: b.shape
+    };
+  });
+  const vs = {};
+  VOICE_DEFS.forEach(function (v) {
+    vs[v.id] = { machine: voices[v.id].machine, level: voices[v.id].level, tune: voices[v.id].tune, decay: voices[v.id].decay, mute: voices[v.id].mute };
+  });
+  return { format: "euclid-grid.v1", bpm: E.bpm, rate: E.rate, swing: E.swing, vol: E.vol, blocks: bs, voices: vs };
+}
+
+const DEMO = [
+  { v: "kick",  st: 16, pu: 4,  ro: 0,  dv: 1, pr: 100 },
+  { v: "snare", st: 16, pu: 2,  ro: 4,  dv: 1, pr: 100 },
+  { v: "ch",    st: 16, pu: 8,  ro: 0,  dv: 1, pr: 92, mod: { src: "12", dst: "prob", amt: -0.5 } },
+  { v: "oh",    st: 16, pu: 3,  ro: 2,  dv: 1, pr: 60 },
+  { v: "clap",  st: 16, pu: 3,  ro: 6,  dv: 1, pr: 75, mut: "15" },
+  { v: "rim",   st: 12, pu: 5,  ro: 1,  dv: 1, pr: 55 },
+  { v: "lt",    st: 16, pu: 2,  ro: 9,  dv: 1, pr: 45, rst: "15" },
+  { v: "mt",    st: 10, pu: 3,  ro: 0,  dv: 1, pr: 40 },
+  { v: "ht",    st: 14, pu: 5,  ro: 3,  dv: 1, pr: 35 },
+  { v: "cow",   st: 16, pu: 3,  ro: 5,  dv: 2, pr: 40, clk: ["G", "1"] },
+  { v: "cym",   st: 4,  pu: 1,  ro: 0,  dv: 1, pr: 70, clk: ["0"] },
+  { v: "shk",   st: 16, pu: 11, ro: 0,  dv: 1, pr: 80, mod: { src: "13", dst: "level", amt: 0.6 } },
+  { v: "",      st: 8,  pu: 3,  ro: 0,  dv: 2, pr: 100, shape: "tri" },
+  { v: "",      st: 6,  pu: 5,  ro: 0,  dv: 1, pr: 100, shape: "rnd" },
+  { v: "",      st: 5,  pu: 2,  ro: 0,  dv: 3, pr: 100, shape: "ramp" },
+  { v: "",      st: 4,  pu: 1,  ro: 0,  dv: 8, pr: 100, gate: 200, shape: "sqr" }
+];
+
+function demoPatch() {
+  const bs = [];
+  for (let i = 0; i < N; i++) {
+    const d = DEMO[i], b = newBlock(i);
+    b.voice = d.v; b.steps = d.st; b.pulses = d.pu; b.rot = d.ro; b.div = d.dv; b.prob = d.pr;
+    if (d.gate) b.gate = d.gate;
+    if (d.shape) b.shape = d.shape;
+    if (d.clk) b.clk = d.clk.slice();
+    if (d.rst) b.rst = d.rst;
+    if (d.mut) b.mut = d.mut;
+    if (d.mod) { b.modSrc = d.mod.src; b.modDst = d.mod.dst; b.modAmt = d.mod.amt; }
+    bs.push(b);
+  }
+  const vs = {};
+  VOICE_DEFS.forEach(function (v) { vs[v.id] = newVoiceState(v.id); });
+  return { format: "euclid-grid.v1", bpm: 124, rate: 4, swing: 12, vol: E.vol, blocks: bs, voices: vs };
+}
+
+function shufflePatterns() {
+  const sizes = [8, 12, 16, 16, 16, 10, 14, 16];
+  for (let i = 0; i < N; i++) {
+    const b = blocks[i];
+    b.steps = sizes[Math.floor(Math.random() * sizes.length)];
+    b.pulses = Math.floor(Math.random() * (b.steps * 0.7)) + (i === 0 ? 3 : 0);
+    b.pulses = clamp(b.pulses, 0, b.steps);
+    b.rot = Math.floor(Math.random() * b.steps);
+    if (i === 0) { b.steps = 16; b.pulses = 4; b.rot = 0; }
+    b.prob = 40 + Math.floor(Math.random() * 61);
+  }
+  refreshAll(); save();
+}
+
+function clearPatch() {
+  for (let i = 0; i < N; i++) {
+    const b = blocks[i], f = newBlock(i);
+    Object.keys(f).forEach(function (k) { b[k] = (k === "clk") ? f[k].slice() : f[k]; });
+  }
+  refreshAll(); save();
+}
+
+/* ---------- persistence ---------- */
+
+let saveTimer = null;
+function save() {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(function () {
+    try { localStorage.setItem("egs.patch.v1", JSON.stringify(patchObject())); } catch (e) {}
+  }, 250);
+}
+function restore() {
+  try {
+    const raw = localStorage.getItem("egs.patch.v1");
+    if (!raw) return false;
+    const p = JSON.parse(raw);
+    if (!p || !p.blocks) return false;
+    applyPatch(p);
+    return true;
+  } catch (e) { return false; }
+}
+
+/* ============================================================
+   Export — Disting NT Lua (runs in Luading) and JSON
+   ============================================================ */
+
+const SHAPE_NUM = { ramp: 1, tri: 2, sqr: 3, rnd: 4 };
+const DST_NUM = { "": 0, pulses: 1, rot: 2, prob: 3, div: 4, tune: 0, decay: 0, level: 0 };
+
+function srcNum(v) {
+  if (v === "" ) return -9;
+  if (v === "G") return 0;
+  if (v === "BAR") return -1;
+  return (+v) + 1;
+}
+
+function luaStr(s) { return '"' + String(s).replace(/"/g, '\\"') + '"'; }
+
+function buildLua() {
+  const usedTrig = {}, usedLfo = {};
+  for (let i = 0; i < N; i++) {
+    const b = blocks[i];
+    b.clk.forEach(function (c) { if (c !== "G") usedTrig[+c] = 1; });
+    if (b.rst !== "" && b.rst !== "G" && b.rst !== "BAR") usedTrig[+b.rst] = 1;
+    if (b.mut !== "") usedTrig[+b.mut] = 1;
+    if (b.modSrc !== "" && b.modAmt !== 0) usedLfo[+b.modSrc] = 1;
+  }
+  const types = [], names = [], outIdx = [], lfoIdx = [];
+  for (let i = 0; i < N; i++) { outIdx.push(0); lfoIdx.push(0); }
+  for (let i = 0; i < N; i++) {
+    if (types.length >= 28) break;
+    if (blocks[i].voice || usedTrig[i]) {
+      types.push("kStepped");
+      names.push(luaStr(pad2(i) + " " + (blocks[i].voice ? voiceName(blocks[i].voice) : "trig")));
+      outIdx[i] = types.length;
+    }
+  }
+  for (let i = 0; i < N; i++) {
+    if (types.length >= 28) break;
+    if (usedLfo[i]) {
+      types.push("kLinear");
+      names.push(luaStr(pad2(i) + " LFO"));
+      lfoIdx[i] = types.length;
+    }
+  }
+  if (!types.length) { types.push("kStepped"); names.push(luaStr("01 trig")); outIdx[0] = 1; }
+
+  const rows = [];
+  for (let i = 0; i < N; i++) {
+    const b = blocks[i];
+    const clk = b.clk.map(srcNum).join(", ");
+    const extra = (b.modDst === "tune" || b.modDst === "decay" || b.modDst === "level")
+      ? "  -- browser voice mod (" + b.modDst + ") not exported"
+      : "";
+    rows.push("\t{ steps=" + b.steps + ", pulses=" + b.pulses + ", rot=" + b.rot +
+      ", div=" + b.div + ", prob=" + b.prob + ", gate=" + b.gate +
+      ", clk={" + clk + "}, rst=" + srcNum(b.rst) + ", mut=" + (b.mut === "" ? 0 : (+b.mut) + 1) +
+      ", mn=" + (b.mute ? "true" : "false") +
+      ", shape=" + SHAPE_NUM[b.shape] +
+      ", msrc=" + (b.modSrc === "" ? 0 : (+b.modSrc) + 1) +
+      ", mdst=" + DST_NUM[b.modDst] + ", mamt=" + b.modAmt.toFixed(2) +
+      ", out=" + outIdx[i] + ", lout=" + lfoIdx[i] +
+      ", tag=" + luaStr(blocks[i].voice ? voiceTag(blocks[i].voice) : "--") + " }," + extra);
+  }
+
+  return "" +
+"-- Euclid Grid\n" +
+"--[[\n" +
+"Sixteen Euclidean blocks on a shared clock tree, exported from the Euclidean\n" +
+"Grid Sequencer. Input 1 is the clock, input 2 is reset. Blocks clock each\n" +
+"other, reset each other, mute each other with their gates and modulate each\n" +
+"other with their step LFOs. Tempo lives outside: feed it a clock.\n" +
+"Exported " + new Date().toISOString().slice(0, 10) + " at " + E.bpm + " BPM, 1/" + (E.rate * 4) + " clock.\n" +
+"]]\n" +
+"\n" +
+"local BAR = " + (E.rate * 4) + "\t\t-- clock pulses per bar\n" +
+"\n" +
+"-- steps/pulses/rot: the Euclidean pattern.  div: clock divide.  prob: chance %.\n" +
+"-- gate: gate length, % of one clock.  clk: clock sources (0 = clock input,\n" +
+"-- n = trigger out of block n).  rst/mut/msrc: block numbers, 0 or -9 = unused.\n" +
+"local blocks = {\n" + rows.join("\n") + "\n}\n" +
+"\n" +
+"local NB = #blocks\n" +
+"local pos, cnt, gate, lfo, rnd = {}, {}, {}, {}, {}\n" +
+"for i = 1, NB do pos[i] = -1 cnt[i] = 0 gate[i] = 0 lfo[i] = 0 rnd[i] = 0 end\n" +
+"\n" +
+"local outs = {}\n" +
+"local gateLen, probScale, lfoDepth, muteAll = 0.02, 1.0, 5.0, false\n" +
+"local gcount = 0\n" +
+"\n" +
+"local function euclidHit( i, steps, pulses, rot )\n" +
+"\tif pulses <= 0 then return false end\n" +
+"\tif pulses >= steps then return true end\n" +
+"\tlocal k = ( i + rot ) % steps\n" +
+"\treturn ( k * pulses ) % steps < pulses\n" +
+"end\n" +
+"\n" +
+"local function shapeValue( shape, ph, r )\n" +
+"\tif shape == 2 then\n" +
+"\t\tlocal v = ph * 2\n" +
+"\t\tif v > 1 then v = 2 - v end\n" +
+"\t\treturn v\n" +
+"\telseif shape == 3 then\n" +
+"\t\tif ph < 0.5 then return 1.0 else return 0.0 end\n" +
+"\telseif shape == 4 then\n" +
+"\t\treturn r\n" +
+"\tend\n" +
+"\treturn ph\n" +
+"end\n" +
+"\n" +
+"local function effective( i )\n" +
+"\tlocal b = blocks[i]\n" +
+"\tlocal m = 0.0\n" +
+"\tif b.msrc > 0 and b.mamt ~= 0 then m = ( lfo[b.msrc] * 2 - 1 ) * b.mamt end\n" +
+"\tlocal steps, pulses, rot, div, prob = b.steps, b.pulses, b.rot, b.div, b.prob\n" +
+"\tif b.mdst == 1 then pulses = math.floor( pulses + m * 8 + 0.5 )\n" +
+"\telseif b.mdst == 2 then rot = math.floor( rot + m * steps + 0.5 )\n" +
+"\telseif b.mdst == 3 then prob = prob + m * 100\n" +
+"\telseif b.mdst == 4 then div = math.floor( div + m * 4 + 0.5 ) end\n" +
+"\tif pulses < 0 then pulses = 0 end\n" +
+"\tif pulses > steps then pulses = steps end\n" +
+"\tif div < 1 then div = 1 end\n" +
+"\treturn steps, pulses, rot, div, prob\n" +
+"end\n" +
+"\n" +
+"local function advance( i )\n" +
+"\tlocal b = blocks[i]\n" +
+"\tcnt[i] = cnt[i] + 1\n" +
+"\tlocal steps, pulses, rot, div, prob = effective( i )\n" +
+"\tif cnt[i] % div ~= 0 then return false end\n" +
+"\tpos[i] = ( pos[i] + 1 ) % steps\n" +
+"\tif pos[i] == 0 then rnd[i] = math.random() end\n" +
+"\tlfo[i] = shapeValue( b.shape, pos[i] / steps, rnd[i] )\n" +
+"\tif not euclidHit( pos[i], steps, pulses, rot ) then return false end\n" +
+"\tif muteAll or b.mn then return false end\n" +
+"\tif b.mut > 0 and gate[b.mut] > 0 then return false end\n" +
+"\tif math.random() * 100 >= prob * probScale then return false end\n" +
+"\tgate[i] = gateLen * ( b.gate / 50 )\n" +
+"\tif b.out > 0 then outs[b.out] = 5.0 end\n" +
+"\treturn true\n" +
+"end\n" +
+"\n" +
+"local queue = {}\n" +
+"local function pulse( src )\n" +
+"\tqueue[1] = src\n" +
+"\tlocal head, tail, guard = 1, 1, 0\n" +
+"\twhile head <= tail and guard < 200 do\n" +
+"\t\tlocal s = queue[head]\n" +
+"\t\thead = head + 1\n" +
+"\t\tguard = guard + 1\n" +
+"\t\tfor i = 1, NB do\n" +
+"\t\t\tif blocks[i].rst == s then pos[i] = -1 cnt[i] = 0 end\n" +
+"\t\tend\n" +
+"\t\tfor i = 1, NB do\n" +
+"\t\t\tlocal c = blocks[i].clk\n" +
+"\t\t\tfor k = 1, #c do\n" +
+"\t\t\t\tif c[k] == s then\n" +
+"\t\t\t\t\tif advance( i ) then tail = tail + 1 queue[tail] = i end\n" +
+"\t\t\t\t\tbreak\n" +
+"\t\t\t\tend\n" +
+"\t\t\tend\n" +
+"\t\tend\n" +
+"\tend\n" +
+"end\n" +
+"\n" +
+"return\n" +
+"{\n" +
+"\tname = 'Euclid Grid'\n" +
+",\tauthor = 'Euclidean Grid Sequencer'\n" +
+",\tinit = function( self )\n" +
+"\t\treturn\n" +
+"\t\t{\n" +
+"\t\t\tinputs = { kTrigger, kTrigger }\n" +
+"\t\t,\tinputNames = { \"Clock\", \"Reset\" }\n" +
+"\t\t,\toutputs = { " + types.join(", ") + " }\n" +
+"\t\t,\toutputNames = { " + names.join(", ") + " }\n" +
+"\t\t,\tparameters =\n" +
+"\t\t\t{\n" +
+"\t\t\t\t{ \"Gate\", 1, 200, 20, kMs }\n" +
+"\t\t\t,\t{ \"Probability\", 0, 200, 100, kPercent }\n" +
+"\t\t\t,\t{ \"LFO depth\", 0, 100, 50, kVolts, kBy10 }\n" +
+"\t\t\t,\t{ \"Mute all\", { \"Off\", \"On\" }, 1 }\n" +
+"\t\t\t}\n" +
+"\t\t}\n" +
+"\tend\n" +
+",\ttrigger = function( self, input )\n" +
+"\t\touts = {}\n" +
+"\t\tgateLen = self.parameters[1] / 1000\n" +
+"\t\tprobScale = self.parameters[2] / 100\n" +
+"\t\tlfoDepth = self.parameters[3]\n" +
+"\t\tmuteAll = self.parameters[4] == 2\n" +
+"\t\tif input == 1 then\n" +
+"\t\t\tgcount = gcount + 1\n" +
+"\t\t\tif gcount % BAR == 1 then pulse( -1 ) end\n" +
+"\t\t\tpulse( 0 )\n" +
+"\t\telse\n" +
+"\t\t\tgcount = 0\n" +
+"\t\t\tfor i = 1, NB do pos[i] = -1 cnt[i] = 0 end\n" +
+"\t\tend\n" +
+"\t\treturn outs\n" +
+"\tend\n" +
+",\tstep = function( self, dt, inputs )\n" +
+"\t\tlocal o = {}\n" +
+"\t\tfor i = 1, NB do\n" +
+"\t\t\tif gate[i] > 0 then\n" +
+"\t\t\t\tgate[i] = gate[i] - dt\n" +
+"\t\t\t\tif gate[i] <= 0 then\n" +
+"\t\t\t\t\tgate[i] = 0\n" +
+"\t\t\t\t\tif blocks[i].out > 0 then o[blocks[i].out] = 0.0 end\n" +
+"\t\t\t\tend\n" +
+"\t\t\tend\n" +
+"\t\t\tif blocks[i].lout > 0 then o[blocks[i].lout] = lfo[i] * lfoDepth end\n" +
+"\t\tend\n" +
+"\t\treturn o\n" +
+"\tend\n" +
+",\tdraw = function( self )\n" +
+"\t\tdrawTinyText( 2, 7, \"EUCLID GRID\", 8 )\n" +
+"\t\tfor i = 1, NB do\n" +
+"\t\t\tlocal col = ( i - 1 ) % 4\n" +
+"\t\t\tlocal row = math.floor( ( i - 1 ) / 4 )\n" +
+"\t\t\tlocal x = 4 + col * 16\n" +
+"\t\t\tlocal y = 12 + row * 13\n" +
+"\t\t\tdrawBox( x, y, x + 13, y + 10, 3 )\n" +
+"\t\t\tif gate[i] > 0 then\n" +
+"\t\t\t\tdrawRectangle( x + 1, y + 1, x + 12, y + 9, 15 )\n" +
+"\t\t\telse\n" +
+"\t\t\t\tdrawTinyText( x + 2, y + 7, blocks[i].tag, 6 )\n" +
+"\t\t\tend\n" +
+"\t\tend\n" +
+"\t\tfor i = 1, NB do\n" +
+"\t\t\tlocal x = 76 + ( i - 1 ) * 11\n" +
+"\t\t\tif x < 250 then\n" +
+"\t\t\t\tdrawRectangle( x, 58 - math.floor( lfo[i] * 14 ), x + 8, 58, 4 + math.floor( lfo[i] * 8 ) )\n" +
+"\t\t\tend\n" +
+"\t\tend\n" +
+"\t\treturn true\n" +
+"\tend\n" +
+"}\n";
+}
+
+/* ---------- drawer ---------- */
+
+let drawerTab = "lua";
+
+function fillDrawer() {
+  const ta = $("exportText");
+  if (drawerTab === "lua") {
+    ta.value = buildLua();
+    ta.readOnly = true;
+    $("drawerNote").textContent = "A Disting NT Lua script: input 1 is the clock, input 2 is reset, one trigger output per block plus CV outputs for the LFOs in use. Paste it into Luading to run it.";
+    $("loadBtn").hidden = true;
+  } else {
+    ta.value = JSON.stringify(patchObject(), null, 2);
+    ta.readOnly = false;
+    $("drawerNote").textContent = "The whole patch as JSON — every block, route and drum setting. Edit or paste another patch here and press Load.";
+    $("loadBtn").hidden = false;
+  }
+  $("tabLua").setAttribute("aria-selected", drawerTab === "lua" ? "true" : "false");
+  $("tabJson").setAttribute("aria-selected", drawerTab === "json" ? "true" : "false");
+  $("msg").textContent = "";
+}
+
+function wireDrawer() {
+  $("exportBtn").addEventListener("click", function () {
+    $("drawer").hidden = false;
+    fillDrawer();
+  });
+  $("closeDrawer").addEventListener("click", function () { $("drawer").hidden = true; });
+  $("tabLua").addEventListener("click", function () { drawerTab = "lua"; fillDrawer(); });
+  $("tabJson").addEventListener("click", function () { drawerTab = "json"; fillDrawer(); });
+  $("copyBtn").addEventListener("click", function () {
+    const ta = $("exportText");
+    ta.select();
+    let ok = false;
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(ta.value);
+        ok = true;
+      } else {
+        ok = document.execCommand("copy");
+      }
+    } catch (e) { ok = false; }
+    $("msg").textContent = ok ? "Copied " + (drawerTab === "lua" ? "Lua script" : "JSON patch") + " to the clipboard."
+                              : "Text selected — press Cmd/Ctrl+C to copy.";
+  });
+  $("loadBtn").addEventListener("click", function () {
+    try {
+      const p = JSON.parse($("exportText").value);
+      if (!p || !p.blocks) throw new Error("no blocks in this patch");
+      applyPatch(p);
+      save();
+      $("msg").textContent = "Patch loaded.";
+    } catch (e) {
+      $("msg").textContent = "That JSON did not load: " + e.message;
+    }
+  });
+  $("demoBtn").addEventListener("click", function () { applyPatch(demoPatch()); save(); });
+  $("diceBtn").addEventListener("click", shufflePatterns);
+  $("clearBtn").addEventListener("click", clearPatch);
+}
+
+/* ============================================================
+   Boot
+   ============================================================ */
+
+function boot() {
+  wireGridDelegates();
+  wireVoices();
+  wireTransport();
+  wireDrawer();
+  const dark = window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  $("themeBtn").textContent = dark ? "light" : "dark";
+  if (!restore()) applyPatch(demoPatch());
+  requestAnimationFrame(frame);
+}
+
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+else boot();
+
+</script>
+</body>
+</html>
