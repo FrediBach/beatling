@@ -78,10 +78,11 @@ export interface BlockVisualState {
   lfo: number;
   fire: boolean;
   muted: boolean;
-  effective: Pick<EffectiveBlock, "steps" | "pulses" | "rot">;
+  effective: Pick<EffectiveBlock, "steps" | "pulses" | "rot" | "div">;
 }
 
 export interface EngineSnapshot {
+  clockPulse: number;
   blocks: BlockVisualState[];
   activeVoices: Partial<Record<VoiceId, boolean>>;
 }

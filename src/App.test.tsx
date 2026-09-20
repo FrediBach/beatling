@@ -1,6 +1,7 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "@/App";
+import { SequencerEngine } from "@/audio/engine";
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
@@ -104,5 +105,61 @@ describe("patch bay", () => {
     fireEvent.keyDown(document, { key: "Escape" });
     expect(screen.queryByRole("region", { name: /Routing for block/ })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Patch block 14" })).toHaveFocus();
+  });
+});
+
+describe("circle view", () => {
+  it("selects just one rhythm, edits it, and preserves changes when switching views", () => {
+    vi.spyOn(window.localStorage.__proto__, "getItem").mockReturnValue(null);
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Circle" }));
+    expect(screen.getAllByTestId(/^orbit-ring-/)).toHaveLength(16);
+    expect(screen.getAllByTestId(/^block-/)).toHaveLength(1);
+    expect(screen.getAllByTestId(/^orbit-playhead-/)).toHaveLength(4);
+    fireEvent.click(screen.getByRole("button", { name: "Select block 02 Snare" }));
+    const settings = screen.getByRole("region", { name: "Settings for block 02" });
+    fireEvent.keyDown(within(settings).getByRole("button", { name: "Steps: 16" }), { key: "ArrowDown" });
+    expect(within(settings).getByRole("button", { name: "Steps: 15" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Grid" }));
+    expect(screen.getAllByTestId(/^block-/)).toHaveLength(16);
+    expect(within(screen.getByTestId("block-2")).getByRole("button", { name: "Steps: 15" })).toBeInTheDocument();
+    expect(within(screen.getByTestId("block-1")).getByRole("button", { name: "Steps: 16" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Circle" }));
+    expect(screen.getByRole("region", { name: "Settings for block 02" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Undo last change" }));
+    expect(screen.getByRole("button", { name: "Steps: 16" })).toBeInTheDocument();
+  });
+
+  it("supports ring selection, arrow navigation and following a patched connection", () => {
+    vi.spyOn(window.localStorage.__proto__, "getItem").mockReturnValue(null);
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Circle" }));
+    fireEvent.click(screen.getByTestId("orbit-ring-2"));
+    expect(screen.getByRole("region", { name: "Settings for block 03" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Block 13 LFO to block 03 chance" }));
+    expect(screen.getByRole("region", { name: "Settings for block 13" })).toBeInTheDocument();
+    fireEvent.keyDown(screen.getByRole("button", { name: "Select block 13 Modulator" }), { key: "ArrowRight" });
+    expect(screen.getByRole("button", { name: "Select block 14 Modulator" })).toHaveFocus();
+    expect(screen.getByRole("region", { name: "Settings for block 14" })).toBeInTheDocument();
+    expect(within(screen.getByRole("group", { name: "Select a rhythm" })).getAllByRole("button", { pressed: true })).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "Voice bank" }));
+    expect(screen.getByRole("button", { name: "Mute all" })).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("orbit-ring-0"));
+    expect(screen.getByRole("region", { name: "Settings for block 01" })).toBeInTheDocument();
+  });
+
+  it("does not stop or restart playback when switching views", async () => {
+    vi.spyOn(window.localStorage.__proto__, "getItem").mockReturnValue(null);
+    let running = false;
+    const start = vi.spyOn(SequencerEngine.prototype, "start").mockImplementation(async () => { running = true; });
+    const stop = vi.spyOn(SequencerEngine.prototype, "stop");
+    vi.spyOn(SequencerEngine.prototype, "running", "get").mockImplementation(() => running);
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Play" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Stop" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Circle" }));
+    fireEvent.click(screen.getByRole("button", { name: "Grid" }));
+    expect(start).toHaveBeenCalledTimes(1);
+    expect(stop).not.toHaveBeenCalled();
   });
 });

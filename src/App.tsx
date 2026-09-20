@@ -4,6 +4,7 @@ import { SequencerEngine } from "@/audio/engine";
 import { ExportDialog } from "@/components/export-dialog";
 import { PatchPanel } from "@/components/patch-panel";
 import { PatchCables } from "@/components/patch-cables";
+import { OrbitView } from "@/components/orbit-view";
 import { CABLE_SIGNALS } from "@/lib/cables";
 import { connectionsFor } from "@/lib/routing";
 import { SequencerCard } from "@/components/sequencer-card";
@@ -18,6 +19,7 @@ import { useDragNumber } from "@/hooks/use-drag-number";
 import { cn } from "@/lib/utils";
 
 const emptySnapshot = (patch: Patch): EngineSnapshot => ({
+  clockPulse: -1,
   blocks: patch.blocks.map((block) => ({
     position: -1,
     lfo: 0,
@@ -54,6 +56,12 @@ export default function App() {
   const [openPatch, setOpenPatch] = useState<number | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [presetId, setPresetId] = useState("");
+  const [view, setView] = useState<"grid" | "circle">(() => {
+    try { return localStorage.getItem("beatling-pattern-view") === "circle" ? "circle" : "grid"; }
+    catch { return "grid"; }
+  });
+  const [selectedRhythm, setSelectedRhythm] = useState(0);
+  const [circlePanel, setCirclePanel] = useState<"rhythm" | "voices">("rhythm");
   const [showCables, setShowCables] = useState(() => {
     try { return localStorage.getItem("beatling-show-cables") === "true"; }
     catch { return false; }
@@ -71,6 +79,11 @@ export default function App() {
     try { localStorage.setItem("beatling-show-cables", String(showCables)); }
     catch { /* The toggle still works when browser storage is unavailable. */ }
   }, [showCables]);
+
+  useEffect(() => {
+    try { localStorage.setItem("beatling-pattern-view", view); }
+    catch { /* View selection works without browser storage. */ }
+  }, [view]);
 
   useEffect(() => {
     const timeout = window.setTimeout(() => savePatch(patch), 250);
@@ -211,6 +224,22 @@ export default function App() {
   const allSettingsLocked = randomizationLocks.every((blockLocks) => Object.values(blockLocks).every(Boolean));
   const allVoicesMuted = Object.values(patch.voices).every((voice) => voice.mute);
 
+  const selectRhythm = (index: number) => {
+    setSelectedRhythm(index);
+    setCirclePanel("rhythm");
+  };
+
+  const switchPatternView = (mode: "grid" | "circle") => {
+    setView(mode);
+    if (mode === "circle") {
+      setCirclePanel("rhythm");
+      if (openPatch !== null) setSelectedRhythm(openPatch);
+    }
+    setOpenPatch(null);
+  };
+
+  const renderCard = (index: number, showDial = true) => <SequencerCard key={index} showDial={showDial} index={index} block={patch.blocks[index]} blocks={patch.blocks} visual={visualFor(index)} patchOpen={showDial && openPatch === index} related={showDial && openPatch !== null && connections.some((connection) => (connection.source === openPatch && connection.target === index) || (connection.target === openPatch && connection.source === index))} locks={randomizationLocks[index]} onPatchOpen={showDial ? setOpenPatch : () => document.getElementById("circle-routing")?.scrollIntoView({ behavior: "instant", block: "nearest" })} onChange={(next) => updateBlock(index, next)} onRandomize={() => updateBlock(index, randomizeBlock(patch.blocks[index], index, randomizationLocks[index]))} onLockToggle={() => setBlockLocks(index, !Object.values(randomizationLocks[index]).every(Boolean))} onParameterRandomize={(parameter) => updateBlock(index, randomizeBlockParameter(patch.blocks[index], index, parameter))} onParameterLockToggle={(parameter) => toggleParameterLock(index, parameter)} />;
+
   return (
     <div className="instrument">
       <header className="instrument-header">
@@ -254,20 +283,29 @@ export default function App() {
 
       <main className="workspace">
         <section className="sequencer-section" aria-label="Sequencer blocks">
-          <div className="section-heading"><div><h2>Pattern grid</h2><span className="section-meta">16 independent sequences</span></div><div className="grid-actions"><button onClick={() => applyPatch(shufflePatch(patch, Math.random, randomizationLocks))} title="Shuffle unlocked settings, preserving routing" disabled={allSettingsLocked}><Dices size={13} />Shuffle</button><button className="lock-all-button" aria-pressed={allSettingsLocked} onClick={() => setRandomizationLocks(createRandomizationLocks(!allSettingsLocked))} title={allSettingsLocked ? "Unlock every pattern setting" : "Lock every pattern setting"}>{allSettingsLocked ? <Lock size={12} /> : <LockOpen size={12} />}{allSettingsLocked ? "Unlock all" : "Lock all"}</button><button onClick={() => applyPatch(createEmptyPatch(patch.vol))}><Eraser size={13} />Clear</button></div></div>
-          <div className="cable-controls">
+          <div className="section-heading pattern-heading"><div><h2>Pattern {view === "grid" ? "grid" : "circle"}</h2><div className="view-switch" role="group" aria-label="Pattern view">{(["grid", "circle"] as const).map((mode) => <button type="button" key={mode} aria-pressed={view === mode} onClick={() => switchPatternView(mode)}>{mode === "grid" ? "Grid" : "Circle"}</button>)}</div><span className="section-meta">16 independent sequences</span></div><div className="grid-actions"><button onClick={() => applyPatch(shufflePatch(patch, Math.random, randomizationLocks))} title="Shuffle unlocked settings, preserving routing" disabled={allSettingsLocked}><Dices size={13} />Shuffle</button><button className="lock-all-button" aria-pressed={allSettingsLocked} onClick={() => setRandomizationLocks(createRandomizationLocks(!allSettingsLocked))} title={allSettingsLocked ? "Unlock every pattern setting" : "Lock every pattern setting"}>{allSettingsLocked ? <Lock size={12} /> : <LockOpen size={12} />}{allSettingsLocked ? "Unlock all" : "Lock all"}</button><button onClick={() => applyPatch(createEmptyPatch(patch.vol))}><Eraser size={13} />Clear</button></div></div>
+          {view === "grid" ? <><div className="cable-controls">
             <button type="button" className="cable-toggle" role="switch" aria-checked={showCables} onClick={() => setShowCables((current) => !current)}><Cable size={13} />Patch cables<span className="toggle-track" aria-hidden="true"><i /></span></button>
             {showCables && <span className="cable-legend">{CABLE_SIGNALS.map((signal) => <span key={signal.input}><i style={{ background: signal.color }} />{signal.input}</span>)}</span>}
             {showCables && <span className="cable-hint">Hover a block to see through cables</span>}
           </div>
           <div className={cn("sequencer-grid", showCables && "cables-visible")}>
-            {patch.blocks.map((block, index) => <SequencerCard key={index} index={index} block={block} blocks={patch.blocks} visual={visualFor(index)} patchOpen={openPatch === index} related={openPatch !== null && connections.some((connection) => (connection.source === openPatch && connection.target === index) || (connection.target === openPatch && connection.source === index))} locks={randomizationLocks[index]} onPatchOpen={setOpenPatch} onChange={(next) => updateBlock(index, next)} onRandomize={() => updateBlock(index, randomizeBlock(block, index, randomizationLocks[index]))} onLockToggle={() => setBlockLocks(index, !Object.values(randomizationLocks[index]).every(Boolean))} onParameterRandomize={(parameter) => updateBlock(index, randomizeBlockParameter(block, index, parameter))} onParameterLockToggle={(parameter) => toggleParameterLock(index, parameter)} />)}
+            {patch.blocks.map((_block, index) => renderCard(index))}
             {showCables && <PatchCables connections={connections} />}
           </div>
+          </> : <OrbitView blocks={patch.blocks} visuals={patch.blocks.map((_block, index) => visualFor(index))} clockPulse={playing ? snapshot.clockPulse : -1} selected={selectedRhythm} onSelect={selectRhythm} />}
           <div className="grid-legend"><span><i className="legend-dot" /> Hit <i className="legend-dot hollow" /> Rest <i className="legend-dot accent" /> Playhead</span><span><Cable size={12} />{connections.length} block connections · Select Patch to trace a signal</span></div>
         </section>
-        <aside className={cn("side-panel", openPatch !== null && "patch-visible")}>
+        <aside className={cn("side-panel", view === "circle" && "circle-side-panel", openPatch !== null && "patch-visible")}>
+          {view === "circle" && <div className="circle-panel-switch" role="group" aria-label="Circle sidebar"><button type="button" aria-pressed={circlePanel === "rhythm"} onClick={() => setCirclePanel("rhythm")}>Rhythm settings</button><button type="button" aria-pressed={circlePanel === "voices"} onClick={() => setCirclePanel("voices")}>Voice bank</button></div>}
+          {view === "circle" && circlePanel === "rhythm" ? <div className="circle-inspector" role="region" aria-label={`Settings for block ${String(selectedRhythm + 1).padStart(2, "0")}`}>
+            <div className="circle-inspector-title"><span className="eyebrow">Selected rhythm / {String(selectedRhythm + 1).padStart(2, "0")}</span><p>One ring, one rhythm. Adjust it here.</p></div>
+            {renderCard(selectedRhythm, false)}
+            <div id="circle-routing"><PatchPanel embedded index={selectedRhythm} blocks={patch.blocks} onChange={(next) => updateBlock(selectedRhythm, next)} onSelect={selectRhythm} onClose={() => undefined} /></div>
+          </div> : <>
+
           {openPatch !== null ? <PatchPanel index={openPatch} blocks={patch.blocks} onChange={(next) => updateBlock(openPatch, next)} onSelect={setOpenPatch} onClose={() => setOpenPatch(null)} /> : <><div className="section-heading voice-bank-heading"><div><h2>Voice bank</h2><span className="section-meta">12 voices</span></div><button className="voice-bank-master" aria-pressed={allVoicesMuted} onClick={() => setAllVoicesMuted(!allVoicesMuted)}>{allVoicesMuted ? <Volume2 size={12} /> : <VolumeX size={12} />}{allVoicesMuted ? "Unmute all" : "Mute all"}</button></div><VoiceBank voices={patch.voices} activeVoices={snapshot.activeVoices} onChange={updateVoice} /><div className="voice-bank-note"><span className="jack" />808 / 909 · Select a model to switch</div></>}
+          </>}
         </aside>
       </main>
       <footer className="instrument-footer"><span><kbd>space</kbd> play / stop</span><span><kbd>↑</kbd> <kbd>↓</kbd> or drag to adjust · <kbd>shift</kbd> for larger steps</span><span className="footer-signoff">RHYTHM, BY DESIGN. <span>EG–16</span></span></footer>

@@ -8,6 +8,7 @@ import { PatternDial } from "@/components/pattern-dial";
 import { cn } from "@/lib/utils";
 
 interface SequencerCardProps {
+  showDial?: boolean;
   index: number;
   block: SequencerBlock;
   blocks: SequencerBlock[];
@@ -23,7 +24,7 @@ interface SequencerCardProps {
   onParameterLockToggle: (parameter: BlockParam) => void;
 }
 
-export function SequencerCard({ index, block, blocks, visual, patchOpen, related, locks, onPatchOpen, onChange, onRandomize, onLockToggle, onParameterRandomize, onParameterLockToggle }: SequencerCardProps) {
+export function SequencerCard({ showDial = true, index, block, blocks, visual, patchOpen, related, locks, onPatchOpen, onChange, onRandomize, onLockToggle, onParameterRandomize, onParameterLockToggle }: SequencerCardProps) {
   const update = <K extends keyof SequencerBlock>(key: K, value: SequencerBlock[K]) => onChange({ ...block, [key]: value });
   const effective = visual.effective;
   const incoming = connectionsFor(blocks).filter((connection) => connection.target === index);
@@ -53,7 +54,7 @@ export function SequencerCard({ index, block, blocks, visual, patchOpen, related
         </button>
       </header>
       <div className="card-body">
-        <PatternDial steps={effective.steps} pulses={effective.pulses} rotation={effective.rot} position={visual.position} lfo={visual.lfo} fire={visual.fire} label={`${block.voice ? voiceTag(block.voice) : "LFO"}${block.div > 1 ? ` ÷${block.div}` : ""}`} />
+        {showDial && <PatternDial steps={effective.steps} pulses={effective.pulses} rotation={effective.rot} position={visual.position} lfo={visual.lfo} fire={visual.fire} label={`${block.voice ? voiceTag(block.voice) : "LFO"}${block.div > 1 ? ` ÷${block.div}` : ""}`} />}
         <div className="parameters">
           {ROW_PARAMS.map((parameter) => <ParameterRow key={parameter} index={index} parameter={parameter} value={block[parameter]} locked={locks[parameter]} modulated={block.modDst === parameter && block.modSrc !== "" && block.modAmt !== 0} onRandomize={() => onParameterRandomize(parameter)} onLockToggle={() => onParameterLockToggle(parameter)} onChange={(value) => {
             const definition = PARAMS[parameter];

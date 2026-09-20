@@ -4,12 +4,12 @@ import type { ClockSource, SequencerBlock } from "@/lib/types";
 import { connectionsFor } from "@/lib/routing";
 import { cn } from "@/lib/utils";
 
-export function PatchPanel({ index, blocks, onChange, onSelect, onClose }: { index: number; blocks: SequencerBlock[]; onChange: (block: SequencerBlock) => void; onSelect: (index: number) => void; onClose: () => void }) {
+export function PatchPanel({ index, blocks, onChange, onSelect, onClose, embedded = false }: { index: number; blocks: SequencerBlock[]; onChange: (block: SequencerBlock) => void; onSelect: (index: number) => void; onClose: () => void; embedded?: boolean }) {
   const block = blocks[index];
   const update = <K extends keyof SequencerBlock>(key: K, value: SequencerBlock[K]) => onChange({ ...block, [key]: value });
   const connections = connectionsFor(blocks).filter((connection) => connection.source === index || connection.target === index);
   return <section className="patch-panel" aria-label={`Routing for block ${padBlock(index)}`}>
-    <div className="panel-heading"><div><span className="eyebrow">Patch bay / {padBlock(index)}</span><h2>{voiceName(block.voice) || "Modulator"}</h2></div><button className="icon-button" aria-label="Close patch bay" onClick={onClose}><X size={16} /></button></div>
+    {!embedded && <div className="panel-heading"><div><span className="eyebrow">Patch bay / {padBlock(index)}</span><h2>{voiceName(block.voice) || "Modulator"}</h2></div><button className="icon-button" aria-label="Close patch bay" onClick={onClose}><X size={16} /></button></div>}
     <div className="patch-target"><span className="jack" /><span>Editing inputs to block <b>{padBlock(index)}</b></span></div>
     <div className="patch-editor">
           <div>

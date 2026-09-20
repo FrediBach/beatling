@@ -8,6 +8,7 @@ interface QueuedVisualEvent {
   steps: number;
   pulses: number;
   rotation: number;
+  division: number;
   lfo: number;
   fire: boolean;
 }
@@ -24,7 +25,7 @@ interface RuntimeBlock {
   displayPosition: number;
   displayLfo: number;
   fireUntil: number;
-  displayPattern: { steps: number; pulses: number; rot: number };
+  displayPattern: { steps: number; pulses: number; rot: number; div: number };
 }
 
 type AudioContextConstructor = typeof AudioContext;
@@ -42,6 +43,8 @@ export class SequencerEngine {
   private timer: number | null = null;
   private nextPulse = 0;
   private pulseIndex = 0;
+  private clockQueue: Array<{ time: number; pulse: number }> = [];
+  private displayClockPulse = -1;
   private _running = false;
 
   constructor(private readonly getPatch: () => Patch) {
@@ -96,12 +99,15 @@ export class SequencerEngine {
   snapshot(): EngineSnapshot {
     const now = this.context?.currentTime ?? 0;
     const patch = this.getPatch();
+    while (this.clockQueue.length && this.clockQueue[0].time <= now) {
+      this.displayClockPulse = this.clockQueue.shift()!.pulse;
+    }
     const blocks = this.runtime.map((runtime, index) => {
       while (runtime.queue.length && runtime.queue[0].time <= now) {
         const event = runtime.queue.shift()!;
         runtime.displayPosition = event.position;
         runtime.displayLfo = event.lfo;
-        runtime.displayPattern = { steps: event.steps, pulses: event.pulses, rot: event.rotation };
+        runtime.displayPattern = { steps: event.steps, pulses: event.pulses, rot: event.rotation, div: event.division };
         if (event.fire) runtime.fireUntil = now + 0.11;
       }
       const block = patch.blocks[index];
@@ -116,7 +122,7 @@ export class SequencerEngine {
     const activeVoices = Object.fromEntries(
       VOICE_DEFS.map(({ id }) => [id, (this.voiceHitAt.get(id) ?? -1) > 0 && now - (this.voiceHitAt.get(id) ?? -1) < 0.1]),
     );
-    return { blocks, activeVoices };
+    return { blocks, activeVoices, clockPulse: this.displayClockPulse };
   }
 
   private initAudio(): void {
@@ -146,6 +152,8 @@ export class SequencerEngine {
   }
 
   private resetRuntime(): void {
+    this.clockQueue = [];
+    this.displayClockPulse = -1;
     const patch = this.getPatch?.();
     this.runtime = Array.from({ length: BLOCK_COUNT }, (_, index) => {
       const block = patch?.blocks[index];
@@ -161,7 +169,7 @@ export class SequencerEngine {
         displayPosition: -1,
         displayLfo: 0,
         fireUntil: -1,
-        displayPattern: { steps: block?.steps ?? 16, pulses: block?.pulses ?? 0, rot: block?.rot ?? 0 },
+        displayPattern: { steps: block?.steps ?? 16, pulses: block?.pulses ?? 0, rot: block?.rot ?? 0, div: block?.div ?? 1 },
       };
     });
   }
@@ -186,6 +194,7 @@ export class SequencerEngine {
   }
 
   private tick(time: number, pulseIndex: number): void {
+    this.clockQueue.push({ time, pulse: pulseIndex });
     const patch = this.getPatch();
     const queue: Array<{ source: string; time: number }> = [{ source: "G", time }];
     if (pulseIndex % (patch.rate * 4) === 0) queue.push({ source: "BAR", time });
@@ -228,6 +237,7 @@ export class SequencerEngine {
       steps: effective.steps,
       pulses: effective.pulses,
       rotation: effective.rot,
+      division: effective.div,
       lfo: runtime.lfo,
       fire: false,
     };
