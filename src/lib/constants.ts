@@ -4,22 +4,29 @@ export interface VoiceDefinition {
   id: VoiceId;
   name: string;
   tag: string;
+  family: "drum" | "synth";
+  model?: "303" | "101";
 }
 
 export const VOICE_DEFS: VoiceDefinition[] = [
-  { id: "kick", name: "Kick", tag: "BD" },
-  { id: "snare", name: "Snare", tag: "SD" },
-  { id: "clap", name: "Clap", tag: "CP" },
-  { id: "rim", name: "Rim", tag: "RS" },
-  { id: "ch", name: "Closed hat", tag: "CH" },
-  { id: "oh", name: "Open hat", tag: "OH" },
-  { id: "lt", name: "Low tom", tag: "LT" },
-  { id: "mt", name: "Mid tom", tag: "MT" },
-  { id: "ht", name: "Hi tom", tag: "HT" },
-  { id: "cow", name: "Cowbell", tag: "CB" },
-  { id: "cym", name: "Cymbal", tag: "CY" },
-  { id: "shk", name: "Shaker", tag: "MA" },
+  { id: "kick", name: "Kick", tag: "BD", family: "drum" },
+  { id: "snare", name: "Snare", tag: "SD", family: "drum" },
+  { id: "clap", name: "Clap", tag: "CP", family: "drum" },
+  { id: "rim", name: "Rim", tag: "RS", family: "drum" },
+  { id: "ch", name: "Closed hat", tag: "CH", family: "drum" },
+  { id: "oh", name: "Open hat", tag: "OH", family: "drum" },
+  { id: "lt", name: "Low tom", tag: "LT", family: "drum" },
+  { id: "mt", name: "Mid tom", tag: "MT", family: "drum" },
+  { id: "ht", name: "Hi tom", tag: "HT", family: "drum" },
+  { id: "cow", name: "Cowbell", tag: "CB", family: "drum" },
+  { id: "cym", name: "Cymbal", tag: "CY", family: "drum" },
+  { id: "shk", name: "Shaker", tag: "MA", family: "drum" },
+  { id: "bassline", name: "Bassline", tag: "303", family: "synth", model: "303" },
+  { id: "lead", name: "Lead", tag: "101", family: "synth", model: "101" },
 ];
+
+export const DRUM_VOICE_DEFS = VOICE_DEFS.filter((voice) => voice.family === "drum");
+export const SYNTH_VOICE_IDS = new Set<VoiceId>(VOICE_DEFS.filter((voice) => voice.family === "synth").map((voice) => voice.id));
 
 export const PARAMS: Record<BlockParam | "gate", { label: string; min: number; max: number; suffix?: string }> = {
   steps: { label: "Steps", min: 1, max: 32 },

@@ -144,7 +144,7 @@ export default function App() {
 
   useEffect(() => {
     const timeout = window.setTimeout(() => saveArrangement({
-      format: "euclid-grid.arrangement.v5",
+      format: "euclid-grid.arrangement.v6",
       variations,
       songParts,
       activeIndex: activeVariation,
@@ -510,7 +510,7 @@ export default function App() {
     <div className="instrument">
       <header className="instrument-header">
         <div className="brand"><span className="brand-mark" aria-hidden="true"><i /><i /><i /><i /></span><h1>beatling<span>Euclidean rhythm instrument</span></h1></div>
-        <span className="model-label">EG–16 <span>/</span> 808 + 909</span>
+        <span className="model-label">EG–16 <span>/</span> 808 + 909 + 303 + 101</span>
         <div className="header-actions">
           <span className={cn("transport-status", playing && "running")}><i />{playing ? "Running" : "Standby"}</span>
           <div className="history-actions" aria-label="Edit history">
@@ -634,7 +634,7 @@ export default function App() {
             <div id="circle-routing"><PatchPanel visual={visualFor(selectedRhythm)} voice={blockVoiceState(patch, selectedRhythm)} embedded index={selectedRhythm} blocks={patch.blocks} onChange={(next) => updateBlock(selectedRhythm, next)} onSelect={selectRhythm} onClose={() => undefined} /></div>
           </div> : <>
 
-          {openPatch !== null ? <PatchPanel visual={visualFor(openPatch)} voice={blockVoiceState(patch, openPatch)} index={openPatch} blocks={patch.blocks} connections={connections} onChange={(next) => updateBlock(openPatch, next)} onSelect={setOpenPatch} onClose={() => setOpenPatch(null)} /> : <><div className="section-heading voice-bank-heading"><div><h2>Voice bank</h2><span className="section-meta">12 voices</span></div><button className="voice-bank-master" aria-pressed={allVoicesMuted} onClick={() => setAllVoicesMuted(!allVoicesMuted)}>{allVoicesMuted ? <Volume2 size={12} /> : <VolumeX size={12} />}{allVoicesMuted ? "Unmute all" : "Mute all"}</button></div><VoiceBank voices={patch.voices} blocks={patch.blocks} connections={connections} lfoValues={playing ? snapshot.blocks.map((block) => block.lfo) : patch.blocks.map(() => 0.5)} activeVoices={snapshot.activeVoices} changedFields={voiceVariationChanges} onChange={updateVoice} /><div className="voice-bank-note"><span className="jack" />808 / 909 / CST · CST opens detailed synthesis controls</div></>}
+          {openPatch !== null ? <PatchPanel visual={visualFor(openPatch)} voice={blockVoiceState(patch, openPatch)} index={openPatch} blocks={patch.blocks} connections={connections} onChange={(next) => updateBlock(openPatch, next)} onSelect={setOpenPatch} onClose={() => setOpenPatch(null)} /> : <><div className="section-heading voice-bank-heading"><div><h2>Voice bank</h2><span className="section-meta">14 voices</span></div><button className="voice-bank-master" aria-pressed={allVoicesMuted} onClick={() => setAllVoicesMuted(!allVoicesMuted)}>{allVoicesMuted ? <Volume2 size={12} /> : <VolumeX size={12} />}{allVoicesMuted ? "Unmute all" : "Mute all"}</button></div><VoiceBank voices={patch.voices} blocks={patch.blocks} connections={connections} lfoValues={playing ? snapshot.blocks.map((block) => block.lfo) : patch.blocks.map(() => 0.5)} activeVoices={snapshot.activeVoices} changedFields={voiceVariationChanges} onChange={updateVoice} /><div className="voice-bank-note"><span className="jack" />808 / 909 / CST · 303 + 101 synths</div></>}
           </>}
         </aside>
         {view === "grid" && showCables && <PatchCables connections={connections} />}

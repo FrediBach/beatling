@@ -1,4 +1,5 @@
 import type { CustomVoiceSettings, VoiceId } from "@/lib/types";
+import { NOTE_NAMES, SCALE_DEFS } from "@/lib/quantizer";
 
 export interface VoiceParameterDefinition {
   key: string;
@@ -8,6 +9,7 @@ export interface VoiceParameterDefinition {
   step: number;
   unit?: string;
   description: string;
+  options?: Array<{ value: number; label: string }>;
 }
 
 export interface VoiceParameterSection {
@@ -29,6 +31,13 @@ const tone = (...parameters: VoiceParameterDefinition[]): VoiceParameterSection 
 const transient = (...parameters: VoiceParameterDefinition[]): VoiceParameterSection => ({ title: "Transient", parameters });
 const noise = (...parameters: VoiceParameterDefinition[]): VoiceParameterSection => ({ title: "Noise", parameters });
 const envelope = (...parameters: VoiceParameterDefinition[]): VoiceParameterSection => ({ title: "Envelope", parameters });
+const pitch = (...parameters: VoiceParameterDefinition[]): VoiceParameterSection => ({ title: "Pitch quantizer", parameters });
+const optionParameter = (key: string, label: string, options: string[], description: string): VoiceParameterDefinition => ({ key, label, min: 0, max: options.length - 1, step: 1, description, options: options.map((name, value) => ({ value, label: name })) });
+const quantizerParameters = () => pitch(
+  optionParameter("root", "Root note", [...NOTE_NAMES], "Tonic used by the quantized V/Oct input."),
+  optionParameter("scale", "Scale", SCALE_DEFS.map(({ name }) => name), "Allowed notes for incoming control voltage."),
+  parameter("octave", "Base octave", 1, 6, 1, "Octave played at zero volts."),
+);
 
 export const VOICE_PARAMETER_SECTIONS: Record<VoiceId, VoiceParameterSection[]> = {
   kick: [
@@ -145,6 +154,34 @@ export const VOICE_PARAMETER_SECTIONS: Record<VoiceId, VoiceParameterSection[]> 
       parameter("duration", "Length", 15, 600, 1, "Base length before the main Decay control is applied.", "ms"),
     ),
   ],
+  bassline: [
+    quantizerParameters(),
+    tone(
+      optionParameter("waveform", "Oscillator", ["Saw", "Square"], "Core oscillator shape."),
+      parameter("cutoff", "Filter cutoff", 80, 8000, 10, "Resting cutoff of the resonant low-pass filter.", "Hz"),
+      parameter("resonance", "Resonance", 0.1, 18, 0.1, "Emphasis around the filter cutoff.", "Q"),
+      parameter("envelopeAmount", "Envelope amount", 0, 100, 1, "How far the filter opens on each note.", "%"),
+    ),
+    envelope(
+      parameter("filterDecay", "Filter decay", 30, 1200, 5, "Time for the filter to return to its cutoff.", "ms"),
+      parameter("accent", "Accent", 0, 100, 1, "Extra bite and level on each triggered note.", "%"),
+    ),
+  ],
+  lead: [
+    quantizerParameters(),
+    tone(
+      optionParameter("waveform", "Main oscillator", ["Saw", "Square", "Triangle"], "Primary oscillator shape."),
+      parameter("pulseMix", "Companion mix", 0, 100, 1, "Level of a detuned square companion oscillator.", "%"),
+      parameter("detune", "Companion detune", -30, 30, 1, "Detuning of the companion oscillator.", "ct"),
+      parameter("cutoff", "Filter cutoff", 200, 12000, 25, "Resting cutoff of the low-pass filter.", "Hz"),
+      parameter("resonance", "Resonance", 0.1, 14, 0.1, "Emphasis around the filter cutoff.", "Q"),
+      parameter("envelopeAmount", "Envelope amount", 0, 100, 1, "How far the filter opens on each note.", "%"),
+    ),
+    envelope(
+      parameter("attack", "Attack", 1, 500, 1, "Time to reach full level.", "ms"),
+      parameter("release", "Release", 30, 2400, 10, "Base note release before the main Decay control.", "ms"),
+    ),
+  ],
 };
 
 const tomSections = (name: string): VoiceParameterSection[] => [
@@ -178,6 +215,8 @@ export const DEFAULT_CUSTOM_VOICE_SETTINGS: Record<VoiceId, CustomVoiceSettings>
   cow: { lowFrequency: 540, highFrequency: 800, filterFrequency: 2640, filterQ: 1.4, toneLevel: 55, duration: 360 },
   cym: { metalBase: 40, metalLevel: 40, highpass: 4200, noiseLevel: 32, noiseHighpass: 5200, duration: 1400 },
   shk: { noiseLevel: 50, filterFrequency: 6200, filterQ: 1.6, attack: 6, duration: 75 },
+  bassline: { root: 0, scale: 2, octave: 2, waveform: 0, cutoff: 700, resonance: 12, envelopeAmount: 82, filterDecay: 260, accent: 30 },
+  lead: { root: 0, scale: 1, octave: 4, waveform: 0, pulseMix: 28, detune: 7, cutoff: 3200, resonance: 3.5, envelopeAmount: 38, attack: 8, release: 520 },
 };
 
 export function createCustomVoiceSettings(id: VoiceId): CustomVoiceSettings {

@@ -2,6 +2,7 @@ import { euclidHit } from "@/lib/euclid";
 import { createBlock, createVoices } from "@/lib/patch";
 import { BLOCK_COUNT, type Arrangement, type Machine, type Patch, type SequencerBlock, type Variation, type VoiceBank, type VoiceId } from "@/lib/types";
 import { createEffects } from "@/lib/effects";
+import { VOICE_DEFS } from "@/lib/constants";
 
 interface PresetLane {
   voice: VoiceId;
@@ -143,7 +144,7 @@ function decomposeLane(laneDefinition: PresetLane): EuclideanPart[] {
 }
 
 function applyPresetCharacter(preset: DrumPreset, voices: VoiceBank) {
-  for (const voice of Object.values(voices)) voice.machine = preset.machine;
+  for (const { id, family } of VOICE_DEFS) if (family === "drum") voices[id].machine = preset.machine;
   for (const [voice, machine] of Object.entries(preset.machineOverrides ?? {})) {
     voices[voice as VoiceId].machine = machine;
   }
@@ -233,7 +234,7 @@ export function createPresetPatch(id: string, volume = 72): Patch {
   const voices = createVoices();
   applyPresetCharacter(preset, voices);
   return {
-    format: "euclid-grid.v5",
+    format: "euclid-grid.v6",
     bpm: preset.bpm,
     rate: preset.rate ?? 4,
     swing: preset.swing,
@@ -352,7 +353,7 @@ export function createPresetArrangement(id: string, volume = 72): Arrangement {
     patch,
   }));
   return {
-    format: "euclid-grid.arrangement.v5",
+    format: "euclid-grid.arrangement.v6",
     variations,
     songParts: variations.map((variation, index) => ({ id: `preset-${id}-part-${index + 1}`, variationId: variation.id, bars: repeats[index] })),
     activeIndex: 0,

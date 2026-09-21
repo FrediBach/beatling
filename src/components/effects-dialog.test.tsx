@@ -28,7 +28,7 @@ function enterValue(name: string, value: string) {
 describe("effects rack", () => {
   it("keeps sends independent across processors and preserves them while bypassed", () => {
     render(<Harness />);
-    expect(screen.getAllByRole("slider", { name: / send$/ })).toHaveLength(12);
+    expect(screen.getAllByRole("slider", { name: / send$/ })).toHaveLength(14);
     expect(screen.getByRole("status")).toHaveTextContent("Effect bypassed");
     fireEvent.change(screen.getByRole("slider", { name: "Kick Distortion send" }), { target: { value: "64" } });
     fireEvent.click(screen.getByRole("button", { name: "Enable distortion" }));

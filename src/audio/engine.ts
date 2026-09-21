@@ -2,6 +2,7 @@ import { BLOCK_COUNT, type CustomVoiceSettings, type EffectId, type EffectsState
 import { VOICE_DEFS } from "@/lib/constants";
 import { clamp, effectiveBlock, euclidHit, volumeGain } from "@/lib/euclid";
 import { effectiveVoiceModulation } from "@/lib/modulation";
+import { quantizeVoiceCv } from "@/lib/quantizer";
 import { sampleLfo, type LfoFrame } from "@/lib/lfo";
 import { EFFECT_IDS, effectGain } from "@/lib/effects";
 
@@ -466,12 +467,14 @@ export class SequencerEngine {
     const voice = this.getPatch().voices[id];
     if (!voice || voice.mute) return;
     const routed = effectiveVoiceModulation(voice, (source) => this.sourceLfo(source, time));
+    const tune = clamp(voice.tune + (modulation.tune + routed.tune) * 12, -24, 24);
     const parameters = {
       machine: voice.machine,
-      tune: clamp(voice.tune + (modulation.tune + routed.tune) * 12, -24, 24),
+      tune,
       decay: clamp(0.25 + (voice.decay + (modulation.decay + routed.decay) * 50) / 100 * 1.6, 0.15, 2.4),
       amplitude: clamp(voice.level / 100 * (1 + (modulation.level + routed.level) * 0.6), 0, 1.4),
       custom: voice.custom,
+      frequency: quantizeVoiceCv(voice.custom, routed.vOct, tune).frequency,
     };
     if (parameters.amplitude <= 0.001) return;
     switch (id) {
@@ -485,6 +488,8 @@ export class SequencerEngine {
       case "cow": this.cowbell(time, parameters); break;
       case "cym": this.cymbal(time, parameters); break;
       case "shk": this.shaker(time, parameters); break;
+      case "bassline": this.bassline(time, parameters); break;
+      case "lead": this.lead(time, parameters); break;
     }
     this.voiceHitAt.set(id, time);
   }
@@ -664,6 +669,53 @@ export class SequencerEngine {
     gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
     this.noiseSource(time, duration).connect(filter).connect(gain).connect(bus);
   }
+
+  private bassline(time: number, p: SynthParameters): void {
+    const bus = this.busses.get("bassline")!;
+    const duration = Math.max(0.06, value(p, "filterDecay", 260) / 1000 * p.decay);
+    const cutoff = value(p, "cutoff", 700);
+    const envelopeAmount = value(p, "envelopeAmount", 82) / 100;
+    const accent = value(p, "accent", 30) / 100;
+    const filter = this.filter("lowpass", cutoff, value(p, "resonance", 12), time);
+    filter.frequency.setValueAtTime(Math.min(16000, cutoff * (1 + envelopeAmount * 10)), time);
+    filter.frequency.exponentialRampToValueAtTime(Math.max(40, cutoff), time + duration);
+    const gain = this.gain(0.0001, time);
+    gain.gain.linearRampToValueAtTime(p.amplitude * (0.72 + accent * 0.28), time + 0.004);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+    const oscillator = this.oscillator(value(p, "waveform", 0) >= 0.5 ? "square" : "sawtooth", p.frequency, time);
+    oscillator.connect(filter).connect(gain).connect(bus);
+    oscillator.start(time);
+    oscillator.stop(time + duration + 0.04);
+  }
+
+  private lead(time: number, p: SynthParameters): void {
+    const bus = this.busses.get("lead")!;
+    const attack = value(p, "attack", 8) / 1000;
+    const duration = Math.max(attack + 0.04, value(p, "release", 520) / 1000 * p.decay);
+    const cutoff = value(p, "cutoff", 3200);
+    const envelopeAmount = value(p, "envelopeAmount", 38) / 100;
+    const filter = this.filter("lowpass", cutoff, value(p, "resonance", 3.5), time);
+    filter.frequency.setValueAtTime(Math.min(18000, cutoff * (1 + envelopeAmount * 4)), time);
+    filter.frequency.exponentialRampToValueAtTime(Math.max(80, cutoff), time + duration);
+    const gain = this.gain(0.0001, time);
+    gain.gain.linearRampToValueAtTime(p.amplitude * 0.72, time + attack);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+    const waveforms: OscillatorType[] = ["sawtooth", "square", "triangle"];
+    const main = this.oscillator(waveforms[Math.round(value(p, "waveform", 0))] ?? "sawtooth", p.frequency, time);
+    main.connect(filter);
+    main.start(time);
+    main.stop(time + duration + 0.04);
+    const companionMix = value(p, "pulseMix", 28) / 100;
+    if (companionMix > 0) {
+      const companionGain = this.gain(companionMix, time);
+      const companionFrequency = p.frequency * 2 ** (value(p, "detune", 7) / 1200);
+      const companion = this.oscillator("square", companionFrequency, time);
+      companion.connect(companionGain).connect(filter);
+      companion.start(time);
+      companion.stop(time + duration + 0.04);
+    }
+    filter.connect(gain).connect(bus);
+  }
 }
 
 interface SynthParameters {
@@ -671,6 +723,7 @@ interface SynthParameters {
   tune: number;
   decay: number;
   amplitude: number;
+  frequency: number;
   custom: CustomVoiceSettings;
 }
 

@@ -104,9 +104,9 @@ describe("application shell", () => {
     vi.spyOn(window.localStorage.__proto__, "getItem").mockReturnValue(null);
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Mute all" }));
-    expect(screen.getAllByRole("button", { name: /Unmute .+ voice/ })).toHaveLength(12);
+    expect(screen.getAllByRole("button", { name: /Unmute .+ voice/ })).toHaveLength(14);
     fireEvent.click(screen.getByRole("button", { name: "Undo last change" }));
-    expect(screen.getAllByRole("button", { name: /Mute .+ voice/ })).toHaveLength(12);
+    expect(screen.getAllByRole("button", { name: /Mute .+ voice/ })).toHaveLength(14);
     fireEvent.click(screen.getByRole("button", { name: "Redo last change" }));
     expect(screen.getByRole("button", { name: "Unmute all" })).toHaveAttribute("aria-pressed", "true");
   });

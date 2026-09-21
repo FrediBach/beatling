@@ -127,3 +127,38 @@ it("routes every Euclidean hit to one Bernoulli voice without dropping it", asyn
     expect(playVoice.mock.calls.map(([voice]) => voice)).toEqual(["kick", "snare"]);
   } finally { engine.destroy(); }
 });
+
+it("dispatches quantized pitches to the 303 and 101 inspired synth voices", async () => {
+  vi.useFakeTimers();
+  const parameter = () => ({ value: 0, setTargetAtTime: vi.fn() });
+  const node = () => ({ connect: vi.fn((destination: unknown) => destination), gain: parameter(), frequency: parameter(), Q: parameter(), delayTime: parameter(), threshold: parameter(), ratio: parameter(), attack: parameter(), release: parameter() });
+  vi.stubGlobal("AudioContext", class {
+    currentTime = 0;
+    state = "running";
+    sampleRate = 1;
+    destination = {};
+    createGain = node;
+    createDynamicsCompressor = node;
+    createWaveShaper = node;
+    createBiquadFilter = node;
+    createConvolver = node;
+    createDelay = node;
+    createBuffer() { return { getChannelData: () => new Float32Array(2) }; }
+    close() { return Promise.resolve(); }
+  });
+  const patch = createEmptyPatch();
+  patch.blocks.forEach((block) => { block.clk = []; });
+  Object.assign(patch.blocks[0], { kind: "voice", voice: "bassline", steps: 1, pulses: 1, clk: ["G"] });
+  Object.assign(patch.blocks[1], { kind: "voice", voice: "lead", steps: 1, pulses: 1, clk: ["G"] });
+  patch.voices.bassline.modulations = [{ source: "12", destination: "vOct", amount: 1 }];
+  const engine = new SequencerEngine(patch);
+  const bassline = vi.spyOn(engine as unknown as { bassline: (time: number, parameters: { frequency: number }) => void }, "bassline").mockImplementation(() => undefined);
+  const lead = vi.spyOn(engine as unknown as { lead: (time: number, parameters: { frequency: number }) => void }, "lead").mockImplementation(() => undefined);
+  try {
+    await engine.start();
+    expect(bassline).toHaveBeenCalledOnce();
+    expect(bassline.mock.calls[0][1].frequency).toBeCloseTo(87.31, 1);
+    expect(lead).toHaveBeenCalledOnce();
+    expect(lead.mock.calls[0][1].frequency).toBeCloseTo(261.63, 1);
+  } finally { engine.destroy(); }
+});

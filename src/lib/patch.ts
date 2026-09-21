@@ -1,11 +1,12 @@
 import { BLOCK_COUNT, type BlockKind, type BlockParam, type BlockRandomizationLocks, type Patch, type SequencerBlock, type VoiceBank, type VoiceId, type VoiceState } from "@/lib/types";
-import { ROW_PARAMS, VOICE_DEFS } from "@/lib/constants";
+import { DRUM_VOICE_DEFS, ROW_PARAMS, SYNTH_VOICE_IDS, VOICE_DEFS } from "@/lib/constants";
 import { clamp } from "@/lib/euclid";
 import { createCustomVoiceSettings, normalizeCustomVoiceSettings } from "@/lib/voice-config";
 import { normalizeModulations, normalizeVoiceModulations } from "@/lib/modulation";
 import { createEffects, normalizeEffects } from "@/lib/effects";
 
-const STORAGE_KEY = "egs.patch.v5";
+const STORAGE_KEY = "egs.patch.v6";
+const V5_STORAGE_KEY = "egs.patch.v5";
 const V4_STORAGE_KEY = "egs.patch.v4";
 const V3_STORAGE_KEY = "egs.patch.v3";
 const V2_STORAGE_KEY = "egs.patch.v2";
@@ -13,8 +14,8 @@ const LEGACY_STORAGE_KEY = "egs.patch.v1";
 
 export function createBlock(index: number): SequencerBlock {
   return {
-    kind: VOICE_DEFS[index]?.id ? "voice" : "modulator",
-    voice: VOICE_DEFS[index]?.id ?? "",
+    kind: DRUM_VOICE_DEFS[index]?.id ? "voice" : "modulator",
+    voice: DRUM_VOICE_DEFS[index]?.id ?? "",
     branchVoices: ["kick", "snare"],
     steps: 16,
     pulses: 0,
@@ -33,7 +34,7 @@ export function createBlock(index: number): SequencerBlock {
 
 export function createVoice(id: VoiceId): VoiceState {
   return {
-    machine: ["kick", "snare", "ch", "oh"].includes(id) ? "909" : "808",
+    machine: SYNTH_VOICE_IDS.has(id) ? "custom" : ["kick", "snare", "ch", "oh"].includes(id) ? "909" : "808",
     level: 78,
     tune: 0,
     decay: 50,
@@ -55,8 +56,8 @@ const DEMO = [
   { v: "clap", st: 16, pu: 3, ro: 6, dv: 1, pr: 75, mut: "15" },
   { v: "rim", st: 12, pu: 5, ro: 1, dv: 1, pr: 55 },
   { v: "lt", st: 16, pu: 2, ro: 9, dv: 1, pr: 45, rst: "15" },
-  { v: "mt", st: 10, pu: 3, ro: 0, dv: 1, pr: 40 },
-  { v: "ht", st: 14, pu: 5, ro: 3, dv: 1, pr: 35 },
+  { v: "bassline", st: 16, pu: 7, ro: 1, dv: 1, pr: 100 },
+  { v: "lead", st: 16, pu: 3, ro: 3, dv: 2, pr: 78 },
   { v: "cow", st: 16, pu: 3, ro: 5, dv: 2, pr: 40, clk: ["G", "1"] },
   { v: "cym", st: 4, pu: 1, ro: 0, dv: 1, pr: 70, clk: ["0"] },
   { v: "shk", st: 16, pu: 11, ro: 0, dv: 1, pr: 80, mod: { src: "13", dst: "level", amt: 0.6 } },
@@ -83,12 +84,17 @@ export function createDemoPatch(volume = 72): Patch {
     if ("mod" in demo) block.modulations = [{ source: demo.mod.src, destination: demo.mod.dst, amount: demo.mod.amt }];
     return block;
   });
-  return { format: "euclid-grid.v5", bpm: 124, rate: 4, swing: 12, vol: volume, blocks, voices: createVoices(), effects: createEffects() };
+  const voices = createVoices();
+  voices.bassline.modulations = [{ source: "12", destination: "vOct", amount: 1 }];
+  voices.lead.modulations = [{ source: "13", destination: "vOct", amount: 1 }];
+  voices.bassline.level = 72;
+  voices.lead.level = 62;
+  return { format: "euclid-grid.v6", bpm: 124, rate: 4, swing: 12, vol: volume, blocks, voices, effects: createEffects() };
 }
 
 export function createEmptyPatch(volume = 72): Patch {
   return {
-    format: "euclid-grid.v5",
+    format: "euclid-grid.v6",
     bpm: 124,
     rate: 4,
     swing: 0,
@@ -138,8 +144,8 @@ export function normalizePatch(value: unknown): Patch | null {
       base.voices[id] = {
         ...base.voices[id],
         ...source,
-        machine: ["808", "909", "custom"].includes(source.machine) ? source.machine : base.voices[id].machine,
-        modulations: normalizeVoiceModulations(source.modulations),
+        machine: SYNTH_VOICE_IDS.has(id) ? "custom" : ["808", "909", "custom"].includes(source.machine) ? source.machine : base.voices[id].machine,
+        modulations: normalizeVoiceModulations(source.modulations, id),
         custom: normalizeCustomVoiceSettings(id, source.custom),
       };
     }
@@ -150,7 +156,7 @@ export function normalizePatch(value: unknown): Patch | null {
 
 export function loadStoredPatch(): Patch | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(V4_STORAGE_KEY) ?? localStorage.getItem(V3_STORAGE_KEY) ?? localStorage.getItem(V2_STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(V5_STORAGE_KEY) ?? localStorage.getItem(V4_STORAGE_KEY) ?? localStorage.getItem(V3_STORAGE_KEY) ?? localStorage.getItem(V2_STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
     return raw ? normalizePatch(JSON.parse(raw)) : null;
   } catch {
     return null;

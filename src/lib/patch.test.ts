@@ -11,9 +11,17 @@ describe("patches", () => {
     expect(patch.blocks).toHaveLength(16);
     expect(patch.blocks[0]).toMatchObject({ voice: "kick", steps: 16, pulses: 4 });
     expect(patch.blocks[2]).toMatchObject({ modulations: [{ source: "12", destination: "prob", amount: -0.5 }] });
+    expect(patch.blocks[7]).toMatchObject({ voice: "bassline", steps: 16, pulses: 7, rot: 1 });
+    expect(patch.blocks[8]).toMatchObject({ voice: "lead", steps: 16, pulses: 3, rot: 3, div: 2 });
     expect(patch.voices.kick.machine).toBe("909");
     expect(patch.voices.clap.machine).toBe("808");
     expect(patch.voices.kick.custom.bodyFrequency).toBe(50);
+    expect(Object.keys(patch.voices)).toHaveLength(14);
+    expect(patch.voices.bassline).toMatchObject({ machine: "custom", custom: { root: 0, scale: 2, octave: 2 } });
+    expect(patch.voices.lead).toMatchObject({ machine: "custom", custom: { root: 0, scale: 1, octave: 4 } });
+    expect(patch.voices.bassline.modulations).toEqual([{ source: "12", destination: "vOct", amount: 1 }]);
+    expect(patch.voices.lead.modulations).toEqual([{ source: "13", destination: "vOct", amount: 1 }]);
+    expect(patch.blocks[12]).toMatchObject({ kind: "modulator", voice: "" });
   });
 
   it("migrates old voices and clamps imported custom synthesis settings", () => {
@@ -30,12 +38,23 @@ describe("patches", () => {
     expect(patch.voices.kick.custom.clickFrequency).toBe(1800);
   });
 
+  it("normalizes quantized V/Oct only for synth voices", () => {
+    const source = createEmptyPatch();
+    source.voices.kick.modulations = [{ source: "12", destination: "vOct", amount: 1 }];
+    source.voices.bassline.modulations = [{ source: "12", destination: "vOct", amount: 2 }];
+    source.voices.bassline.machine = "808";
+    source.voices.bassline.custom = { ...source.voices.bassline.custom, root: 99, scale: 99, octave: -5 };
+    const patch = normalizePatch(source)!;
+    expect(patch.voices.kick.modulations).toEqual([]);
+    expect(patch.voices.bassline).toMatchObject({ machine: "custom", modulations: [{ source: "12", destination: "vOct", amount: 1 }], custom: { root: 11, scale: 5, octave: 1 } });
+  });
+
   it("migrates v1 patches to silent effect sends and clamps imported effect settings", () => {
     const legacy = createEmptyPatch() as unknown as Record<string, unknown>;
     legacy.format = "euclid-grid.v1";
     delete legacy.effects;
     const migrated = normalizePatch(legacy)!;
-    expect(migrated.format).toBe("euclid-grid.v5");
+    expect(migrated.format).toBe("euclid-grid.v6");
     expect(migrated.effects.distortion.enabled).toBe(false);
     expect(migrated.effects.sends.kick.reverb).toBe(0);
 

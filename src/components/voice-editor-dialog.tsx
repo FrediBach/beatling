@@ -66,7 +66,14 @@ function VoiceParameter({ voiceName, definition, value, onChange }: {
     <div className="voice-editor-control">
       <span>{definition.label}<small>{definition.description}</small></span>
       <div>
-        <input
+        {definition.options ? <select
+          className="control voice-editor-select"
+          value={value}
+          aria-label={`${voiceName} ${definition.label}`}
+          onChange={(event) => onChange(Number(event.target.value))}
+        >
+          {definition.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+        </select> : <><input
           className="range"
           type="range"
           min={definition.min}
@@ -90,7 +97,7 @@ function VoiceParameter({ voiceName, definition, value, onChange }: {
             }}
           />
           {definition.unit && <i>{definition.unit}</i>}
-        </span>
+        </span></>}
       </div>
     </div>
   );

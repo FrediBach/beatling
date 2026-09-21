@@ -26,3 +26,18 @@ it("patches a block LFO into a shared voice and exposes a cable socket", () => {
   expect(input.title).toContain("Block 13 LFO → voice Kick Tune");
   expect(container.querySelector('[data-voice-id="kick"] [data-cable-port="in-Mod-Tune"]')).not.toBeNull();
 });
+
+it("offers quantized V/Oct and musical scale controls for synth voices", () => {
+  render(<Fixture />);
+  fireEvent.click(screen.getByRole("button", { name: "Patch Bassline voice" }));
+  fireEvent.click(screen.getByRole("button", { name: "Add modulation target" }));
+  expect(screen.getByRole("combobox", { name: "Modulation destination for Bassline Quantized V/Oct" })).toHaveValue("vOct");
+  fireEvent.change(screen.getByRole("combobox", { name: "Modulation source for Bassline Quantized V/Oct" }), { target: { value: "12" } });
+  expect(screen.getByText("F2 · 0.50 V")).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
+  fireEvent.click(screen.getByRole("button", { name: "Configure Bassline synthesizer" }));
+  expect(screen.getByRole("combobox", { name: "Bassline Root note" })).toHaveValue("0");
+  expect(screen.getByRole("combobox", { name: "Bassline Scale" })).toHaveValue("2");
+  fireEvent.change(screen.getByRole("combobox", { name: "Bassline Scale" }), { target: { value: "5" } });
+  expect(screen.getByRole("combobox", { name: "Bassline Scale" })).toHaveValue("5");
+});

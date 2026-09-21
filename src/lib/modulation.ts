@@ -1,13 +1,20 @@
 import { MOD_DESTS } from "./constants";
+import { SYNTH_VOICE_IDS } from "./constants";
 import { clamp } from "./euclid";
-import { BLOCK_COUNT, type ModulationRoute, type SequencerBlock, type VoiceModulationRoute, type VoiceState, type EffectiveBlock } from "./types";
+import { quantizeVoiceCv } from "./quantizer";
+import { BLOCK_COUNT, type EffectiveVoiceModulation, type ModulationRoute, type SequencerBlock, type VoiceId, type VoiceModulationRoute, type VoiceState, type EffectiveBlock } from "./types";
 
 export const MODULATION_TARGETS = MOD_DESTS.filter((entry): entry is [ModulationRoute["destination"], string] => entry[0] !== "");
 export const VOICE_MODULATION_TARGETS: Array<[VoiceModulationRoute["destination"], string]> = [
   ["tune", "Tune"],
   ["decay", "Decay"],
   ["level", "Level"],
+  ["vOct", "Quantized V/Oct"],
 ];
+
+export const voiceModulationTargets = (id: VoiceId) => SYNTH_VOICE_IDS.has(id)
+  ? [VOICE_MODULATION_TARGETS[3], ...VOICE_MODULATION_TARGETS.slice(0, 3)]
+  : VOICE_MODULATION_TARGETS.slice(0, 3);
 
 export function normalizeModulations(value: object, index: number): ModulationRoute[] {
   const input = value as { modulations?: unknown; modSrc?: unknown; modDst?: unknown; modAmt?: unknown };
@@ -24,13 +31,14 @@ export function normalizeModulations(value: object, index: number): ModulationRo
   });
 }
 
-export function normalizeVoiceModulations(value: unknown): VoiceModulationRoute[] {
+export function normalizeVoiceModulations(value: unknown, id: VoiceId): VoiceModulationRoute[] {
   if (!Array.isArray(value)) return [];
+  const targets = voiceModulationTargets(id);
   const seen = new Set<string>();
-  return value.slice(0, VOICE_MODULATION_TARGETS.length).flatMap((entry) => {
+  return value.slice(0, targets.length).flatMap((entry) => {
     if (!entry || typeof entry !== "object") return [];
     const route = entry as VoiceModulationRoute;
-    if (!VOICE_MODULATION_TARGETS.some(([destination]) => destination === route.destination) || seen.has(route.destination)) return [];
+    if (!targets.some(([destination]) => destination === route.destination) || seen.has(route.destination)) return [];
     const source = String(route.source);
     if (source !== "" && (!/^\d+$/.test(source) || Number(source) >= BLOCK_COUNT)) return [];
     seen.add(route.destination);
@@ -38,11 +46,12 @@ export function normalizeVoiceModulations(value: unknown): VoiceModulationRoute[
   });
 }
 
-export function effectiveVoiceModulation(voice: VoiceState, sourceLfo: (source: number) => number = () => 0.5): Pick<EffectiveBlock, "tune" | "decay" | "level"> {
-  const effective = { tune: 0, decay: 0, level: 0 };
+export function effectiveVoiceModulation(voice: VoiceState, sourceLfo: (source: number) => number = () => 0.5): EffectiveVoiceModulation {
+  const effective: EffectiveVoiceModulation = { tune: 0, decay: 0, level: 0, vOct: 0 };
   for (const route of voice.modulations) {
     if (route.source === "" || route.amount === 0) continue;
-    effective[route.destination] = (sourceLfo(Number(route.source)) * 2 - 1) * route.amount;
+    const source = sourceLfo(Number(route.source));
+    effective[route.destination] = route.destination === "vOct" ? source * route.amount : (source * 2 - 1) * route.amount;
   }
   return effective;
 }
@@ -56,7 +65,8 @@ export function targetValue(destination: ModulationRoute["destination"], block: 
   return `${Math.round(effective?.[destination] ?? block[destination])}${destination === "prob" ? "%" : ""}`;
 }
 
-export function voiceTargetValue(destination: VoiceModulationRoute["destination"], voice: VoiceState, effective?: Pick<EffectiveBlock, "tune" | "decay" | "level">): string {
+export function voiceTargetValue(destination: VoiceModulationRoute["destination"], voice: VoiceState, effective?: EffectiveVoiceModulation): string {
+  if (destination === "vOct") return `${quantizeVoiceCv(voice.custom, effective?.vOct ?? 0, voice.tune).name} · ${(effective?.vOct ?? 0).toFixed(2)} V`;
   if (destination === "tune") return `${Math.round(clamp(voice.tune + (effective?.tune ?? 0) * 12, -24, 24))} st`;
   if (destination === "decay") return `${Math.round(clamp(0.25 + (voice.decay + (effective?.decay ?? 0) * 50) / 100 * 1.6, 0.15, 2.4) * 100)}% time`;
   return `${Math.round(clamp(voice.level / 100 * (1 + (effective?.level ?? 0) * 0.6), 0, 1.4) * 100)}%`;

@@ -2,23 +2,25 @@ import { useRef } from "react";
 import { Plus, X } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { blockName, padBlock } from "@/lib/constants";
-import { signedAmount, voiceTargetValue, VOICE_MODULATION_TARGETS } from "@/lib/modulation";
-import type { EffectiveBlock, SequencerBlock, VoiceModulationRoute, VoiceState } from "@/lib/types";
+import { signedAmount, voiceModulationTargets, voiceTargetValue } from "@/lib/modulation";
+import type { EffectiveVoiceModulation, SequencerBlock, VoiceId, VoiceModulationRoute, VoiceState } from "@/lib/types";
 
 interface VoiceModulationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   voiceName: string;
+  voiceId: VoiceId;
   value: VoiceState;
   blocks: SequencerBlock[];
-  effective: Pick<EffectiveBlock, "tune" | "decay" | "level">;
+  effective: EffectiveVoiceModulation;
   onChange: (voice: VoiceState) => void;
 }
 
-export function VoiceModulationDialog({ open, onOpenChange, voiceName, value, blocks, effective, onChange }: VoiceModulationDialogProps) {
+export function VoiceModulationDialog({ open, onOpenChange, voiceName, voiceId, value, blocks, effective, onChange }: VoiceModulationDialogProps) {
   const focusDestination = useRef<VoiceModulationRoute["destination"] | null>(null);
+  const targets = voiceModulationTargets(voiceId);
   const used = new Set(value.modulations.map((route) => route.destination));
-  const available = VOICE_MODULATION_TARGETS.filter(([destination]) => !used.has(destination));
+  const available = targets.filter(([destination]) => !used.has(destination));
   const update = (destination: VoiceModulationRoute["destination"], next: VoiceModulationRoute) => onChange({ ...value, modulations: value.modulations.map((route) => route.destination === destination ? next : route) });
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="voice-routing-dialog" aria-describedby="voice-routing-description">
@@ -26,9 +28,9 @@ export function VoiceModulationDialog({ open, onOpenChange, voiceName, value, bl
         <div><span className="eyebrow">Voice patch bay</span><DialogTitle>{voiceName} modulation</DialogTitle><DialogDescription id="voice-routing-description">Route any block LFO directly to this shared voice. Every block that triggers {voiceName.toLowerCase()} uses the result.</DialogDescription></div>
       </header>
       <section className="modulation-editor" aria-label={`${voiceName} modulation targets`}>
-        <div className="modulation-heading"><span className="eyebrow">Modulation in</span><span>{value.modulations.length} / {VOICE_MODULATION_TARGETS.length} targets</span></div>
+        <div className="modulation-heading"><span className="eyebrow">Modulation in</span><span>{value.modulations.length} / {targets.length} targets</span></div>
         {value.modulations.map((route) => {
-          const label = VOICE_MODULATION_TARGETS.find(([destination]) => destination === route.destination)?.[1] ?? route.destination;
+          const label = targets.find(([destination]) => destination === route.destination)?.[1] ?? route.destination;
           return <fieldset className="modulation-route" key={route.destination}>
             <legend>{label}</legend>
             <div className="modulation-route-top">
@@ -38,7 +40,7 @@ export function VoiceModulationDialog({ open, onOpenChange, voiceName, value, bl
               </select>
               <span aria-hidden="true">→</span>
               <select ref={(node) => { if (node && focusDestination.current === route.destination) { node.focus(); focusDestination.current = null; } }} className="control" aria-label={`Modulation destination for ${voiceName} ${label}`} value={route.destination} onChange={(event) => { const destination = event.target.value as VoiceModulationRoute["destination"]; focusDestination.current = destination; update(route.destination, { ...route, destination }); }}>
-                {VOICE_MODULATION_TARGETS.map(([destination, name]) => <option key={destination} value={destination} disabled={used.has(destination) && destination !== route.destination}>{name}</option>)}
+                {targets.map(([destination, name]) => <option key={destination} value={destination} disabled={used.has(destination) && destination !== route.destination}>{name}</option>)}
               </select>
               <button type="button" className="icon-button" aria-label={`Remove ${voiceName} ${label} modulation`} onClick={() => onChange({ ...value, modulations: value.modulations.filter((item) => item.destination !== route.destination) })}><X size={12} /></button>
             </div>
@@ -47,7 +49,7 @@ export function VoiceModulationDialog({ open, onOpenChange, voiceName, value, bl
           </fieldset>;
         })}
         <button type="button" className="add-modulation" disabled={available.length === 0} onClick={() => onChange({ ...value, modulations: [...value.modulations, { source: value.modulations[0]?.source ?? "", destination: available[0][0], amount: 0.5 }] })}><Plus size={12} />Add modulation target</button>
-        <p className="modulation-intro">At 100% depth, tune moves ±12 semitones, decay ±50 points, and level ±60% of its base. A future VCO can add its quantized V/Oct input here as another stable voice destination.</p>
+        <p className="modulation-intro">At 100% depth, tune moves ±12 semitones, decay ±50 points, and level ±60% of its base.{targets.some(([destination]) => destination === "vOct") && " Quantized V/Oct maps 0–1 V to one octave, constrained to the root and scale in the synth controls."}</p>
       </section>
     </DialogContent>
   </Dialog>;

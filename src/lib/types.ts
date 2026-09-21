@@ -12,7 +12,9 @@ export type VoiceId =
   | "ht"
   | "cow"
   | "cym"
-  | "shk";
+  | "shk"
+  | "bassline"
+  | "lead";
 
 export type BlockKind = "voice" | "modulator" | "bernoulli";
 
@@ -21,7 +23,7 @@ export type EffectId = "distortion" | "reverb" | "delay" | "compressor";
 export type CustomVoiceSettings = Record<string, number>;
 export type LfoShape = "ramp" | "tri" | "sqr" | "rnd";
 export type ModDestination = "" | "pulses" | "rot" | "prob" | "div" | "tune" | "decay" | "level";
-export type VoiceModDestination = "tune" | "decay" | "level";
+export type VoiceModDestination = "tune" | "decay" | "level" | "vOct";
 export type ClockSource = "G" | `${number}`;
 export type ResetSource = "" | "G" | "BAR" | `${number}`;
 export type BlockSource = "" | `${number}`;
@@ -39,6 +41,13 @@ export interface VoiceModulationRoute {
   source: BlockSource;
   destination: VoiceModDestination;
   amount: number;
+}
+
+export interface EffectiveVoiceModulation {
+  tune: number;
+  decay: number;
+  level: number;
+  vOct: number;
 }
 
 export interface SequencerBlock {
@@ -112,7 +121,7 @@ export interface EffectsState {
 }
 
 export interface Patch {
-  format: "euclid-grid.v5";
+  format: "euclid-grid.v6";
   bpm: number;
   rate: number;
   swing: number;
@@ -135,7 +144,7 @@ export interface SongPart {
 }
 
 export interface Arrangement {
-  format: "euclid-grid.arrangement.v5";
+  format: "euclid-grid.arrangement.v6";
   variations: Variation[];
   songParts: SongPart[];
   activeIndex: number;

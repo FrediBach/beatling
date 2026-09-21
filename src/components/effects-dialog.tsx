@@ -86,7 +86,7 @@ function VoiceSends({ id, value, onChange }: EditorProps<EffectId>) {
   const info = EFFECT_INFO[id];
   const sendCount = VOICE_DEFS.filter((voice) => value.sends[voice.id][id] > 0).length;
   return <section className="effects-sends" aria-label={`${info.label} voice sends`}>
-    <header className="effects-sends-heading"><div><span className="eyebrow">Routing / 12 voices</span><h3>Send to {info.label.toLowerCase()}</h3></div><span>{sendCount} routed</span></header>
+    <header className="effects-sends-heading"><div><span className="eyebrow">Routing / {VOICE_DEFS.length} voices</span><h3>Send to {info.label.toLowerCase()}</h3></div><span>{sendCount} routed</span></header>
     <p className="effects-send-status" role="status">{!value[id].enabled ? "Effect bypassed. Enable it to hear these sends." : value[id].return === 0 ? "Return is at zero. Raise it to hear this effect." : sendCount === 0 ? "Raise a voice send to hear this effect." : "Sends follow voice level, before the master."}</p>
     <div className="effect-send-list">
       {VOICE_DEFS.map((voice) => <div className="effect-send-row" key={voice.id} data-active={value.sends[voice.id][id] > 0 || undefined}>
