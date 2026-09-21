@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
 import { ArrowUpRight, Moon, Redo2, Sun, Undo2 } from "lucide-react";
 import { HelpDialog } from "@/components/help-dialog";
+import { OutputSpectrum } from "@/components/output-spectrum";
+import type { OutputAnalysis } from "@/audio/engine";
 import { cn } from "@/lib/utils";
 
-export function InstrumentHeader({ playing, canUndo, canRedo, onUndo, onRedo }: {
+export function InstrumentHeader({ playing, observeOutput, canUndo, canRedo, onUndo, onRedo }: {
   playing: boolean;
+  observeOutput: () => OutputAnalysis | null;
   canUndo: boolean;
   canRedo: boolean;
   onUndo: () => void;
@@ -17,7 +20,10 @@ export function InstrumentHeader({ playing, canUndo, canRedo, onUndo, onRedo }: 
 
   return <header className="instrument-header">
     <div className="brand"><span className="brand-mark" aria-hidden="true"><i /><i /><i /><i /></span><h1>beatling<span>Euclidean rhythm instrument</span></h1></div>
-    <span className="model-label">EG–16 <span>/</span> 808 + 909 + 303 + 101</span>
+    <div className="header-center">
+      <span className="model-label">EG–16 <span>/</span> 808 + 909 + 303 + 101</span>
+      <OutputSpectrum playing={playing} observeOutput={observeOutput} />
+    </div>
     <div className="header-actions">
       <span className={cn("transport-status", playing && "running")}><i />{playing ? "Running" : "Standby"}</span>
       <div className="history-actions" aria-label="Edit history">

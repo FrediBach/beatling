@@ -38,9 +38,17 @@ type AudioContextConstructor = typeof AudioContext;
 
 const LOOKAHEAD_SECONDS = 0.14;
 
+export interface OutputAnalysis {
+  sampleRate: number;
+  binCount: number;
+  read: (data: Uint8Array<ArrayBuffer>) => void;
+  disconnect: () => void;
+}
+
 export class SequencerEngine {
   private context: AudioContext | null = null;
   private master: GainNode | null = null;
+  private outputAnalysers = new Set<AnalyserNode>();
   private compressor: DynamicsCompressorNode | null = null;
   private noise: AudioBuffer | null = null;
   private busses = new Map<VoiceId, GainNode>();
@@ -94,6 +102,7 @@ export class SequencerEngine {
 
   stop(): void {
     this._running = false;
+    this.outputAnalysers.forEach((analyser) => this.disconnectOutputAnalyser(analyser));
     if (this.timer !== null) window.clearInterval(this.timer);
     this.timer = null;
     this.resetRuntime();
@@ -112,6 +121,30 @@ export class SequencerEngine {
     if (this.master && this.context) {
       this.master.gain.setTargetAtTime(volumeGain(value), this.context.currentTime, 0.02);
     }
+  }
+
+  // A lazy, silent side branch leaves the audible master path untouched.
+  observeOutput = (): OutputAnalysis | null => {
+    if (!this._running || !this.context || !this.master) return null;
+    const analyser = this.context.createAnalyser();
+    analyser.fftSize = 1024;
+    analyser.smoothingTimeConstant = 0.78;
+    analyser.minDecibels = -80;
+    analyser.maxDecibels = -12;
+    this.master.connect(analyser);
+    this.outputAnalysers.add(analyser);
+    return {
+      sampleRate: this.context.sampleRate,
+      binCount: analyser.frequencyBinCount,
+      read: (data) => analyser.getByteFrequencyData(data),
+      disconnect: () => this.disconnectOutputAnalyser(analyser),
+    };
+  };
+
+  private disconnectOutputAnalyser(analyser: AnalyserNode): void {
+    if (!this.outputAnalysers.delete(analyser)) return;
+    this.master?.disconnect(analyser);
+    analyser.disconnect();
   }
 
   setPatch(patch: Patch): void {

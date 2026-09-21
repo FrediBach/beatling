@@ -4,6 +4,57 @@ import { createEmptyPatch } from "@/lib/patch";
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
+it("observes post-master audio lazily without changing the audible path and releases analysis on stop/destroy", async () => {
+  vi.useFakeTimers();
+  const parameter = () => ({ value: 0, setTargetAtTime: vi.fn() });
+  const node = () => ({ connect: vi.fn((destination: unknown) => destination), disconnect: vi.fn(), gain: parameter(), frequency: parameter(), Q: parameter(), delayTime: parameter(), threshold: parameter(), ratio: parameter(), attack: parameter(), release: parameter() });
+  const master = node();
+  const destination = {};
+  const analyser = { disconnect: vi.fn(), frequencyBinCount: 512, getByteFrequencyData: vi.fn((data: Uint8Array) => data.fill(123)) };
+  const createAnalyser = vi.fn(() => analyser);
+  const close = vi.fn().mockResolvedValue(undefined);
+  const createGain = vi.fn(node).mockReturnValueOnce(master);
+  const construct = vi.fn();
+  vi.stubGlobal("AudioContext", class {
+    constructor() { construct(); }
+    currentTime = 0;
+    state = "running";
+    sampleRate = 48000;
+    destination = destination;
+    createGain = createGain;
+    createAnalyser = createAnalyser;
+    createDynamicsCompressor = node;
+    createWaveShaper = node;
+    createBiquadFilter = node;
+    createConvolver = node;
+    createDelay = node;
+    createBuffer() { return { getChannelData: () => new Float32Array(2) }; }
+    close = close;
+  });
+  const engine = new SequencerEngine(createEmptyPatch());
+  expect(engine.observeOutput()).toBeNull();
+  expect(construct).not.toHaveBeenCalled();
+  try {
+    await engine.start();
+    expect(createAnalyser).not.toHaveBeenCalled();
+    const analysis = engine.observeOutput()!;
+    expect(master.connect.mock.calls).toEqual([[destination], [analyser]]);
+    expect(analysis.sampleRate).toBe(48000);
+    const data = new Uint8Array(analysis.binCount);
+    analysis.read(data);
+    expect(data[0]).toBe(123);
+    engine.stop();
+    analysis.disconnect();
+    expect(master.disconnect).toHaveBeenCalledExactlyOnceWith(analyser);
+    expect(analyser.disconnect).toHaveBeenCalledOnce();
+    expect(engine.observeOutput()).toBeNull();
+    await engine.start();
+    engine.observeOutput();
+  } finally { engine.destroy(); }
+  expect(analyser.disconnect).toHaveBeenCalledTimes(2);
+  expect(close).toHaveBeenCalledOnce();
+});
+
 it("shows audible clock pulses and effective divisions, respecting lookahead, swing and reset", async () => {
   vi.useFakeTimers();
   let now = 0;
