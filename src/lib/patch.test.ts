@@ -57,7 +57,7 @@ describe("patches", () => {
     legacy.format = "euclid-grid.v1";
     delete legacy.effects;
     const migrated = normalizePatch(legacy)!;
-    expect(migrated.format).toBe("euclid-grid.v6");
+    expect(migrated.format).toBe("euclid-grid.v7");
     expect(migrated.effects.distortion.enabled).toBe(false);
     expect(migrated.effects.sends.kick.reverb).toBe(0);
 
@@ -120,6 +120,21 @@ describe("patches", () => {
     expect(normalized?.blocks).toHaveLength(16);
     expect(normalized?.blocks[0].pulses).toBe(7);
     expect(normalized?.blocks[1]).toEqual(createEmptyPatch().blocks[1]);
+  });
+
+  it("migrates and bounds per-block rhythm series", () => {
+    const patch = normalizePatch({
+      blocks: [{ steps: 8, pulses: 3, rot: 2, repeats: 99, series: [
+        { steps: 12, pulses: 5, rot: 4, repeats: 2 },
+        { steps: 0, pulses: 99, rot: 99, repeats: 0 },
+      ] }],
+    })!;
+    expect(patch.blocks[0]).toMatchObject({ steps: 8, pulses: 3, rot: 2, repeats: 16 });
+    expect(patch.blocks[0].series).toEqual([
+      { id: "block-1-rhythm-2", steps: 12, pulses: 5, rot: 4, repeats: 2 },
+      { id: "block-1-rhythm-3", steps: 8, pulses: 8, rot: 7, repeats: 1 },
+    ]);
+    expect(patch.blocks[1]).toMatchObject({ repeats: 1, series: [] });
   });
 
   it("builds every documented drum preset within the 16-block system", () => {

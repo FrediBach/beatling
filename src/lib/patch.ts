@@ -4,8 +4,10 @@ import { clamp } from "@/lib/euclid";
 import { createCustomVoiceSettings, normalizeCustomVoiceSettings } from "@/lib/voice-config";
 import { normalizeModulations, normalizeVoiceModulations } from "@/lib/modulation";
 import { createEffects, normalizeEffects } from "@/lib/effects";
+import { MAX_RHYTHMS, normalizeRhythmPattern } from "@/lib/rhythm-series";
 
-const STORAGE_KEY = "egs.patch.v6";
+const STORAGE_KEY = "egs.patch.v7";
+const V6_STORAGE_KEY = "egs.patch.v6";
 const V5_STORAGE_KEY = "egs.patch.v5";
 const V4_STORAGE_KEY = "egs.patch.v4";
 const V3_STORAGE_KEY = "egs.patch.v3";
@@ -20,6 +22,9 @@ export function createBlock(index: number): SequencerBlock {
     steps: 16,
     pulses: 0,
     rot: 0,
+    rhythmId: `block-${index + 1}-rhythm-1`,
+    repeats: 1,
+    series: [],
     div: 1,
     prob: 100,
     gate: 50,
@@ -92,12 +97,12 @@ export function createDemoPatch(volume = 72): Patch {
   const effects = createEffects();
   effects.reverb = { ...effects.reverb, enabled: true, return: 95 };
   effects.sends.lead.reverb = 78;
-  return { format: "euclid-grid.v6", bpm: 124, rate: 4, swing: 12, vol: volume, blocks, voices, effects };
+  return { format: "euclid-grid.v7", bpm: 124, rate: 4, swing: 12, vol: volume, blocks, voices, effects };
 }
 
 export function createEmptyPatch(volume = 72): Patch {
   return {
-    format: "euclid-grid.v6",
+    format: "euclid-grid.v7",
     bpm: 124,
     rate: 4,
     swing: 0,
@@ -132,6 +137,23 @@ export function normalizePatch(value: unknown): Patch | null {
     merged.branchVoices = [first, secondCandidate === first ? (first === "snare" ? "kick" : "snare") : secondCandidate];
     merged.steps = clamp(Math.round(Number(source.steps) || fallback.steps), 1, 32);
     merged.pulses = clamp(Math.round(Number(source.pulses) || 0), 0, merged.steps);
+    merged.rot = clamp(Math.round(Number(source.rot) || 0), 0, merged.steps - 1);
+    merged.repeats = clamp(Math.round(Number(raw.repeats) || 1), 1, 16);
+    merged.rhythmId = typeof raw.rhythmId === "string" && raw.rhythmId ? raw.rhythmId : fallback.rhythmId;
+    const rhythmIds = new Set([merged.rhythmId]);
+    merged.series = (Array.isArray(raw.series) ? raw.series : []).slice(0, MAX_RHYTHMS - 1).map((rhythm, rhythmIndex) => {
+      const fallbackId = `block-${index + 1}-rhythm-${rhythmIndex + 2}`;
+      const normalized = normalizeRhythmPattern(rhythm, {
+        id: fallbackId,
+        steps: merged.steps,
+        pulses: merged.pulses,
+        rot: merged.rot,
+        repeats: 1,
+      });
+      if (rhythmIds.has(normalized.id)) normalized.id = fallbackId;
+      rhythmIds.add(normalized.id);
+      return normalized;
+    });
     merged.modulations = normalizeModulations(source, index);
     // Legacy fields must not survive reserialization or variation comparisons.
     const clean = merged as SequencerBlock & { modSrc?: unknown; modDst?: unknown; modAmt?: unknown };
@@ -159,7 +181,7 @@ export function normalizePatch(value: unknown): Patch | null {
 
 export function loadStoredPatch(): Patch | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(V5_STORAGE_KEY) ?? localStorage.getItem(V4_STORAGE_KEY) ?? localStorage.getItem(V3_STORAGE_KEY) ?? localStorage.getItem(V2_STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(V6_STORAGE_KEY) ?? localStorage.getItem(V5_STORAGE_KEY) ?? localStorage.getItem(V4_STORAGE_KEY) ?? localStorage.getItem(V3_STORAGE_KEY) ?? localStorage.getItem(V2_STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
     return raw ? normalizePatch(JSON.parse(raw)) : null;
   } catch {
     return null;

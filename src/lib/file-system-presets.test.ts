@@ -49,7 +49,7 @@ describe("file system presets", () => {
 
     await writePresetFile(fileHandle("preset.json", "", write, close), arrangement);
 
-    expect(write).toHaveBeenCalledWith(expect.stringContaining('"format": "euclid-grid.arrangement.v6"'));
+    expect(write).toHaveBeenCalledWith(expect.stringContaining('"format": "euclid-grid.arrangement.v7"'));
     expect(close).toHaveBeenCalledOnce();
   });
 });

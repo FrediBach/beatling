@@ -234,7 +234,7 @@ export function createPresetPatch(id: string, volume = 72): Patch {
   const voices = createVoices();
   applyPresetCharacter(preset, voices);
   return {
-    format: "euclid-grid.v6",
+    format: "euclid-grid.v7",
     bpm: preset.bpm,
     rate: preset.rate ?? 4,
     swing: preset.swing,
@@ -353,7 +353,7 @@ export function createPresetArrangement(id: string, volume = 72): Arrangement {
     patch,
   }));
   return {
-    format: "euclid-grid.arrangement.v6",
+    format: "euclid-grid.arrangement.v7",
     variations,
     songParts: variations.map((variation, index) => ({ id: `preset-${id}-part-${index + 1}`, variationId: variation.id, bars: repeats[index] })),
     activeIndex: 0,

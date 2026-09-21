@@ -1,4 +1,4 @@
-import { ChevronDown, Dices, Lock, LockOpen, Volume2, VolumeX } from "lucide-react";
+import { ChevronDown, Dices, Layers3, Lock, LockOpen, Volume2, VolumeX } from "lucide-react";
 import { VOICE_DEFS, blockTag, padBlock } from "@/lib/constants";
 import type { BlockKind, SequencerBlock, VoiceId } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -11,9 +11,10 @@ interface SequencerHeadingProps {
   onChange: (block: SequencerBlock) => void;
   onRandomize: () => void;
   onLockToggle: () => void;
+  onSeriesOpen: () => void;
 }
 
-export function SequencerHeading({ index, block, blockLocked, changedFields, onChange, onRandomize, onLockToggle }: SequencerHeadingProps) {
+export function SequencerHeading({ index, block, blockLocked, changedFields, onChange, onRandomize, onLockToggle, onSeriesOpen }: SequencerHeadingProps) {
   const update = <K extends keyof SequencerBlock>(key: K, value: SequencerBlock[K]) => onChange({ ...block, [key]: value });
   const selection = block.kind === "voice" ? block.voice : block.kind;
   const selectKind = (value: string) => {
@@ -33,6 +34,7 @@ export function SequencerHeading({ index, block, blockLocked, changedFields, onC
           <ChevronDown size={11} />
         </div>
         <div className="card-tools">
+          <button type="button" className={cn("card-tool-button series-button", block.series.length > 0 && "has-series", changedFields.has("series") && "variation-changed")} aria-label={`Edit rhythm series for block ${padBlock(index)}`} title="Rhythm series" onClick={onSeriesOpen}><Layers3 size={12} />{block.series.length > 0 && <small>{block.series.length + 1}</small>}</button>
           <button type="button" className="card-tool-button" aria-label={`Randomize block ${padBlock(index)}`} title="Randomize unlocked settings" disabled={blockLocked} onClick={onRandomize}><Dices size={12} /></button>
           <button type="button" className="card-tool-button lock-button" aria-label={`${blockLocked ? "Unlock" : "Lock"} all settings in block ${padBlock(index)}`} aria-pressed={blockLocked} title={blockLocked ? "Unlock all settings in this block" : "Lock all settings in this block"} onClick={onLockToggle}>{blockLocked ? <Lock size={11} /> : <LockOpen size={11} />}</button>
         </div>

@@ -30,6 +30,14 @@ export type BlockSource = "" | `${number}`;
 export type BlockParam = "steps" | "pulses" | "rot" | "div" | "prob";
 export type BlockRandomizationLocks = Record<BlockParam, boolean>;
 
+export interface RhythmPattern {
+  id: string;
+  steps: number;
+  pulses: number;
+  rot: number;
+  repeats: number;
+}
+
 // Each destination is a stable route identity; a block can have all seven targets.
 export interface ModulationRoute {
   source: BlockSource;
@@ -57,6 +65,9 @@ export interface SequencerBlock {
   steps: number;
   pulses: number;
   rot: number;
+  rhythmId: string;
+  repeats: number;
+  series: RhythmPattern[];
   div: number;
   prob: number;
   gate: number;
@@ -121,7 +132,7 @@ export interface EffectsState {
 }
 
 export interface Patch {
-  format: "euclid-grid.v6";
+  format: "euclid-grid.v7";
   bpm: number;
   rate: number;
   swing: number;
@@ -144,7 +155,7 @@ export interface SongPart {
 }
 
 export interface Arrangement {
-  format: "euclid-grid.arrangement.v6";
+  format: "euclid-grid.arrangement.v7";
   variations: Variation[];
   songParts: SongPart[];
   activeIndex: number;
@@ -165,6 +176,7 @@ export interface EffectiveBlock {
 
 export interface BlockVisualState {
   position: number;
+  rhythmIndex?: number;
   lfo: number;
   lfoPosition?: number;
   fire: boolean;

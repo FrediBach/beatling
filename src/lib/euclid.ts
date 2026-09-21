@@ -1,4 +1,5 @@
 import type { EffectiveBlock, LfoShape, SequencerBlock } from "@/lib/types";
+import { rhythmAt } from "@/lib/rhythm-series";
 
 export const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
@@ -19,11 +20,12 @@ export function lfoValue(shape: LfoShape, phase: number, randomValue: number): n
   return phase;
 }
 
-export function effectiveBlock(block: SequencerBlock, sourceLfo: (source: number) => number = () => 0): EffectiveBlock {
+export function effectiveBlock(block: SequencerBlock, sourceLfo: (source: number) => number = () => 0, rhythmIndex = 0): EffectiveBlock {
+  const rhythm = rhythmAt(block, rhythmIndex);
   const effective: EffectiveBlock = {
-    steps: block.steps,
-    pulses: block.pulses,
-    rot: block.rot,
+    steps: rhythm.steps,
+    pulses: rhythm.pulses,
+    rot: rhythm.rot,
     div: block.div,
     prob: block.prob,
     tune: 0,
@@ -35,8 +37,8 @@ export function effectiveBlock(block: SequencerBlock, sourceLfo: (source: number
     if (route.source === "" || route.amount === 0) continue;
     const mod = (sourceLfo(Number(route.source)) * 2 - 1) * route.amount;
     switch (route.destination) {
-      case "pulses": effective.pulses = Math.round(block.pulses + mod * 8); break;
-      case "rot": effective.rot = Math.round(block.rot + mod * effective.steps); break;
+      case "pulses": effective.pulses = Math.round(rhythm.pulses + mod * 8); break;
+      case "rot": effective.rot = Math.round(rhythm.rot + mod * effective.steps); break;
       case "prob": effective.prob = block.prob + mod * 100; break;
       case "div": effective.div = Math.round(block.div + mod * 4); break;
       case "tune": effective.tune = mod; break;

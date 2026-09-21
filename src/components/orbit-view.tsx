@@ -4,6 +4,7 @@ import { euclidHit } from "@/lib/euclid";
 import { divisionColor, divisionPhase, ringOffset } from "@/lib/orbit";
 import type { BlockVisualState, SequencerBlock } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { rhythmsFor } from "@/lib/rhythm-series";
 
 interface OrbitViewProps {
   blocks: SequencerBlock[];
@@ -56,18 +57,24 @@ export function OrbitView({ blocks, visuals, clockPulse, selected, onSelect }: O
           const visual = visuals[index];
           const { steps, pulses, rot, div } = visual.effective;
           const radius = radiusFor(index);
+          const activeRhythm = visual.rhythmIndex ?? 0;
+          const rhythms = rhythmsFor(block);
           const phase = divisionPhase(clockPulse, div);
           const offset = clockPulse < 0 ? 0 : ringOffset(phase, visual.position, steps);
-          const label = `Block ${padBlock(index)} ${blockName(block)}, ${pulses} of ${steps}, divide ${div}`;
-          return <g key={key} className={cn("orbit-ring", selected === index && "is-selected", visual.muted && "is-muted", pulses === 0 && "is-empty")} style={{ "--division-color": divisionColor(div) } as CSSProperties} role="button" tabIndex={-1} aria-label={`Select ring ${label}`} aria-pressed={selected === index} onClick={() => onSelect(index)} onKeyDown={(event) => onKeyDown(event, index)} data-testid={`orbit-ring-${index}`}>
+          const label = `Block ${padBlock(index)} ${blockName(block)}, ${pulses} of ${steps}, divide ${div}${rhythms.length > 1 ? `, rhythm ${activeRhythm + 1} of ${rhythms.length} in series` : ""}`;
+          return <g key={key} className={cn("orbit-ring", selected === index && "is-selected", visual.muted && "is-muted", pulses === 0 && "is-empty", rhythms.length > 1 && "has-series")} style={{ "--division-color": divisionColor(div) } as CSSProperties} role="button" tabIndex={-1} aria-label={`Select ring ${label}`} aria-pressed={selected === index} onClick={() => onSelect(index)} onKeyDown={(event) => onKeyDown(event, index)} data-testid={`orbit-ring-${index}`}>
             <title>{label}</title>
             <circle cx={center} cy={center} r={radius} className="orbit-ring-target" />
             <circle cx={center} cy={center} r={radius} className="orbit-ring-track" />
-            {Array.from({ length: steps }, (_, step) => {
+            {rhythms.map((rhythm, rhythmIndex) => rhythmIndex === activeRhythm ? null : Array.from({ length: rhythm.steps }, (_, step) => ({ id: `${rhythm.id}-step-${step + 1}`, step })).filter(({ step }) => euclidHit(step, rhythm.steps, rhythm.pulses, rhythm.rot)).map(({ id, step }) => {
+              const p = point(radius, step / rhythm.steps + offset);
+              return <circle key={id} cx={p.x} cy={p.y} r="2.8" className="orbit-step is-series" />;
+            }))}
+            {Array.from({ length: steps }, (_, step) => ({ id: `${rhythms[activeRhythm]?.id ?? block.rhythmId}-step-${step + 1}`, step })).map(({ id, step }) => {
               const active = euclidHit(step, steps, pulses, rot);
               const hit = visual.fire && step === visual.position;
               const p = point(radius, step / steps + offset);
-              return <circle key={step} cx={p.x} cy={p.y} r={hit ? 4.8 : active ? 3.4 : 2.3} className={cn("orbit-step", active && "is-hit", hit && "is-firing")} />;
+              return <circle key={id} cx={p.x} cy={p.y} r={hit ? 4.8 : active ? 3.4 : 2.3} className={cn("orbit-step", active && "is-hit", hit && "is-firing")} />;
             })}
           </g>;
         })}
@@ -85,7 +92,7 @@ export function OrbitView({ blocks, visuals, clockPulse, selected, onSelect }: O
         <g className="orbit-center" aria-hidden="true">
           <text x={center} y="282" className="orbit-center-number" textAnchor="middle">{padBlock(selected)}</text>
           <text x={center} y="309" className="orbit-center-pattern" textAnchor="middle">{current.pulses}/{current.steps}</text>
-          <text x={center} y="329" className="orbit-center-label" textAnchor="middle">SELECTED</text>
+          <text x={center} y="329" className="orbit-center-label" textAnchor="middle">{blocks[selected].series.length > 0 ? `RHYTHM ${String.fromCharCode(65 + (visuals[selected].rhythmIndex ?? 0))}` : "SELECTED"}</text>
         </g>
       </svg>
     </div>

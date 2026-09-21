@@ -24,6 +24,7 @@ const emptySnapshot = (patch: Patch): EngineSnapshot => ({
   clockPulse: -1,
   blocks: patch.blocks.map((block) => ({
     position: -1,
+    rhythmIndex: 0,
     lfo: 0,
     fire: false,
     muted: block.mute,
@@ -142,7 +143,7 @@ export default function App() {
 
   useEffect(() => {
     const timeout = window.setTimeout(() => saveArrangement({
-      format: "euclid-grid.arrangement.v6",
+      format: "euclid-grid.arrangement.v7",
       variations,
       songParts,
       activeIndex: activeVariation,
@@ -470,7 +471,7 @@ export default function App() {
   };
 
   const currentArrangement = useMemo<Arrangement>(() => ({
-    format: "euclid-grid.arrangement.v6",
+    format: "euclid-grid.arrangement.v7",
     variations,
     songParts,
     activeIndex: activeVariation,
@@ -481,7 +482,7 @@ export default function App() {
     const visual = snapshot.blocks[index] ?? emptySnapshot(patch).blocks[index];
     if (!playing) {
       const block = patch.blocks[index];
-      return { ...visual, effective: effectiveBlock({ ...block, modulations: [] }), muted: block.mute };
+      return { ...visual, rhythmIndex: 0, effective: effectiveBlock({ ...block, modulations: [] }), muted: block.mute };
     }
     return visual;
   };

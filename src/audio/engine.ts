@@ -5,10 +5,12 @@ import { effectiveVoiceModulation } from "@/lib/modulation";
 import { quantizeVoiceCv } from "@/lib/quantizer";
 import { sampleLfo, type LfoFrame } from "@/lib/lfo";
 import { EFFECT_IDS, effectGain } from "@/lib/effects";
+import { rhythmAt, rhythmsFor } from "@/lib/rhythm-series";
 
 interface QueuedVisualEvent {
   time: number;
   position: number;
+  rhythmIndex: number;
   effective: EffectiveBlock;
   wave: LfoFrame | null;
   fire: boolean;
@@ -16,6 +18,8 @@ interface QueuedVisualEvent {
 
 interface RuntimeBlock {
   position: number;
+  rhythmIndex: number;
+  rhythmRepeat: number;
   count: number;
   wave: LfoFrame | null;
   random: number;
@@ -24,6 +28,7 @@ interface RuntimeBlock {
   lastClock: number | null;
   queue: QueuedVisualEvent[];
   displayPosition: number;
+  displayRhythmIndex: number;
   displayWave: LfoFrame | null;
   fireUntil: number;
   displayPattern: EffectiveBlock;
@@ -138,14 +143,17 @@ export class SequencerEngine {
       while (runtime.queue.length && runtime.queue[0].time <= now) {
         const event = runtime.queue.shift()!;
         runtime.displayPosition = event.position;
+        runtime.displayRhythmIndex = event.rhythmIndex;
         runtime.displayWave = event.wave;
         runtime.displayPattern = event.effective;
         if (event.fire) runtime.fireUntil = now + 0.11;
       }
       const block = patch.blocks[index];
+      const displayRhythmIndex = Math.min(runtime.displayRhythmIndex, rhythmsFor(block).length - 1);
       const lfo = runtime.displayWave ? sampleLfo(runtime.displayWave, now) : { value: block.kind === "voice" && block.voice ? 0 : 0.5, position: -1 };
       return {
         position: runtime.displayPosition,
+        rhythmIndex: displayRhythmIndex,
         lfo: lfo.value,
         lfoPosition: lfo.position,
         fire: runtime.fireUntil > now,
@@ -301,6 +309,8 @@ export class SequencerEngine {
       const block = patch?.blocks[index];
       return {
         position: -1,
+        rhythmIndex: 0,
+        rhythmRepeat: 0,
         count: 0,
         wave: null,
         random: Math.random(),
@@ -309,6 +319,7 @@ export class SequencerEngine {
         lastClock: null,
         queue: [],
         displayPosition: -1,
+        displayRhythmIndex: 0,
         displayWave: null,
         fireUntil: -1,
         displayPattern: { steps: block?.steps ?? 16, pulses: block?.pulses ?? 0, rot: block?.rot ?? 0, div: block?.div ?? 1, prob: block?.prob ?? 100, tune: 0, decay: 0, level: 0 },
@@ -361,9 +372,9 @@ export class SequencerEngine {
     }
   }
 
-  private effective(index: number, time: number): EffectiveBlock {
+  private effective(index: number, time: number, rhythmIndex = this.runtime[index].rhythmIndex): EffectiveBlock {
     const block = this.getPatch().blocks[index];
-    return effectiveBlock(block, (source) => this.sourceLfo(source, time));
+    return effectiveBlock(block, (source) => this.sourceLfo(source, time), rhythmIndex);
   }
 
   private sourceLfo(source: number, time: number): number {
@@ -376,12 +387,29 @@ export class SequencerEngine {
     const patch = this.getPatch();
     const block = patch.blocks[index];
     const runtime = this.runtime[index];
+    const rhythms = rhythmsFor(block);
+    if (runtime.rhythmIndex >= rhythms.length) {
+      runtime.rhythmIndex = 0;
+      runtime.rhythmRepeat = 0;
+      runtime.position = -1;
+    }
     const interval = runtime.lastClock === null ? this.pulseInterval() : Math.max(0.008, time - runtime.lastClock);
     runtime.lastClock = time;
     runtime.count += 1;
-    const effective = this.effective(index, time);
+    let effective = this.effective(index, time);
     if (runtime.count % effective.div !== 0) return false;
-    runtime.position = (runtime.position + 1) % effective.steps;
+    if (runtime.position >= effective.steps - 1) {
+      runtime.rhythmRepeat += 1;
+      const rhythm = rhythmAt(block, runtime.rhythmIndex);
+      if (runtime.rhythmRepeat >= rhythm.repeats) {
+        runtime.rhythmRepeat = 0;
+        runtime.rhythmIndex = (runtime.rhythmIndex + 1) % rhythms.length;
+      }
+      effective = this.effective(index, time);
+      runtime.position = 0;
+    } else {
+      runtime.position += 1;
+    }
     const hit = euclidHit(runtime.position, effective.steps, effective.pulses, effective.rot);
     const euclideanLfo = block.kind !== "voice" || !block.voice;
     if (euclideanLfo ? hit : runtime.position === 0) runtime.random = Math.random();
@@ -392,6 +420,7 @@ export class SequencerEngine {
     const event: QueuedVisualEvent = {
       time,
       position: runtime.position,
+      rhythmIndex: runtime.rhythmIndex,
       effective,
       wave: runtime.wave,
       fire: false,
@@ -412,10 +441,12 @@ export class SequencerEngine {
   private resetBlock(index: number, time: number): void {
     const runtime = this.runtime[index];
     runtime.position = -1;
+    runtime.rhythmIndex = 0;
+    runtime.rhythmRepeat = 0;
     runtime.count = 0;
     runtime.wave = null;
     runtime.lastClock = null;
-    runtime.queue.push({ time, position: -1, wave: null, fire: false, effective: effectiveBlock({ ...this.getPatch().blocks[index], modulations: [] }) });
+    runtime.queue.push({ time, position: -1, rhythmIndex: 0, wave: null, fire: false, effective: effectiveBlock({ ...this.getPatch().blocks[index], modulations: [] }) });
   }
 
   private gateHigh(index: number, time: number): boolean {

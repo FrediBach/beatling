@@ -1,5 +1,6 @@
 import { BLOCK_COUNT, type LfoShape, type ModDestination, type Patch } from "@/lib/types";
 import { blockName, padBlock, voiceTag } from "@/lib/constants";
+import { rhythmsFor } from "@/lib/rhythm-series";
 
 const SHAPE_NUMBER: Record<LfoShape, number> = { ramp: 1, tri: 2, sqr: 3, rnd: 4 };
 const DESTINATION_NUMBER: Record<ModDestination, number> = {
@@ -64,7 +65,8 @@ export function buildLua(patch: Patch, date = new Date()): string {
     ].filter(Boolean);
     const browserOnly = browserNotes.length ? `  -- browser ${browserNotes.join("; ")} not exported` : "";
     const mods = block.modulations.filter((route) => route.source !== "" && DESTINATION_NUMBER[route.destination] > 0).map((route) => `{ src=${Number(route.source) + 1}, dst=${DESTINATION_NUMBER[route.destination]}, amt=${route.amount.toFixed(2)} }`).join(", ");
-    return `\t{ steps=${block.steps}, pulses=${block.pulses}, rot=${block.rot}, div=${block.div}, prob=${block.prob}, gate=${block.gate}, clk={${block.clk.map(sourceNumber).join(", ")}}, rst=${sourceNumber(block.rst)}, mut=${block.mut === "" ? 0 : Number(block.mut) + 1}, mn=${block.mute}, shape=${SHAPE_NUMBER[block.shape]}, euclidean=${!voiceBlock}, mods={${mods}}, out=${outputIndexes[index]}, lout=${lfoIndexes[index]}, tag=${luaString(voiceBlock ? voiceTag(block.voice) : "--")} },${browserOnly}`;
+    const series = rhythmsFor(block).map((rhythm) => `{ steps=${rhythm.steps}, pulses=${rhythm.pulses}, rot=${rhythm.rot}, repeats=${rhythm.repeats} }`).join(", ");
+    return `\t{ steps=${block.steps}, pulses=${block.pulses}, rot=${block.rot}, series={${series}}, div=${block.div}, prob=${block.prob}, gate=${block.gate}, clk={${block.clk.map(sourceNumber).join(", ")}}, rst=${sourceNumber(block.rst)}, mut=${block.mut === "" ? 0 : Number(block.mut) + 1}, mn=${block.mute}, shape=${SHAPE_NUMBER[block.shape]}, euclidean=${!voiceBlock}, mods={${mods}}, out=${outputIndexes[index]}, lout=${lfoIndexes[index]}, tag=${luaString(voiceBlock ? voiceTag(block.voice) : "--")} },${browserOnly}`;
   });
   const voiceRoutingNotes = Object.entries(patch.voices).flatMap(([id, voice]) => voice.modulations
     .filter((route) => route.source !== "")
@@ -81,7 +83,8 @@ Exported ${date.toISOString().slice(0, 10)} at ${patch.bpm} BPM, 1/${patch.rate 
 
 local BAR = ${patch.rate * 4}\t\t-- clock pulses per bar
 
--- steps/pulses/rot: the Euclidean pattern. div: clock divide. prob: chance %.
+-- series: ordered Euclidean patterns with per-pattern repeat counts.
+-- div: shared clock divide. prob: chance %.
 -- gate: gate length, % of one clock. clk: clock sources (0 = clock input,
 -- n = trigger out of block n). rst/mut/mods.src: block numbers, 0 or -9 = unused.
 local blocks = {
@@ -90,11 +93,12 @@ ${rows.join("\n")}
 ${voiceRoutingNotes.length ? `\n${voiceRoutingNotes.join("\n")}\n` : ""}
 
 local NB = #blocks
-local pos, cnt, gate, lfo, rnd = {}, {}, {}, {}, {}
+local pos, cnt, gate, lfo, rnd, seq, rep = {}, {}, {}, {}, {}, {}, {}
 local lastClock, waveTime, duration, rhythm = {}, {}, {}, {}
 local now = 0
 for i = 1, NB do
 \tpos[i] = -1 cnt[i] = 0 gate[i] = 0
+\tseq[i] = 1 rep[i] = 0
 \tlfo[i] = blocks[i].euclidean and 0.5 or 0 rnd[i] = 0
 end
 
@@ -147,13 +151,14 @@ local function updateLfo( i )
 end
 
 local function resetBlock( i )
-\tpos[i] = -1 cnt[i] = 0 rhythm[i] = nil lastClock[i] = nil
+\tpos[i] = -1 cnt[i] = 0 seq[i] = 1 rep[i] = 0 rhythm[i] = nil lastClock[i] = nil
 \tlfo[i] = blocks[i].euclidean and 0.5 or 0
 end
 
 local function effective( i )
 \tlocal b = blocks[i]
-\tlocal steps, pulses, rot, div, prob = b.steps, b.pulses, b.rot, b.div, b.prob
+\tlocal p = b.series[seq[i]]
+\tlocal steps, pulses, rot, div, prob = p.steps, p.pulses, p.rot, b.div, b.prob
 \tfor _, route in ipairs( b.mods ) do
 \t\tupdateLfo(route.src)
 \t\tlocal m = ( lfo[route.src] * 2 - 1 ) * route.amt
@@ -176,7 +181,17 @@ local function advance( i )
 \tcnt[i] = cnt[i] + 1
 \tlocal steps, pulses, rot, div, prob = effective( i )
 \tif cnt[i] % div ~= 0 then return false end
-\tpos[i] = ( pos[i] + 1 ) % steps
+\tif pos[i] >= steps - 1 then
+\t\trep[i] = rep[i] + 1
+\t\tif rep[i] >= b.series[seq[i]].repeats then
+\t\t\trep[i] = 0
+\t\t\tseq[i] = seq[i] % #b.series + 1
+\t\tend
+\t\tsteps, pulses, rot, div, prob = effective( i )
+\t\tpos[i] = 0
+\telse
+\t\tpos[i] = pos[i] + 1
+\tend
 \tlocal hit = euclidHit(pos[i], steps, pulses, rot)
 \tif (b.euclidean and hit) or (not b.euclidean and pos[i] == 0) then rnd[i] = math.random() end
 \trhythm[i] = { steps=steps, pulses=pulses, rot=rot }

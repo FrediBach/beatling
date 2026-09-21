@@ -162,3 +162,32 @@ it("dispatches quantized pitches to the 303 and 101 inspired synth voices", asyn
     expect(lead.mock.calls[0][1].frequency).toBeCloseTo(261.63, 1);
   } finally { engine.destroy(); }
 });
+
+it("plays a block's Euclidean rhythms in series for their configured cycle counts", () => {
+  const patch = createEmptyPatch();
+  Object.assign(patch.blocks[0], {
+    steps: 2,
+    pulses: 1,
+    repeats: 2,
+    series: [{ id: "second", steps: 3, pulses: 2, rot: 1, repeats: 1 }],
+  });
+  const engine = new SequencerEngine(patch);
+  const advance = (engine as unknown as { advance: (index: number, time: number) => boolean }).advance.bind(engine);
+
+  const frame = () => {
+    advance(0, 0);
+    return engine.snapshot().blocks[0];
+  };
+  expect(frame()).toMatchObject({ rhythmIndex: 0, position: 0, effective: { steps: 2, pulses: 1 } });
+  expect(frame()).toMatchObject({ rhythmIndex: 0, position: 1 });
+  expect(frame()).toMatchObject({ rhythmIndex: 0, position: 0 });
+  expect(frame()).toMatchObject({ rhythmIndex: 0, position: 1 });
+  expect(frame()).toMatchObject({ rhythmIndex: 1, position: 0, effective: { steps: 3, pulses: 2, rot: 1 } });
+  expect(frame()).toMatchObject({ rhythmIndex: 1, position: 1 });
+  expect(frame()).toMatchObject({ rhythmIndex: 1, position: 2 });
+  expect(frame()).toMatchObject({ rhythmIndex: 0, position: 0 });
+
+  engine.reset();
+  expect(engine.snapshot().blocks[0]).toMatchObject({ rhythmIndex: 0, position: -1 });
+  engine.destroy();
+});

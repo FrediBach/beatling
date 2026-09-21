@@ -115,7 +115,7 @@ describe("application shell", () => {
     await waitFor(() => expect(screen.getByLabelText("Beats per minute")).toHaveValue("137"));
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(write).toHaveBeenCalledWith(expect.stringContaining('"format": "euclid-grid.arrangement.v6"')));
+    await waitFor(() => expect(write).toHaveBeenCalledWith(expect.stringContaining('"format": "euclid-grid.arrangement.v7"')));
     expect(close).toHaveBeenCalledOnce();
   });
 

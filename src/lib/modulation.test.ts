@@ -28,11 +28,11 @@ describe("multiple modulation targets", () => {
     expect(effectiveBlock(block, () => 0)).toMatchObject({ pulses: 4, prob: 0 });
   });
 
-  it("migrates legacy patch and arrangement routing and preserves v6 round trips", () => {
+  it("migrates legacy patch and arrangement routing and preserves v7 round trips", () => {
     const legacy = { ...createEmptyPatch(), format: "euclid-grid.v2", blocks: [{ pulses: 4, modSrc: "12", modDst: "prob", modAmt: -0.65 }] };
     localStorage.setItem("egs.patch.v2", JSON.stringify(legacy));
     const patch = loadStoredPatch()!;
-    expect(patch.format).toBe("euclid-grid.v6");
+    expect(patch.format).toBe("euclid-grid.v7");
     expect(patch.blocks[0].modulations).toEqual([{ source: "12", destination: "prob", amount: -0.65 }]);
     expect(patch.blocks[0]).not.toHaveProperty("modSrc");
     patch.blocks[0].modulations.push({ source: "13", destination: "rot", amount: 0.4 });
@@ -44,7 +44,7 @@ describe("multiple modulation targets", () => {
     expect(loaded.variations[0].patch.blocks[0].modulations).toEqual([{ source: "12", destination: "prob", amount: -0.65 }]);
     saveArrangement(createArrangement(patch));
     expect(loadStoredArrangement(patch).variations[0].patch).toEqual(patch);
-    expect(normalizeArrangement(arrangement, patch).format).toBe("euclid-grid.arrangement.v6");
+    expect(normalizeArrangement(arrangement, patch).format).toBe("euclid-grid.arrangement.v7");
   });
 
   it("normalizes invalid routes, duplicate targets, depths and step bounds", () => {

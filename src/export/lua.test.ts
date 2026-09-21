@@ -11,6 +11,7 @@ describe("Disting NT Lua export", () => {
     expect(lua).toContain("kLinear");
     expect(lua).toContain("euclidean=true");
     expect(lua).toContain("euclidean=false");
+    expect(lua).toContain("series={{ steps=16, pulses=4, rot=0, repeats=1 }}");
     expect(lua).toContain("local phase = cyclePhase(pos[i] + fraction, r)");
     expect(lua).toContain("now = now + dt");
   });
