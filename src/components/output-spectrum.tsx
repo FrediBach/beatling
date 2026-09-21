@@ -57,12 +57,12 @@ export const OutputSpectrum = memo(function OutputSpectrum({ playing, observeOut
     let frame = 0;
     let analysis: OutputAnalysis | null = null;
     let context: CanvasRenderingContext2D | null = null;
-    const stop = () => {
+    const stop = (preserveFrame = false) => {
       cancelAnimationFrame(frame);
       frame = 0;
       analysis?.disconnect();
       analysis = null;
-      context?.clearRect(0, 0, canvas.width, canvas.height);
+      if (!preserveFrame) context?.clearRect(0, 0, canvas.width, canvas.height);
     };
     const sync = () => {
       if (width < MIN_WIDTH || !height || !visible || document.hidden || motion.matches) { stop(); return; }
@@ -92,12 +92,13 @@ export const OutputSpectrum = memo(function OutputSpectrum({ playing, observeOut
     document.addEventListener("visibilitychange", sync);
     motion.addEventListener("change", sync);
     return () => {
-      stop();
+      // Fade the last frame with CSS while releasing audio and drawing immediately.
+      stop(true);
       resize.disconnect();
       intersection.disconnect();
       document.removeEventListener("visibilitychange", sync);
       motion.removeEventListener("change", sync);
     };
   }, [playing, observeOutput]);
-  return <div className="output-spectrum" aria-hidden="true"><canvas ref={canvasRef} /></div>;
+  return <div className="output-spectrum" data-playing={playing} aria-hidden="true"><canvas ref={canvasRef} /></div>;
 });

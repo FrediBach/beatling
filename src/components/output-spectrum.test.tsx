@@ -44,7 +44,9 @@ it("only analyses visible playback with spare space, reuses samples, and caps dr
   const { rerender, container } = render(<OutputSpectrum playing={false} observeOutput={test.observeOutput} />);
   expect(test.observeOutput).not.toHaveBeenCalled();
   expect(container.firstChild).toHaveAttribute("aria-hidden", "true");
+  expect(container.firstChild).toHaveAttribute("data-playing", "false");
   rerender(<OutputSpectrum playing observeOutput={test.observeOutput} />);
+  expect(container.firstChild).toHaveAttribute("data-playing", "true");
   test.resize(100);
   test.intersect(true);
   expect(test.observeOutput).not.toHaveBeenCalled();
@@ -61,7 +63,12 @@ it("only analyses visible playback with spare space, reuses samples, and caps dr
   expect(test.frames.size).toBe(0);
   test.resize(240);
   expect(test.observeOutput).toHaveBeenCalledTimes(2);
+  test.tick(68);
+  test.context.clearRect.mockClear();
   rerender(<OutputSpectrum playing={false} observeOutput={test.observeOutput} />);
+  expect(container.firstChild).toHaveAttribute("data-playing", "false");
+  // The last painted frame remains available for the CSS fade after drawing stops.
+  expect(test.context.clearRect).not.toHaveBeenCalled();
   expect(test.analysis.disconnect).toHaveBeenCalledTimes(2);
   expect(test.frames.size).toBe(0);
   expect(test.resizeDisconnect).toHaveBeenCalledOnce();
