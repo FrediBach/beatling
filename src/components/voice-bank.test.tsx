@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, expect, it } from "vitest";
 import { useState } from "react";
 import { createEmptyPatch } from "@/lib/patch";
@@ -20,11 +20,51 @@ it("patches a block LFO into a shared voice and exposes a cable socket", () => {
   expect(screen.getByRole("heading", { name: "Kick modulation" })).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Add modulation target" }));
   fireEvent.change(screen.getByRole("combobox", { name: "Modulation source for Kick Tune" }), { target: { value: "12" } });
-  expect(screen.getByText("0→+6")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
   const input = screen.getByRole("button", { name: /^Inputs to voice Kick: 1 connection/ });
   expect(input.title).toContain("Block 13 LFO → voice Kick Tune");
   expect(container.querySelector('[data-voice-id="kick"] [data-cable-port="in-Mod-Tune"]')).not.toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Configure Kick voice" }));
+  expect(screen.getByText("0→+6")).toBeInTheDocument();
+  fireEvent.change(screen.getByRole("slider", { name: "Kick tune" }), { target: { value: "-3" } });
+  expect(screen.getByText("-3→+3")).toBeInTheDocument();
+});
+
+it.each(["Kick", "Clap", "Bassline", "Lead"])("edits %s tune and decay in settings while keeping level and mute on the card", async (name) => {
+  render(<Fixture />);
+  expect(screen.getAllByRole("slider")).toHaveLength(14);
+  const card = screen.getByRole("region", { name: `${name} voice` });
+  const level = within(card).getByRole("slider", { name: `${name} level` });
+  fireEvent.change(level, { target: { value: "63" } });
+  fireEvent.click(within(card).getByRole("button", { name: `Mute ${name} voice` }));
+  const settings = within(card).getByRole("button", { name: /^Configure/ });
+  fireEvent.click(settings);
+  const dialog = screen.getByRole("dialog");
+  const tune = within(dialog).getByRole("slider", { name: `${name} tune` });
+  expect(tune).toHaveAttribute("min", "-12");
+  expect(tune).toHaveAttribute("max", "12");
+  fireEvent.change(tune, { target: { value: "7" } });
+  fireEvent.change(within(dialog).getByRole("slider", { name: `${name} decay` }), { target: { value: "31" } });
+  fireEvent.keyDown(dialog, { key: "Escape" });
+  await waitFor(() => expect(settings).toHaveFocus());
+  expect(level).toHaveValue("63");
+  expect(within(card).getByRole("button", { name: `Unmute ${name} voice` })).toHaveAttribute("aria-pressed", "true");
+  fireEvent.click(settings);
+  expect(screen.getByRole("slider", { name: `${name} tune` })).toHaveValue("7");
+  expect(screen.getByRole("slider", { name: `${name} decay` })).toHaveValue("31");
+});
+
+it("keeps tune and decay when resetting custom synthesis", () => {
+  render(<Fixture />);
+  fireEvent.click(screen.getByRole("button", { name: "Use custom Kick" }));
+  fireEvent.click(screen.getByRole("button", { name: "Configure custom Kick" }));
+  fireEvent.change(screen.getByRole("slider", { name: "Kick tune" }), { target: { value: "-5" } });
+  fireEvent.change(screen.getByRole("slider", { name: "Kick decay" }), { target: { value: "81" } });
+  fireEvent.change(screen.getByRole("slider", { name: "Kick Body frequency" }), { target: { value: "64" } });
+  fireEvent.click(screen.getByRole("button", { name: "Reset synthesis" }));
+  expect(screen.getByRole("slider", { name: "Kick Body frequency" })).toHaveValue("50");
+  expect(screen.getByRole("slider", { name: "Kick tune" })).toHaveValue("-5");
+  expect(screen.getByRole("slider", { name: "Kick decay" })).toHaveValue("81");
 });
 
 it("offers quantized V/Oct and musical scale controls for synth voices", () => {

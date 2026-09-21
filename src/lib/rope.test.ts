@@ -36,4 +36,19 @@ describe("Verlet patch ropes", () => {
     expect(ropeOverlaps(rope, { left: 90, top: 80, right: 110, bottom: 120 })).toBe(false);
     expect(ropeOverlaps(rope, { left: 250, top: 20, right: 280, bottom: 80 })).toBe(false);
   });
+
+  it.each([
+    [{ x: 100, y: 710 }, { x: 1250, y: 708 }],
+    [{ x: 100, y: 30 }, { x: 1250, y: 710 }],
+  ])("keeps long cables near the bottom visible throughout settling", (start, end) => {
+    const bottom = 734;
+    const rope = createRope(start, end, bottom);
+    expect(Math.max(...rope.points.map((point) => point.y))).toBeLessThanOrEqual(bottom);
+    for (let step = 0; step < 1200; step++) {
+      stepRope(rope);
+      expect(Math.max(...rope.points.map((point) => point.y))).toBeLessThanOrEqual(bottom);
+    }
+    expect(rope.points[0]).toMatchObject(start);
+    expect(rope.points.at(-1)).toMatchObject(end);
+  });
 });

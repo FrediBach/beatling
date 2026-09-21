@@ -5,17 +5,19 @@ export interface Rope {
   start: Point;
   end: Point;
   segmentLength: number;
+  bottom?: number;
 }
 export interface Rectangle { left: number; top: number; right: number; bottom: number }
 
 export const ROPE_STEP = 1 / 120;
 
 export function createRope(start: Point, end: Point, bottom?: number): Rope {
+  const floor = bottom === undefined ? undefined : Math.max(bottom, start.y, end.y);
   const distance = Math.hypot(end.x - start.x, end.y - start.y);
   const desiredLength = distance + Math.min(100, Math.max(30, distance * 0.16));
   // Shorten cables near the bottom edge so the hanging loop fits the rack.
   // Reflect an endpoint across the bottom to bound the length reaching that edge.
-  const availableLength = bottom === undefined ? Infinity : Math.hypot(end.x - start.x, 2 * bottom - start.y - end.y);
+  const availableLength = floor === undefined ? Infinity : Math.hypot(end.x - start.x, 2 * floor - start.y - end.y);
   const length = Math.min(desiredLength, Math.max(distance + 1, availableLength));
   const segments = 24;
   const points = Array.from({ length: segments + 1 }, (_, index) => {
@@ -23,10 +25,10 @@ export function createRope(start: Point, end: Point, bottom?: number): Rope {
     const sag = Math.sin(t * Math.PI);
     // A little sideways slack breaks the symmetry of vertically aligned jacks.
     const x = start.x + (end.x - start.x) * t + sag * 12;
-    const y = start.y + (end.y - start.y) * t + sag * Math.min(70, length * 0.2);
+    const y = Math.min(floor ?? Infinity, start.y + (end.y - start.y) * t + sag * Math.min(70, length * 0.2));
     return { x, y, previousX: x, previousY: y };
   });
-  return { points, start: { ...start }, end: { ...end }, segmentLength: length / segments };
+  return { points, start: { ...start }, end: { ...end }, segmentLength: length / segments, bottom: floor };
 }
 
 /** Fixed-step Verlet integration with pinned ends and inextensible distance constraints. */
@@ -58,6 +60,13 @@ export function stepRope(rope: Rope): number {
       a.y += dy * correction * aWeight;
       b.x -= dx * correction * bWeight;
       b.y -= dy * correction * bWeight;
+    }
+    // Distance relaxation can stretch long, nearly horizontal cables past the
+    // length estimate. Keep their hanging loop within the visible workspace.
+    if (rope.bottom !== undefined) {
+      for (let index = 1; index < points.length - 1; index++) {
+        points[index].y = Math.min(points[index].y, rope.bottom);
+      }
     }
   }
   return Math.max(...points.slice(1, -1).map((point) => Math.hypot(point.x - point.previousX, point.y - point.previousY)));

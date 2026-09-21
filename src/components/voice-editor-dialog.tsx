@@ -2,38 +2,53 @@ import { RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { VOICE_PARAMETER_SECTIONS, createCustomVoiceSettings } from "@/lib/voice-config";
-import type { CustomVoiceSettings, VoiceId } from "@/lib/types";
+import { SYNTH_VOICE_IDS } from "@/lib/constants";
+import { VoiceRange } from "@/components/voice-range";
+import type { EffectiveVoiceModulation, VoiceId, VoiceState } from "@/lib/types";
 
 interface VoiceEditorDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   voiceId: VoiceId;
   voiceName: string;
-  value: CustomVoiceSettings;
-  onChange: (value: CustomVoiceSettings) => void;
+  value: VoiceState;
+  effective: EffectiveVoiceModulation;
+  changedFields?: ReadonlySet<keyof VoiceState>;
+  onChange: (value: VoiceState) => void;
+  onCloseAutoFocus: (event: Event) => void;
 }
 
-export function VoiceEditorDialog({ open, onOpenChange, voiceId, voiceName, value, onChange }: VoiceEditorDialogProps) {
+export function VoiceEditorDialog({ open, onOpenChange, voiceId, voiceName, value, effective, changedFields, onChange, onCloseAutoFocus }: VoiceEditorDialogProps) {
   const sections = VOICE_PARAMETER_SECTIONS[voiceId];
-  const update = (key: string, next: number) => onChange({ ...value, [key]: next });
+  const hasSynthControls = SYNTH_VOICE_IDS.has(voiceId) || value.machine === "custom";
+  const update = (key: string, next: number) => onChange({ ...value, custom: { ...value.custom, [key]: next } });
+  const modulatedTargets = new Set(value.modulations.map((route) => route.destination));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="voice-editor-dialog" aria-describedby={`voice-editor-description-${voiceId}`}>
+      <DialogContent className="voice-editor-dialog" aria-describedby={`voice-editor-description-${voiceId}`} onCloseAutoFocus={onCloseAutoFocus}>
         <header className="voice-editor-header">
           <div>
-            <span className="eyebrow">Custom voice / {voiceId.toUpperCase()}</span>
-            <DialogTitle>{voiceName} synthesizer</DialogTitle>
+            <span className="eyebrow">Voice settings / {voiceId.toUpperCase()}</span>
+            <DialogTitle>{voiceName} {hasSynthControls ? "synthesizer" : "settings"}</DialogTitle>
             <DialogDescription id={`voice-editor-description-${voiceId}`}>
-              Shape the {voiceName.toLowerCase()} synthesis circuit. Level, tune, and decay remain available in the voice bank.
+              Adjust tuning and decay{hasSynthControls ? ` and shape the ${voiceName.toLowerCase()} synthesis circuit` : ` for the ${value.machine} ${voiceName.toLowerCase()}`}. Level and mute remain in the voice bank. Changes apply as you play.
             </DialogDescription>
           </div>
-          <Button type="button" variant="outline" onClick={() => onChange(createCustomVoiceSettings(voiceId))}>
-            <RotateCcw size={13} />Reset voice
-          </Button>
+          {hasSynthControls && <Button type="button" variant="outline" onClick={() => onChange({ ...value, custom: createCustomVoiceSettings(voiceId) })}>
+            <RotateCcw size={13} />Reset synthesis
+          </Button>}
         </header>
         <div className="voice-editor-sections">
-          {sections.map((section) => (
+          <fieldset className="voice-editor-section">
+            <legend>Tuning &amp; envelope</legend>
+            <div className="voice-editor-controls voice-tone-controls">
+              <VoiceRange voiceName={voiceName} label="Tune" min={-12} max={12} value={value.tune} signed changed={changedFields?.has("tune")} effectiveValue={modulatedTargets.has("tune") ? value.tune + effective.tune * 12 : undefined} onChange={(tune) => onChange({ ...value, tune })} />
+              <VoiceRange voiceName={voiceName} label="Decay" min={0} max={100} value={value.decay} changed={changedFields?.has("decay")} effectiveValue={modulatedTargets.has("decay") ? value.decay + effective.decay * 50 : undefined} onChange={(decay) => onChange({ ...value, decay })} />
+            </div>
+            <p className="voice-tone-note">Tune in semitones · Decay from short to long</p>
+          </fieldset>
+          {hasSynthControls && sections.map((section) => (
             <fieldset key={section.title} className="voice-editor-section">
               <legend>{section.title}</legend>
               <div className="voice-editor-controls">
@@ -42,7 +57,7 @@ export function VoiceEditorDialog({ open, onOpenChange, voiceId, voiceName, valu
                     key={definition.key}
                     voiceName={voiceName}
                     definition={definition}
-                    value={value[definition.key]}
+                    value={value.custom[definition.key]}
                     onChange={(next) => update(definition.key, next)}
                   />
                 ))}
