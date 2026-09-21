@@ -2,8 +2,16 @@ import { act, cleanup, fireEvent, render, screen, within, waitFor } from "@testi
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "@/App";
 import { SequencerEngine } from "@/audio/engine";
+import { createDemoPatch } from "@/lib/patch";
+import { createArrangement } from "@/lib/variations";
 
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+  Reflect.deleteProperty(window, "showDirectoryPicker");
+  Reflect.deleteProperty(window, "showOpenFilePicker");
+  Reflect.deleteProperty(window, "showSaveFilePicker");
+});
 
 describe("application shell", () => {
   it("toggles optional cables without changing routing or blocking block controls", () => {
@@ -68,6 +76,47 @@ describe("application shell", () => {
     expect(screen.getByRole("button", { name: "Song part 1: pattern A, 4 bars" })).toHaveStyle({ flexBasis: "60px" });
     expect(screen.getByRole("button", { name: "Song part 4: pattern D, 2 bars" })).toHaveStyle({ flexBasis: "46px" });
     expect(screen.getByRole("button", { name: "Song" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("syncs valid files into a grouped preset menu, loads them, and saves changes", async () => {
+    vi.spyOn(window.localStorage.__proto__, "getItem").mockReturnValue(null);
+    const preset = createArrangement({ ...createDemoPatch(), bpm: 137 });
+    const write = vi.fn();
+    const close = vi.fn();
+    const file = {
+      kind: "file",
+      name: "Night Drive.json",
+      getFile: async () => ({ text: async () => JSON.stringify(preset) }),
+      createWritable: async () => ({ write, close }),
+    } as unknown as FileSystemFileHandle;
+    const directory = {
+      kind: "directory",
+      name: "My Beats",
+      async *entries() { yield [file.name, file] as [string, FileSystemFileHandle]; },
+      resolve: async () => [file.name],
+    } as unknown as FileSystemDirectoryHandle;
+    const openPicker = vi.fn().mockResolvedValue([file]);
+    Object.defineProperties(window, {
+      showDirectoryPicker: { configurable: true, value: vi.fn().mockResolvedValue(directory) },
+      showOpenFilePicker: { configurable: true, value: openPicker },
+      showSaveFilePicker: { configurable: true, value: vi.fn().mockResolvedValue(file) },
+    });
+
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Load" }));
+    await waitFor(() => expect(screen.getByLabelText("Beats per minute")).toHaveValue("137"));
+    expect(openPicker).toHaveBeenCalledOnce();
+
+    fireEvent.click(screen.getByRole("button", { name: "Sync folder" }));
+
+    const option = await screen.findByRole("option", { name: "Night Drive" });
+    expect(option.closest("optgroup")).toHaveAttribute("label", "Local · My Beats");
+    fireEvent.change(screen.getByLabelText("Drum pattern preset"), { target: { value: "local:Night%20Drive.json" } });
+    await waitFor(() => expect(screen.getByLabelText("Beats per minute")).toHaveValue("137"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(write).toHaveBeenCalledWith(expect.stringContaining('"format": "euclid-grid.arrangement.v6"')));
+    expect(close).toHaveBeenCalledOnce();
   });
 
   it("locks individual, block and global randomization controls", () => {

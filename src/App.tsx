@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useEffectEvent, useId, useMemo, useRef, useState, type SetStateAction } from "react";
-import { AudioLines, Dices, Download, ArrowUpRight, Cable, Eraser, GripVertical, ListMusic, Lock, LockOpen, Minus, Moon, Play, Plus, Redo2, RotateCcw, Square, Sun, Trash2, Undo2, Volume2, VolumeX } from "lucide-react";
+import { AudioLines, Dices, ArrowUpRight, Cable, Eraser, GripVertical, ListMusic, Lock, LockOpen, Minus, Moon, Play, Plus, Redo2, RotateCcw, Square, Sun, Trash2, Undo2, Volume2, VolumeX } from "lucide-react";
 import { SequencerEngine } from "@/audio/engine";
 import { ExportDialog } from "@/components/export-dialog";
 import { EffectsDialog } from "@/components/effects-dialog";
@@ -9,14 +9,13 @@ import { OrbitView } from "@/components/orbit-view";
 import { CABLE_SIGNALS } from "@/lib/cables";
 import { connectionsFor } from "@/lib/routing";
 import { SequencerCard } from "@/components/sequencer-card";
-import { Button } from "@/components/ui/button";
+import { SessionPresetControls } from "@/components/session-preset-controls";
 import { VoiceBank } from "@/components/voice-bank";
 import { RATE_OPTIONS, VOICE_DEFS } from "@/lib/constants";
 import { effectiveBlock, volumeGain } from "@/lib/euclid";
 import { EFFECT_IDS, effectsHaveChanges } from "@/lib/effects";
 import { createDemoPatch, createEmptyPatch, createRandomizationLocks, loadStoredPatch, randomizeBlock, randomizeBlockParameter, savePatch, shufflePatch } from "@/lib/patch";
-import { createPresetArrangement, PRESET_GROUPS } from "@/lib/presets";
-import { changedBlockFields, changedVoiceFields, createArrangement, loadStoredArrangement, MAX_VARIATIONS, saveArrangement, variationHasChanges } from "@/lib/variations";
+import { changedBlockFields, changedVoiceFields, loadStoredArrangement, MAX_VARIATIONS, saveArrangement, variationHasChanges } from "@/lib/variations";
 import { BLOCK_COUNT, type Arrangement, type BlockParam, type BlockRandomizationLocks, type BlockVisualState, type EffectsState, type EngineSnapshot, type Patch, type SequencerBlock, type SongPart, type Variation, type VoiceId, type VoiceState } from "@/lib/types";
 import { useDragNumber } from "@/hooks/use-drag-number";
 import { cn } from "@/lib/utils";
@@ -106,7 +105,6 @@ export default function App() {
   const [openPatch, setOpenPatch] = useState<number | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const [effectsOpen, setEffectsOpen] = useState(false);
-  const [presetId, setPresetId] = useState("");
   const [view, setView] = useState<"grid" | "circle">(() => {
     try { return localStorage.getItem("beatling-pattern-view") === "circle" ? "circle" : "grid"; }
     catch { return "grid"; }
@@ -471,6 +469,14 @@ export default function App() {
     setOpenPatch(null);
   };
 
+  const currentArrangement = useMemo<Arrangement>(() => ({
+    format: "euclid-grid.arrangement.v6",
+    variations,
+    songParts,
+    activeIndex: activeVariation,
+    activeSongPartIndex: activeSongPart,
+    songMode,
+  }), [activeSongPart, activeVariation, songMode, songParts, variations]);
   const visualFor = (index: number): BlockVisualState => {
     const visual = snapshot.blocks[index] ?? emptySnapshot(patch).blocks[index];
     if (!playing) {
@@ -529,23 +535,7 @@ export default function App() {
         <div className="global-range"><LabeledRange label="Swing" min={0} max={70} value={patch.swing} display={`${patch.swing}%`} onChange={(value) => updateGlobal("swing", value)} /></div>
         <div className="global-range master-range"><LabeledRange label="Master" min={0} max={100} value={patch.vol} display={`${patch.vol === 0 ? "−∞" : Math.round(20 * Math.log10(volumeGain(patch.vol)))} dB`} onChange={(value) => updateGlobal("vol", value)} /></div>
         <button type="button" className={cn("effects-button", enabledEffectCount > 0 && "has-active-effects", effectsVariationChanged && "variation-changed")} aria-haspopup="dialog" aria-label={`Open effects mixer, ${enabledEffectCount} ${enabledEffectCount === 1 ? "effect" : "effects"} enabled`} onClick={() => setEffectsOpen(true)}><AudioLines size={15} /><span>Effects</span><small>{enabledEffectCount || "off"}</small></button>
-        <div className="session-actions">
-          <select
-            className="preset-select"
-            aria-label="Drum pattern preset"
-            value={presetId}
-            onChange={(event) => {
-              const nextPreset = event.target.value;
-              setPresetId(nextPreset);
-              applyArrangement(createPresetArrangement(nextPreset, patch.vol));
-            }}
-          >
-            <option value="" disabled>Presets</option>
-            {PRESET_GROUPS.map((group) => <optgroup key={group.category} label={group.category}>{group.presets.map((preset) => <option key={preset.id} value={preset.id}>{preset.name}</option>)}</optgroup>)}
-          </select>
-          <Button variant="outline" onClick={() => { setPresetId(""); applyArrangement(createArrangement(createDemoPatch(patch.vol))); }}>Load demo</Button>
-          <Button variant="outline" onClick={() => setExportOpen(true)}><Download size={13} />Export</Button>
-        </div>
+        <SessionPresetControls arrangement={currentArrangement} onApply={applyArrangement} onExport={() => setExportOpen(true)} />
       </section>
 
       <main className="workspace">

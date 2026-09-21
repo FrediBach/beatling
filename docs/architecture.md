@@ -2,7 +2,7 @@
 
 ## System overview
 
-Beatling is a browser-only Euclidean rhythm instrument with drum and synth voices. It is a React and TypeScript single-page application built with Vite. There is no application server: patches and arrangements are stored in browser `localStorage`, Web Audio produces sound locally, and export/import happens in the client.
+Beatling is a browser-only Euclidean rhythm instrument with drum and synth voices. It is a React and TypeScript single-page application built with Vite. There is no application server: patches and arrangements are stored in browser `localStorage`, Web Audio produces sound locally, and export/import happens in the client. Browsers that implement the File System Access API can also load and save arrangement files or sync a user-authorized preset directory.
 
 ```text
 User input
@@ -41,6 +41,7 @@ Pure domain modules in `src/lib` support both the UI and audio engine.
 | `src/lib/variations.ts` | Arrangement defaults, migrations, persistence, change detection | Preserve compatibility with versioned stored formats |
 | `src/lib/routing.ts`, `cables.ts`, `orbit.ts` | Derived routing and visualization data | No React state or side effects |
 | `src/lib/presets.ts`, `voice-config.ts`, `constants.ts` | Curated data and domain configuration | Keep source data separate from rendering |
+| `src/lib/file-system-presets.ts` | JSON preset parsing plus directory/file reads and writes | Normalize every external file before exposing it to session state |
 | `src/audio/engine.ts` | Clock, routing evaluation, voice synthesis, runtime snapshots | Timing cannot depend on React renders; all loops stay bounded |
 | `src/components/` | Accessible controls and visualizations | Receive data and typed callbacks; no in-place domain mutation |
 | `src/hooks/` | Reusable browser interaction behavior | Own and clean up listeners created by the hook |
@@ -75,6 +76,8 @@ Two versioned local-storage records currently exist:
 - `egs.arrangement.v6` for variations and song structure.
 
 All reads are defensive. `normalizePatch` and `normalizeArrangement` supply defaults, constrain values, and migrate v1 patches to silent default effect sends as well as the older variation-repeat representation into song parts. The v6 readers fall back through v5, v4, v3, v2, and v1 storage keys so existing sessions migrate on their next save. Patch v3 replaced the single `modSrc` / `modDst` / `modAmt` tuple with `modulations`, an array of independently sourced and scaled routes. Patch v4 adds an explicit block kind and two normalized voice destinations for Bernoulli gates; older blocks infer voice or Modulator kind from their voice assignment. Patch v5 adds normalized modulation routes to each shared voice. Patch v6 adds the bassline and lead synth voices, their normalized synthesis/scale controls, effect sends, and synth-only quantized V/Oct routes. Each modulation destination is a stable route identity and occurs at most once per receiving block or voice. Legacy tuples migrate to one block route; an explicitly empty modern array stays empty. Normalization rejects invalid/self block sources and duplicate destinations, clamps depths, and strips legacy fields. Arrangement v6 carries these patches, with unchanged song-part semantics. Storage access remains wrapped in `try/catch` because privacy settings and quota failures must degrade to an in-memory session.
+
+Local preset files contain the arrangement v6 shape so variations and song parts round-trip together; legacy patch-only JSON also remains loadable. `useLocalPresets` owns File System Access API permissions, keeps the chosen directory handle in IndexedDB when available, rescans on focus, and exposes only normalized top-level JSON files. Unsupported browsers retain the local-storage and text export/import paths.
 
 Changing either serialized shape requires a new format decision, migration coverage, and backward-compatibility tests. Do not silently reinterpret existing fields.
 
