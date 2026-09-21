@@ -21,7 +21,7 @@ describe("application shell", () => {
     fireEvent.click(screen.getByRole("button", { name: "Mute block 01" }));
     expect(screen.getByRole("button", { name: "Unmute block 01" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Patch block 03" }));
-    expect(screen.getByLabelText("Modulation source")).toHaveValue("12");
+    expect(screen.getByLabelText("Modulation source for chance")).toHaveValue("12");
     fireEvent.click(toggle);
     expect(screen.queryByTestId("patch-cables")).not.toBeInTheDocument();
   });
@@ -202,13 +202,26 @@ describe("variations and song mode", () => {
 });
 
 describe("patch bay", () => {
+  it("undoes and redoes additional modulation targets without changing existing routes", () => {
+    vi.spyOn(window.localStorage.__proto__, "getItem").mockReturnValue(null);
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Patch block 03" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add modulation target" }));
+    expect(screen.getByLabelText("Modulation source for fill")).toHaveValue("12");
+    fireEvent.click(screen.getByRole("button", { name: "Undo last change" }));
+    expect(screen.queryByLabelText("Modulation source for fill")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Modulation source for chance")).toHaveValue("12");
+    fireEvent.click(screen.getByRole("button", { name: "Redo last change" }));
+    expect(screen.getByLabelText("Modulation source for fill")).toHaveValue("12");
+  });
+
   it("highlights connected blocks, edits routing and follows a connection", () => {
     vi.spyOn(window.localStorage.__proto__, "getItem").mockReturnValue(null);
     render(<App />);
     fireEvent.click(screen.getByRole("button", { name: "Patch block 03" }));
     expect(screen.getByTestId("block-13")).toHaveClass("is-related");
-    expect(screen.getByLabelText("Modulation source")).toHaveValue("12");
-    fireEvent.change(screen.getByLabelText("Modulation source"), { target: { value: "13" } });
+    expect(screen.getByLabelText("Modulation source for chance")).toHaveValue("12");
+    fireEvent.change(screen.getByLabelText("Modulation source for chance"), { target: { value: "13" } });
     expect(screen.getByTestId("block-14")).toHaveClass("is-related");
     expect(screen.getByTestId("block-13")).not.toHaveClass("is-related");
     fireEvent.click(screen.getByRole("button", { name: "Block 14 LFO to block 03 chance" }));

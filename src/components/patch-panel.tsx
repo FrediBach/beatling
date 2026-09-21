@@ -1,10 +1,12 @@
 import { ArrowRight, X } from "lucide-react";
-import { LFO_SHAPES, MOD_DESTS, padBlock, voiceName } from "@/lib/constants";
-import type { ClockSource, SequencerBlock } from "@/lib/types";
+import { LFO_SHAPES, padBlock, voiceName } from "@/lib/constants";
+import type { BlockVisualState, VoiceState, ClockSource, SequencerBlock } from "@/lib/types";
 import { connectionsFor } from "@/lib/routing";
+import { ModulationScope } from "./modulation-scope";
+import { ModulationEditor } from "./modulation-editor";
 import { cn } from "@/lib/utils";
 
-export function PatchPanel({ index, blocks, onChange, onSelect, onClose, embedded = false }: { index: number; blocks: SequencerBlock[]; onChange: (block: SequencerBlock) => void; onSelect: (index: number) => void; onClose: () => void; embedded?: boolean }) {
+export function PatchPanel({ index, blocks, onChange, onSelect, onClose, visual, voice, embedded = false }: { index: number; blocks: SequencerBlock[]; onChange: (block: SequencerBlock) => void; onSelect: (index: number) => void; onClose: () => void; embedded?: boolean; visual?: BlockVisualState; voice?: VoiceState }) {
   const block = blocks[index];
   const update = <K extends keyof SequencerBlock>(key: K, value: SequencerBlock[K]) => onChange({ ...block, [key]: value });
   const connections = connectionsFor(blocks).filter((connection) => connection.source === index || connection.target === index);
@@ -50,18 +52,10 @@ export function PatchPanel({ index, blocks, onChange, onSelect, onClose, embedde
               {LFO_SHAPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
 
-            <PatchLabel>Mod from</PatchLabel>
-            <BlockSelect label="Modulation source" value={block.modSrc} index={index} blocks={blocks} onChange={(value) => update("modSrc", value)} />
-
-            <PatchLabel>Mod to</PatchLabel>
-            <select aria-label="Modulation destination" className="control" value={block.modDst} onChange={(event) => update("modDst", event.target.value as SequencerBlock["modDst"])}>
-              {MOD_DESTS.map(([value, label]) => <option key={value || "none"} value={value}>{label}</option>)}
-            </select>
-
-            <PatchLabel>Amount</PatchLabel>
-            <RangeWithOutput label="Modulation amount" min={-100} max={100} value={Math.round(block.modAmt * 100)} suffix="%" onChange={(value) => update("modAmt", value / 100)} />
           </div>
     </div>
+    <ModulationScope block={block} visual={visual} />
+    <ModulationEditor index={index} blocks={blocks} visual={visual} voice={voice} onChange={onChange} />
     <div className="connection-heading"><span className="eyebrow">Signal flow</span><span>{connections.length} connections</span></div>
     <div className="connection-list">
       {connections.length === 0 && <p className="empty-routing">No block connections yet. Choose a clock or modulation source above.</p>}

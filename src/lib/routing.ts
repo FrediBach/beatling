@@ -14,7 +14,9 @@ export function connectionsFor(blocks: SequencerBlock[]): Connection[] {
     block.clk.filter((source) => source !== "G").forEach((source) => connections.push({ source: Number(source), target, output: "Trigger", input: "Clock" }));
     if (block.rst !== "" && block.rst !== "BAR" && block.rst !== "G") connections.push({ source: Number(block.rst), target, output: "Trigger", input: "Reset" });
     if (block.mut !== "") connections.push({ source: Number(block.mut), target, output: "Gate", input: "Mute" });
-    if (block.modSrc !== "" && block.modDst !== "") connections.push({ source: Number(block.modSrc), target, output: "LFO", input: MOD_DESTS.find(([value]) => value === block.modDst)?.[1] ?? block.modDst });
+    for (const route of block.modulations) {
+      if (route.source !== "") connections.push({ source: Number(route.source), target, output: "LFO", input: MOD_DESTS.find(([value]) => value === route.destination)?.[1] ?? route.destination });
+    }
   });
   return connections;
 }

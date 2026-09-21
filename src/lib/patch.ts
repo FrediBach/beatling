@@ -2,9 +2,11 @@ import { BLOCK_COUNT, type BlockParam, type BlockRandomizationLocks, type Patch,
 import { ROW_PARAMS, VOICE_DEFS } from "@/lib/constants";
 import { clamp } from "@/lib/euclid";
 import { createCustomVoiceSettings, normalizeCustomVoiceSettings } from "@/lib/voice-config";
+import { normalizeModulations } from "@/lib/modulation";
 import { createEffects, normalizeEffects } from "@/lib/effects";
 
-const STORAGE_KEY = "egs.patch.v2";
+const STORAGE_KEY = "egs.patch.v3";
+const V2_STORAGE_KEY = "egs.patch.v2";
 const LEGACY_STORAGE_KEY = "egs.patch.v1";
 
 export function createBlock(index: number): SequencerBlock {
@@ -20,9 +22,7 @@ export function createBlock(index: number): SequencerBlock {
     rst: "",
     mut: "",
     mute: false,
-    modSrc: "",
-    modDst: "",
-    modAmt: 0,
+    modulations: [],
     shape: "ramp",
   };
 }
@@ -75,19 +75,15 @@ export function createDemoPatch(volume = 72): Patch {
     if ("clk" in demo) block.clk = [...demo.clk];
     if ("rst" in demo) block.rst = demo.rst;
     if ("mut" in demo) block.mut = demo.mut;
-    if ("mod" in demo) {
-      block.modSrc = demo.mod.src;
-      block.modDst = demo.mod.dst;
-      block.modAmt = demo.mod.amt;
-    }
+    if ("mod" in demo) block.modulations = [{ source: demo.mod.src, destination: demo.mod.dst, amount: demo.mod.amt }];
     return block;
   });
-  return { format: "euclid-grid.v2", bpm: 124, rate: 4, swing: 12, vol: volume, blocks, voices: createVoices(), effects: createEffects() };
+  return { format: "euclid-grid.v3", bpm: 124, rate: 4, swing: 12, vol: volume, blocks, voices: createVoices(), effects: createEffects() };
 }
 
 export function createEmptyPatch(volume = 72): Patch {
   return {
-    format: "euclid-grid.v2",
+    format: "euclid-grid.v3",
     bpm: 124,
     rate: 4,
     swing: 0,
@@ -110,7 +106,16 @@ export function normalizePatch(value: unknown): Patch | null {
   base.blocks = base.blocks.map((fallback, index) => {
     const source = input.blocks?.[index];
     if (!source || typeof source !== "object") return fallback;
-    return { ...fallback, ...source, clk: Array.isArray(source.clk) ? [...source.clk] : [...fallback.clk] };
+    const merged = { ...fallback, ...source, clk: Array.isArray(source.clk) ? [...source.clk] : [...fallback.clk] };
+    merged.steps = clamp(Math.round(Number(source.steps) || fallback.steps), 1, 32);
+    merged.pulses = clamp(Math.round(Number(source.pulses) || 0), 0, merged.steps);
+    merged.modulations = normalizeModulations(source, index);
+    // Legacy fields must not survive reserialization or variation comparisons.
+    const clean = merged as SequencerBlock & { modSrc?: unknown; modDst?: unknown; modAmt?: unknown };
+    delete clean.modSrc;
+    delete clean.modDst;
+    delete clean.modAmt;
+    return clean;
   });
   if (input.voices) {
     for (const { id } of VOICE_DEFS) {
@@ -130,7 +135,7 @@ export function normalizePatch(value: unknown): Patch | null {
 
 export function loadStoredPatch(): Patch | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(V2_STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
     return raw ? normalizePatch(JSON.parse(raw)) : null;
   } catch {
     return null;

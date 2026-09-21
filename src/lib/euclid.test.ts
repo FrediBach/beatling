@@ -22,9 +22,9 @@ describe("Euclidean rhythm", () => {
 
 describe("modulation", () => {
   it("modulates and clamps a destination", () => {
-    const block = { ...createBlock(0), pulses: 4, modSrc: "1" as const, modDst: "pulses" as const, modAmt: 1 };
-    expect(effectiveBlock(block, 1).pulses).toBe(12);
-    expect(effectiveBlock({ ...block, steps: 6 }, 1).pulses).toBe(6);
+    const block = { ...createBlock(0), pulses: 4, modulations: [{ source: "1" as const, destination: "pulses" as const, amount: 1 }] };
+    expect(effectiveBlock(block, () => 1).pulses).toBe(12);
+    expect(effectiveBlock({ ...block, steps: 6 }, () => 1).pulses).toBe(6);
   });
 
   it("reproduces all LFO shapes", () => {

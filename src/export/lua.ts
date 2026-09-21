@@ -29,7 +29,7 @@ export function buildLua(patch: Patch, date = new Date()): string {
     block.clk.forEach((source) => source !== "G" && usedTriggers.add(Number(source)));
     if (!["", "G", "BAR"].includes(block.rst)) usedTriggers.add(Number(block.rst));
     if (block.mut !== "") usedTriggers.add(Number(block.mut));
-    if (block.modSrc !== "" && block.modAmt !== 0) usedLfos.add(Number(block.modSrc));
+    block.modulations.forEach((route) => { if (route.source !== "" && route.amount !== 0) usedLfos.add(Number(route.source)); });
   });
 
   const types: string[] = [];
@@ -55,10 +55,10 @@ export function buildLua(patch: Patch, date = new Date()): string {
   }
 
   const rows = patch.blocks.map((block, index) => {
-    const browserOnly = ["tune", "decay", "level"].includes(block.modDst)
-      ? `  -- browser voice mod (${block.modDst}) not exported`
-      : "";
-    return `\t{ steps=${block.steps}, pulses=${block.pulses}, rot=${block.rot}, div=${block.div}, prob=${block.prob}, gate=${block.gate}, clk={${block.clk.map(sourceNumber).join(", ")}}, rst=${sourceNumber(block.rst)}, mut=${block.mut === "" ? 0 : Number(block.mut) + 1}, mn=${block.mute}, shape=${SHAPE_NUMBER[block.shape]}, msrc=${block.modSrc === "" ? 0 : Number(block.modSrc) + 1}, mdst=${DESTINATION_NUMBER[block.modDst]}, mamt=${block.modAmt.toFixed(2)}, out=${outputIndexes[index]}, lout=${lfoIndexes[index]}, tag=${luaString(block.voice ? voiceTag(block.voice) : "--")} },${browserOnly}`;
+    const voiceTargets = block.modulations.filter((route) => ["tune", "decay", "level"].includes(route.destination));
+    const browserOnly = voiceTargets.length ? `  -- browser voice mod (${voiceTargets.map((route) => route.destination).join(", ")}) not exported` : "";
+    const mods = block.modulations.filter((route) => route.source !== "" && DESTINATION_NUMBER[route.destination] > 0).map((route) => `{ src=${Number(route.source) + 1}, dst=${DESTINATION_NUMBER[route.destination]}, amt=${route.amount.toFixed(2)} }`).join(", ");
+    return `\t{ steps=${block.steps}, pulses=${block.pulses}, rot=${block.rot}, div=${block.div}, prob=${block.prob}, gate=${block.gate}, clk={${block.clk.map(sourceNumber).join(", ")}}, rst=${sourceNumber(block.rst)}, mut=${block.mut === "" ? 0 : Number(block.mut) + 1}, mn=${block.mute}, shape=${SHAPE_NUMBER[block.shape]}, euclidean=${!block.voice}, mods={${mods}}, out=${outputIndexes[index]}, lout=${lfoIndexes[index]}, tag=${luaString(block.voice ? voiceTag(block.voice) : "--")} },${browserOnly}`;
   });
 
   return `-- Euclid Grid
@@ -66,7 +66,7 @@ export function buildLua(patch: Patch, date = new Date()): string {
 Sixteen Euclidean blocks on a shared clock tree, exported from the Euclidean
 Grid Sequencer. Input 1 is the clock, input 2 is reset. Blocks clock each
 other, reset each other, mute each other with their gates and modulate each
-other with their step LFOs. Tempo lives outside: feed it a clock.
+other with Euclidean cycle LFOs (modulators) or step LFOs (voices). Tempo lives outside: feed it a clock.
 Exported ${date.toISOString().slice(0, 10)} at ${patch.bpm} BPM, 1/${patch.rate * 4} clock.
 ]]
 
@@ -74,14 +74,19 @@ local BAR = ${patch.rate * 4}\t\t-- clock pulses per bar
 
 -- steps/pulses/rot: the Euclidean pattern. div: clock divide. prob: chance %.
 -- gate: gate length, % of one clock. clk: clock sources (0 = clock input,
--- n = trigger out of block n). rst/mut/msrc: block numbers, 0 or -9 = unused.
+-- n = trigger out of block n). rst/mut/mods.src: block numbers, 0 or -9 = unused.
 local blocks = {
 ${rows.join("\n")}
 }
 
 local NB = #blocks
 local pos, cnt, gate, lfo, rnd = {}, {}, {}, {}, {}
-for i = 1, NB do pos[i] = -1 cnt[i] = 0 gate[i] = 0 lfo[i] = 0 rnd[i] = 0 end
+local lastClock, waveTime, duration, rhythm = {}, {}, {}, {}
+local now = 0
+for i = 1, NB do
+\tpos[i] = -1 cnt[i] = 0 gate[i] = 0
+\tlfo[i] = blocks[i].euclidean and 0.5 or 0 rnd[i] = 0
+end
 
 local outs = {}
 local gateLen, probScale, lfoDepth, muteAll = 0.02, 1.0, 5.0, false
@@ -107,30 +112,68 @@ local function shapeValue( shape, ph, r )
 \treturn ph
 end
 
+-- A complete waveform fills each interval between Euclidean hits.
+local function cyclePhase( p, r )
+\tif r.pulses <= 0 then return nil end
+\tfor back = 0, r.steps - 1 do
+\t\tlocal start = math.floor(p) - back
+\t\tif euclidHit(start, r.steps, r.pulses, r.rot) then
+\t\t\tfor length = 1, r.steps do
+\t\t\t\tif euclidHit(start + length, r.steps, r.pulses, r.rot) then
+\t\t\t\t\treturn (p - start) / length
+\t\t\t\tend
+\t\t\tend
+\t\tend
+\tend
+end
+
+local function updateLfo( i )
+\tlocal b, r = blocks[i], rhythm[i]
+\tif not r then lfo[i] = b.euclidean and 0.5 or 0 return end
+\tif not b.euclidean then return end
+\tlocal fraction = math.min(1, math.max(0, (now - waveTime[i]) / duration[i]))
+\tlocal phase = cyclePhase(pos[i] + fraction, r)
+\tlfo[i] = phase and shapeValue(b.shape, phase, rnd[i]) or 0.5
+end
+
+local function resetBlock( i )
+\tpos[i] = -1 cnt[i] = 0 rhythm[i] = nil lastClock[i] = nil
+\tlfo[i] = blocks[i].euclidean and 0.5 or 0
+end
+
 local function effective( i )
 \tlocal b = blocks[i]
-\tlocal m = 0.0
-\tif b.msrc > 0 and b.mamt ~= 0 then m = ( lfo[b.msrc] * 2 - 1 ) * b.mamt end
 \tlocal steps, pulses, rot, div, prob = b.steps, b.pulses, b.rot, b.div, b.prob
-\tif b.mdst == 1 then pulses = math.floor( pulses + m * 8 + 0.5 )
-\telseif b.mdst == 2 then rot = math.floor( rot + m * steps + 0.5 )
-\telseif b.mdst == 3 then prob = prob + m * 100
-\telseif b.mdst == 4 then div = math.floor( div + m * 4 + 0.5 ) end
+\tfor _, route in ipairs( b.mods ) do
+\t\tupdateLfo(route.src)
+\t\tlocal m = ( lfo[route.src] * 2 - 1 ) * route.amt
+\t\tif route.dst == 1 then pulses = math.floor( pulses + m * 8 + 0.5 )
+\t\telseif route.dst == 2 then rot = math.floor( rot + m * steps + 0.5 )
+\t\telseif route.dst == 3 then prob = prob + m * 100
+\t\telseif route.dst == 4 then div = math.floor( div + m * 4 + 0.5 ) end
+\tend
 \tif pulses < 0 then pulses = 0 end
 \tif pulses > steps then pulses = steps end
-\tif div < 1 then div = 1 end
+\tdiv = math.min(16, math.max(1, div))
+\tprob = math.min(100, math.max(0, prob))
 \treturn steps, pulses, rot, div, prob
 end
 
 local function advance( i )
 \tlocal b = blocks[i]
+\tlocal interval = lastClock[i] and math.max(0.008, now - lastClock[i]) or 0.125
+\tlastClock[i] = now
 \tcnt[i] = cnt[i] + 1
 \tlocal steps, pulses, rot, div, prob = effective( i )
 \tif cnt[i] % div ~= 0 then return false end
 \tpos[i] = ( pos[i] + 1 ) % steps
-\tif pos[i] == 0 then rnd[i] = math.random() end
-\tlfo[i] = shapeValue( b.shape, pos[i] / steps, rnd[i] )
-\tif not euclidHit( pos[i], steps, pulses, rot ) then return false end
+\tlocal hit = euclidHit(pos[i], steps, pulses, rot)
+\tif (b.euclidean and hit) or (not b.euclidean and pos[i] == 0) then rnd[i] = math.random() end
+\trhythm[i] = { steps=steps, pulses=pulses, rot=rot }
+\twaveTime[i] = now duration[i] = interval * div
+\tif b.euclidean then updateLfo(i)
+\telse lfo[i] = shapeValue(b.shape, pos[i] / steps, rnd[i]) end
+\tif not hit then return false end
 \tif muteAll or b.mn then return false end
 \tif b.mut > 0 and gate[b.mut] > 0 then return false end
 \tif math.random() * 100 >= prob * probScale then return false end
@@ -148,7 +191,7 @@ local function pulse( src )
 \t\thead = head + 1
 \t\tguard = guard + 1
 \t\tfor i = 1, NB do
-\t\t\tif blocks[i].rst == s then pos[i] = -1 cnt[i] = 0 end
+\t\t\tif blocks[i].rst == s then resetBlock(i) end
 \t\tend
 \t\tfor i = 1, NB do
 \t\t\tlocal c = blocks[i].clk
@@ -194,11 +237,12 @@ return
 \t\t\tpulse( 0 )
 \t\telse
 \t\t\tgcount = 0
-\t\t\tfor i = 1, NB do pos[i] = -1 cnt[i] = 0 end
+\t\t\tfor i = 1, NB do resetBlock(i) end
 \t\tend
 \t\treturn outs
 \tend
 ,\tstep = function( self, dt, inputs )
+\t\tnow = now + dt
 \t\tlocal o = {}
 \t\tfor i = 1, NB do
 \t\t\tif gate[i] > 0 then
@@ -208,6 +252,7 @@ return
 \t\t\t\t\tif blocks[i].out > 0 then o[blocks[i].out] = 0.0 end
 \t\t\t\tend
 \t\t\tend
+\t\t\tupdateLfo(i)
 \t\t\tif blocks[i].lout > 0 then o[blocks[i].lout] = lfo[i] * lfoDepth end
 \t\tend
 \t\treturn o

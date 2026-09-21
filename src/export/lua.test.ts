@@ -9,6 +9,10 @@ describe("Disting NT Lua export", () => {
     expect(lua).toContain("clk={0, 2}");
     expect(lua).toContain('name = \'Euclid Grid\'');
     expect(lua).toContain("kLinear");
+    expect(lua).toContain("euclidean=true");
+    expect(lua).toContain("euclidean=false");
+    expect(lua).toContain("local phase = cyclePhase(pos[i] + fraction, r)");
+    expect(lua).toContain("now = now + dt");
   });
 
   it("always creates at least one output", () => {

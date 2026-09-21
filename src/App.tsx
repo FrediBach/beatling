@@ -138,7 +138,7 @@ export default function App() {
 
   useEffect(() => {
     const timeout = window.setTimeout(() => saveArrangement({
-      format: "euclid-grid.arrangement.v2",
+      format: "euclid-grid.arrangement.v3",
       variations,
       songParts,
       activeIndex: activeVariation,
@@ -469,8 +469,7 @@ export default function App() {
     const visual = snapshot.blocks[index] ?? emptySnapshot(patch).blocks[index];
     if (!playing) {
       const block = patch.blocks[index];
-      const sourceLfo = block.modSrc === "" ? 0 : (snapshot.blocks[Number(block.modSrc)]?.lfo ?? 0);
-      return { ...visual, effective: effectiveBlock(block, sourceLfo), muted: block.mute };
+      return { ...visual, effective: effectiveBlock({ ...block, modulations: [] }), muted: block.mute };
     }
     return visual;
   };
@@ -627,10 +626,10 @@ export default function App() {
           {view === "circle" && circlePanel === "rhythm" ? <div className="circle-inspector" role="region" aria-label={`Settings for block ${String(selectedRhythm + 1).padStart(2, "0")}`}>
             <div className="circle-inspector-title"><span className="eyebrow">Selected rhythm / {String(selectedRhythm + 1).padStart(2, "0")}</span><p>One ring, one rhythm. Adjust it here.</p></div>
             {renderCard(selectedRhythm, false)}
-            <div id="circle-routing"><PatchPanel embedded index={selectedRhythm} blocks={patch.blocks} onChange={(next) => updateBlock(selectedRhythm, next)} onSelect={selectRhythm} onClose={() => undefined} /></div>
+            <div id="circle-routing"><PatchPanel visual={visualFor(selectedRhythm)} voice={patch.blocks[selectedRhythm].voice ? patch.voices[patch.blocks[selectedRhythm].voice] : undefined} embedded index={selectedRhythm} blocks={patch.blocks} onChange={(next) => updateBlock(selectedRhythm, next)} onSelect={selectRhythm} onClose={() => undefined} /></div>
           </div> : <>
 
-          {openPatch !== null ? <PatchPanel index={openPatch} blocks={patch.blocks} onChange={(next) => updateBlock(openPatch, next)} onSelect={setOpenPatch} onClose={() => setOpenPatch(null)} /> : <><div className="section-heading voice-bank-heading"><div><h2>Voice bank</h2><span className="section-meta">12 voices</span></div><button className="voice-bank-master" aria-pressed={allVoicesMuted} onClick={() => setAllVoicesMuted(!allVoicesMuted)}>{allVoicesMuted ? <Volume2 size={12} /> : <VolumeX size={12} />}{allVoicesMuted ? "Unmute all" : "Mute all"}</button></div><VoiceBank voices={patch.voices} activeVoices={snapshot.activeVoices} changedFields={voiceVariationChanges} onChange={updateVoice} /><div className="voice-bank-note"><span className="jack" />808 / 909 / CST · CST opens detailed synthesis controls</div></>}
+          {openPatch !== null ? <PatchPanel visual={visualFor(openPatch)} voice={patch.blocks[openPatch].voice ? patch.voices[patch.blocks[openPatch].voice] : undefined} index={openPatch} blocks={patch.blocks} onChange={(next) => updateBlock(openPatch, next)} onSelect={setOpenPatch} onClose={() => setOpenPatch(null)} /> : <><div className="section-heading voice-bank-heading"><div><h2>Voice bank</h2><span className="section-meta">12 voices</span></div><button className="voice-bank-master" aria-pressed={allVoicesMuted} onClick={() => setAllVoicesMuted(!allVoicesMuted)}>{allVoicesMuted ? <Volume2 size={12} /> : <VolumeX size={12} />}{allVoicesMuted ? "Unmute all" : "Mute all"}</button></div><VoiceBank voices={patch.voices} activeVoices={snapshot.activeVoices} changedFields={voiceVariationChanges} onChange={updateVoice} /><div className="voice-bank-note"><span className="jack" />808 / 909 / CST · CST opens detailed synthesis controls</div></>}
           </>}
         </aside>
       </main>

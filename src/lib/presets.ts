@@ -230,7 +230,7 @@ export function createPresetPatch(id: string, volume = 72): Patch {
   const voices = createVoices();
   applyPresetCharacter(preset, voices);
   return {
-    format: "euclid-grid.v2",
+    format: "euclid-grid.v3",
     bpm: preset.bpm,
     rate: preset.rate ?? 4,
     swing: preset.swing,
@@ -316,7 +316,7 @@ function createFillVariation(base: Patch, preset: DrumPreset): Patch {
   const referenced = new Set<number>();
   patch.blocks.forEach((block) => {
     block.clk.forEach((source) => { if (source !== "G") referenced.add(Number(source)); });
-    for (const source of [block.rst, block.mut, block.modSrc]) {
+    for (const source of [block.rst, block.mut, ...block.modulations.map((route) => route.source)]) {
       if (source !== "" && source !== "G" && source !== "BAR") referenced.add(Number(source));
     }
   });
@@ -348,7 +348,7 @@ export function createPresetArrangement(id: string, volume = 72): Arrangement {
     patch,
   }));
   return {
-    format: "euclid-grid.arrangement.v2",
+    format: "euclid-grid.arrangement.v3",
     variations,
     songParts: variations.map((variation, index) => ({ id: `preset-${id}-part-${index + 1}`, variationId: variation.id, bars: repeats[index] })),
     activeIndex: 0,

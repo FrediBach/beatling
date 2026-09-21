@@ -9,7 +9,7 @@ describe("patches", () => {
     const patch = createDemoPatch();
     expect(patch.blocks).toHaveLength(16);
     expect(patch.blocks[0]).toMatchObject({ voice: "kick", steps: 16, pulses: 4 });
-    expect(patch.blocks[2]).toMatchObject({ modSrc: "12", modDst: "prob", modAmt: -0.5 });
+    expect(patch.blocks[2]).toMatchObject({ modulations: [{ source: "12", destination: "prob", amount: -0.5 }] });
     expect(patch.voices.kick.machine).toBe("909");
     expect(patch.voices.clap.machine).toBe("808");
     expect(patch.voices.kick.custom.bodyFrequency).toBe(50);
@@ -34,7 +34,7 @@ describe("patches", () => {
     legacy.format = "euclid-grid.v1";
     delete legacy.effects;
     const migrated = normalizePatch(legacy)!;
-    expect(migrated.format).toBe("euclid-grid.v2");
+    expect(migrated.format).toBe("euclid-grid.v3");
     expect(migrated.effects.distortion.enabled).toBe(false);
     expect(migrated.effects.sends.kick.reverb).toBe(0);
 

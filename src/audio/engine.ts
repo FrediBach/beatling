@@ -1,32 +1,30 @@
 import { BLOCK_COUNT, type CustomVoiceSettings, type EffectId, type EffectsState, type EffectiveBlock, type EngineSnapshot, type Machine, type Patch, type VoiceId } from "@/lib/types";
 import { VOICE_DEFS } from "@/lib/constants";
-import { clamp, effectiveBlock, euclidHit, lfoValue, volumeGain } from "@/lib/euclid";
+import { clamp, effectiveBlock, euclidHit, volumeGain } from "@/lib/euclid";
+import { sampleLfo, type LfoFrame } from "@/lib/lfo";
 import { EFFECT_IDS, effectGain } from "@/lib/effects";
 
 interface QueuedVisualEvent {
   time: number;
   position: number;
-  steps: number;
-  pulses: number;
-  rotation: number;
-  division: number;
-  lfo: number;
+  effective: EffectiveBlock;
+  wave: LfoFrame | null;
   fire: boolean;
 }
 
 interface RuntimeBlock {
   position: number;
   count: number;
-  lfo: number;
+  wave: LfoFrame | null;
   random: number;
   gateFrom: number;
   gateTo: number;
   lastClock: number | null;
   queue: QueuedVisualEvent[];
   displayPosition: number;
-  displayLfo: number;
+  displayWave: LfoFrame | null;
   fireUntil: number;
-  displayPattern: { steps: number; pulses: number; rot: number; div: number };
+  displayPattern: EffectiveBlock;
 }
 
 type AudioContextConstructor = typeof AudioContext;
@@ -138,14 +136,16 @@ export class SequencerEngine {
       while (runtime.queue.length && runtime.queue[0].time <= now) {
         const event = runtime.queue.shift()!;
         runtime.displayPosition = event.position;
-        runtime.displayLfo = event.lfo;
-        runtime.displayPattern = { steps: event.steps, pulses: event.pulses, rot: event.rotation, div: event.division };
+        runtime.displayWave = event.wave;
+        runtime.displayPattern = event.effective;
         if (event.fire) runtime.fireUntil = now + 0.11;
       }
       const block = patch.blocks[index];
+      const lfo = runtime.displayWave ? sampleLfo(runtime.displayWave, now) : { value: block.voice ? 0 : 0.5, position: -1 };
       return {
         position: runtime.displayPosition,
-        lfo: runtime.displayLfo,
+        lfo: lfo.value,
+        lfoPosition: lfo.position,
         fire: runtime.fireUntil > now,
         muted: block.mute || (block.mut !== "" && this.gateHigh(Number(block.mut), now)),
         effective: runtime.displayPattern,
@@ -300,16 +300,16 @@ export class SequencerEngine {
       return {
         position: -1,
         count: 0,
-        lfo: 0,
+        wave: null,
         random: Math.random(),
         gateFrom: -1,
         gateTo: -1,
         lastClock: null,
         queue: [],
         displayPosition: -1,
-        displayLfo: 0,
+        displayWave: null,
         fireUntil: -1,
-        displayPattern: { steps: block?.steps ?? 16, pulses: block?.pulses ?? 0, rot: block?.rot ?? 0, div: block?.div ?? 1 },
+        displayPattern: { steps: block?.steps ?? 16, pulses: block?.pulses ?? 0, rot: block?.rot ?? 0, div: block?.div ?? 1, prob: block?.prob ?? 100, tune: 0, decay: 0, level: 0 },
       };
     });
   }
@@ -350,7 +350,7 @@ export class SequencerEngine {
     while (head < queue.length && guard++ < 400) {
       const event = queue[head++];
       patch.blocks.forEach((block, index) => {
-        if (block.rst === event.source) this.resetBlock(index);
+        if (block.rst === event.source) this.resetBlock(index, event.time);
       });
       patch.blocks.forEach((block, index) => {
         if (!block.clk.includes(event.source as never) || counts[index]++ >= 8) return;
@@ -359,10 +359,12 @@ export class SequencerEngine {
     }
   }
 
-  private effective(index: number): EffectiveBlock {
+  private effective(index: number, time: number): EffectiveBlock {
     const block = this.getPatch().blocks[index];
-    const sourceLfo = block.modSrc === "" ? 0 : (this.runtime[Number(block.modSrc)]?.lfo ?? 0);
-    return effectiveBlock(block, sourceLfo);
+    return effectiveBlock(block, (source) => {
+      const wave = this.runtime[source]?.wave;
+      return wave ? sampleLfo(wave, time).value : this.getPatch().blocks[source]?.voice ? 0 : 0.5;
+    });
   }
 
   private advance(index: number, time: number): boolean {
@@ -372,23 +374,24 @@ export class SequencerEngine {
     const interval = runtime.lastClock === null ? this.pulseInterval() : Math.max(0.008, time - runtime.lastClock);
     runtime.lastClock = time;
     runtime.count += 1;
-    const effective = this.effective(index);
+    const effective = this.effective(index, time);
     if (runtime.count % effective.div !== 0) return false;
     runtime.position = (runtime.position + 1) % effective.steps;
-    if (runtime.position === 0) runtime.random = Math.random();
-    runtime.lfo = lfoValue(block.shape, runtime.position / effective.steps, runtime.random);
+    const hit = euclidHit(runtime.position, effective.steps, effective.pulses, effective.rot);
+    if (block.voice ? runtime.position === 0 : hit) runtime.random = Math.random();
+    runtime.wave = {
+      time, position: runtime.position, stepDuration: interval * effective.div,
+      rhythm: effective, shape: block.shape, random: runtime.random, euclidean: !block.voice,
+    };
     const event: QueuedVisualEvent = {
       time,
       position: runtime.position,
-      steps: effective.steps,
-      pulses: effective.pulses,
-      rotation: effective.rot,
-      division: effective.div,
-      lfo: runtime.lfo,
+      effective,
+      wave: runtime.wave,
       fire: false,
     };
     if (
-      !euclidHit(runtime.position, effective.steps, effective.pulses, effective.rot)
+      !hit
       || this.isMuted(index, time)
       || Math.random() * 100 >= effective.prob
     ) {
@@ -403,9 +406,13 @@ export class SequencerEngine {
     return true;
   }
 
-  private resetBlock(index: number): void {
-    this.runtime[index].position = -1;
-    this.runtime[index].count = 0;
+  private resetBlock(index: number, time: number): void {
+    const runtime = this.runtime[index];
+    runtime.position = -1;
+    runtime.count = 0;
+    runtime.wave = null;
+    runtime.lastClock = null;
+    runtime.queue.push({ time, position: -1, wave: null, fire: false, effective: effectiveBlock({ ...this.getPatch().blocks[index], modulations: [] }) });
   }
 
   private gateHigh(index: number, time: number): boolean {

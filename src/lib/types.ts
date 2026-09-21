@@ -25,6 +25,13 @@ export type BlockSource = "" | `${number}`;
 export type BlockParam = "steps" | "pulses" | "rot" | "div" | "prob";
 export type BlockRandomizationLocks = Record<BlockParam, boolean>;
 
+// Each destination is a stable route identity; a block can have all seven targets.
+export interface ModulationRoute {
+  source: BlockSource;
+  destination: Exclude<ModDestination, "">;
+  amount: number;
+}
+
 export interface SequencerBlock {
   voice: VoiceId | "";
   steps: number;
@@ -37,9 +44,7 @@ export interface SequencerBlock {
   rst: ResetSource;
   mut: BlockSource;
   mute: boolean;
-  modSrc: BlockSource;
-  modDst: ModDestination;
-  modAmt: number;
+  modulations: ModulationRoute[];
   shape: LfoShape;
 }
 
@@ -95,7 +100,7 @@ export interface EffectsState {
 }
 
 export interface Patch {
-  format: "euclid-grid.v2";
+  format: "euclid-grid.v3";
   bpm: number;
   rate: number;
   swing: number;
@@ -118,7 +123,7 @@ export interface SongPart {
 }
 
 export interface Arrangement {
-  format: "euclid-grid.arrangement.v2";
+  format: "euclid-grid.arrangement.v3";
   variations: Variation[];
   songParts: SongPart[];
   activeIndex: number;
@@ -135,15 +140,15 @@ export interface EffectiveBlock {
   tune: number;
   decay: number;
   level: number;
-  mod: number;
 }
 
 export interface BlockVisualState {
   position: number;
   lfo: number;
+  lfoPosition?: number;
   fire: boolean;
   muted: boolean;
-  effective: Pick<EffectiveBlock, "steps" | "pulses" | "rot" | "div">;
+  effective: EffectiveBlock;
 }
 
 export interface EngineSnapshot {

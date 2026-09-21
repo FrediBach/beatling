@@ -19,7 +19,7 @@ export function lfoValue(shape: LfoShape, phase: number, randomValue: number): n
   return phase;
 }
 
-export function effectiveBlock(block: SequencerBlock, sourceLfo = 0): EffectiveBlock {
+export function effectiveBlock(block: SequencerBlock, sourceLfo: (source: number) => number = () => 0): EffectiveBlock {
   const effective: EffectiveBlock = {
     steps: block.steps,
     pulses: block.pulses,
@@ -29,17 +29,20 @@ export function effectiveBlock(block: SequencerBlock, sourceLfo = 0): EffectiveB
     tune: 0,
     decay: 0,
     level: 0,
-    mod: block.modSrc !== "" && block.modAmt !== 0 ? (sourceLfo * 2 - 1) * block.modAmt : 0,
   };
 
-  switch (block.modDst) {
-    case "pulses": effective.pulses = Math.round(block.pulses + effective.mod * 8); break;
-    case "rot": effective.rot = Math.round(block.rot + effective.mod * effective.steps); break;
-    case "prob": effective.prob = block.prob + effective.mod * 100; break;
-    case "div": effective.div = Math.round(block.div + effective.mod * 4); break;
-    case "tune": effective.tune = effective.mod; break;
-    case "decay": effective.decay = effective.mod; break;
-    case "level": effective.level = effective.mod; break;
+  for (const route of block.modulations) {
+    if (route.source === "" || route.amount === 0) continue;
+    const mod = (sourceLfo(Number(route.source)) * 2 - 1) * route.amount;
+    switch (route.destination) {
+      case "pulses": effective.pulses = Math.round(block.pulses + mod * 8); break;
+      case "rot": effective.rot = Math.round(block.rot + mod * effective.steps); break;
+      case "prob": effective.prob = block.prob + mod * 100; break;
+      case "div": effective.div = Math.round(block.div + mod * 4); break;
+      case "tune": effective.tune = mod; break;
+      case "decay": effective.decay = mod; break;
+      case "level": effective.level = mod; break;
+    }
   }
 
   effective.pulses = clamp(effective.pulses, 0, effective.steps);
