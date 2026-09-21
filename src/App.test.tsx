@@ -139,7 +139,7 @@ describe("application shell", () => {
   it("configures shared effects and independent voice sends as undoable changes", () => {
     vi.spyOn(window.localStorage.__proto__, "getItem").mockReturnValue(null);
     render(<App />);
-    const effectsButton = screen.getByRole("button", { name: "Open effects mixer, 0 effects enabled" });
+    const effectsButton = screen.getByRole("button", { name: "Open effects mixer, 1 effect enabled" });
     fireEvent.click(effectsButton);
 
     const dialog = screen.getByRole("dialog");
@@ -150,9 +150,9 @@ describe("application shell", () => {
     expect(within(dialog).getByRole("button", { name: "Disable distortion" })).toHaveAttribute("aria-pressed", "true");
 
     fireEvent.click(within(dialog).getByRole("button", { name: "Close dialog" }));
-    expect(screen.getByRole("button", { name: "Open effects mixer, 1 effect enabled" })).toHaveClass("has-active-effects");
+    expect(screen.getByRole("button", { name: "Open effects mixer, 2 effects enabled" })).toHaveClass("has-active-effects");
     fireEvent.click(screen.getByRole("button", { name: "Undo last change" }));
-    fireEvent.click(screen.getByRole("button", { name: "Open effects mixer, 1 effect enabled" }));
+    fireEvent.click(screen.getByRole("button", { name: "Open effects mixer, 2 effects enabled" }));
     expect(screen.getByLabelText("Kick Distortion send")).toHaveValue("0");
   });
 });

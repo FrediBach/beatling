@@ -57,7 +57,7 @@ const DEMO = [
   { v: "rim", st: 12, pu: 5, ro: 1, dv: 1, pr: 55 },
   { v: "lt", st: 16, pu: 2, ro: 9, dv: 1, pr: 45, rst: "15" },
   { v: "bassline", st: 16, pu: 7, ro: 1, dv: 1, pr: 100 },
-  { v: "lead", st: 16, pu: 3, ro: 3, dv: 2, pr: 78 },
+  { v: "lead", st: 16, pu: 6, ro: 1, dv: 1, pr: 100 },
   { v: "cow", st: 16, pu: 3, ro: 5, dv: 2, pr: 40, clk: ["G", "1"] },
   { v: "cym", st: 4, pu: 1, ro: 0, dv: 1, pr: 70, clk: ["0"] },
   { v: "shk", st: 16, pu: 11, ro: 0, dv: 1, pr: 80, mod: { src: "13", dst: "level", amt: 0.6 } },
@@ -88,8 +88,11 @@ export function createDemoPatch(volume = 72): Patch {
   voices.bassline.modulations = [{ source: "12", destination: "vOct", amount: 1 }];
   voices.lead.modulations = [{ source: "13", destination: "vOct", amount: 1 }];
   voices.bassline.level = 72;
-  voices.lead.level = 62;
-  return { format: "euclid-grid.v6", bpm: 124, rate: 4, swing: 12, vol: volume, blocks, voices, effects: createEffects() };
+  voices.lead.level = 42;
+  const effects = createEffects();
+  effects.reverb = { ...effects.reverb, enabled: true, return: 95 };
+  effects.sends.lead.reverb = 78;
+  return { format: "euclid-grid.v6", bpm: 124, rate: 4, swing: 12, vol: volume, blocks, voices, effects };
 }
 
 export function createEmptyPatch(volume = 72): Patch {

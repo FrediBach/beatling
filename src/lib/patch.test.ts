@@ -12,7 +12,7 @@ describe("patches", () => {
     expect(patch.blocks[0]).toMatchObject({ voice: "kick", steps: 16, pulses: 4 });
     expect(patch.blocks[2]).toMatchObject({ modulations: [{ source: "12", destination: "prob", amount: -0.5 }] });
     expect(patch.blocks[7]).toMatchObject({ voice: "bassline", steps: 16, pulses: 7, rot: 1 });
-    expect(patch.blocks[8]).toMatchObject({ voice: "lead", steps: 16, pulses: 3, rot: 3, div: 2 });
+    expect(patch.blocks[8]).toMatchObject({ voice: "lead", steps: 16, pulses: 6, rot: 1, div: 1, prob: 100 });
     expect(patch.voices.kick.machine).toBe("909");
     expect(patch.voices.clap.machine).toBe("808");
     expect(patch.voices.kick.custom.bodyFrequency).toBe(50);
@@ -21,6 +21,9 @@ describe("patches", () => {
     expect(patch.voices.lead).toMatchObject({ machine: "custom", custom: { root: 0, scale: 1, octave: 4 } });
     expect(patch.voices.bassline.modulations).toEqual([{ source: "12", destination: "vOct", amount: 1 }]);
     expect(patch.voices.lead.modulations).toEqual([{ source: "13", destination: "vOct", amount: 1 }]);
+    expect(patch.voices.lead.level).toBe(42);
+    expect(patch.effects.reverb).toMatchObject({ enabled: true, damping: 7000, return: 95 });
+    expect(patch.effects.sends.lead.reverb).toBe(78);
     expect(patch.blocks[12]).toMatchObject({ kind: "modulator", voice: "" });
   });
 
