@@ -27,7 +27,7 @@ Pure domain modules in `src/lib` support both the UI and audio engine.
 
 - `index.html` provides the Vite page and React mount node.
 - `src/main.tsx` mounts `App` under `StrictMode` and imports global styles.
-- `src/App.tsx` is the composition root and current owner of session, arrangement, selection, history, theme, and engine coordination.
+- `src/App.tsx` is the composition root and current owner of session, arrangement, selection, history, and engine coordination.
 - `src/audio/engine.ts` is the imperative audio runtime. It schedules clock pulses ahead of playback time, synthesizes voices, and exposes display snapshots to React.
 - `Euclidean Grid Sequencer.html` is a preserved pre-React prototype. It is not imported by the application, included in the production module graph, or a target for new development.
 
@@ -48,6 +48,8 @@ Pure domain modules in `src/lib` support both the UI and audio engine.
 | `src/export/` | Serialization to Lua data, Standard MIDI Files, and Strudel code | Deterministic output with unit coverage |
 
 The small components under `src/components/ui/` wrap reusable Radix primitives or styling variants. Feature components should depend on these primitives rather than reproduce dialog and button mechanics.
+
+`InstrumentHeader` owns theme selection and composes the history controls and help entry point. `HelpDialog` uses the shared Radix dialog and tabs for a keyboard-accessible field guide; `help-content.ts` holds the chapters. Its silent Euclidean playground has isolated local state and uses the same pure rhythm calculation as the instrument. Help interactions do not edit patches or invoke document playback/history shortcuts.
 
 `SequencerRouting` renders compact input/output counts and connected cable anchors inside each card's existing fixed-height Patch footer. Voice cards expose the same counted modulation-input sockets and Patch action. Hover tooltips and accessible names describe the source, signal, and destination of every route. Only assigned ports are rendered, and modulation destinations have separate cable anchors. `PatchCables` measures block and voice anchors across the workspace without owning routing state.
 

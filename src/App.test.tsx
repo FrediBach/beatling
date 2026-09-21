@@ -14,6 +14,25 @@ afterEach(() => {
 });
 
 describe("application shell", () => {
+  it("opens help beside the theme switch without changing the active patch", async () => {
+    vi.spyOn(window.localStorage.__proto__, "getItem").mockReturnValue(null);
+    const start = vi.spyOn(SequencerEngine.prototype, "start").mockResolvedValue();
+    render(<App />);
+    const help = screen.getByRole("button", { name: "Open Beatling help" });
+    expect(help.nextElementSibling).toHaveAccessibleName(/Use (dark|light) theme/);
+    fireEvent.click(screen.getByRole("button", { name: "Mute block 01" }));
+    help.focus();
+    fireEvent.click(help);
+    fireEvent.change(screen.getByRole("slider", { name: /Fill/ }), { target: { value: "0" } });
+    fireEvent.keyDown(screen.getByRole("tabpanel"), { key: "z", ctrlKey: true });
+    fireEvent.keyDown(screen.getByRole("tabpanel"), { key: " ", code: "Space" });
+    expect(start).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
+    await waitFor(() => expect(help).toHaveFocus());
+    expect(screen.getByRole("button", { name: "Unmute block 01" })).toBeInTheDocument();
+    expect(within(screen.getByTestId("block-1")).getByRole("button", { name: "Fill: 4" })).toBeInTheDocument();
+  });
+
   it("toggles optional cables without changing routing or blocking block controls", () => {
     vi.spyOn(window.localStorage.__proto__, "getItem").mockReturnValue(null);
     const save = vi.spyOn(window.localStorage.__proto__, "setItem");

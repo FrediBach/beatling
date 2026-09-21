@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useEffectEvent, useId, useMemo, useRef, useState, type SetStateAction } from "react";
-import { AudioLines, Dices, ArrowUpRight, Cable, Eraser, GripVertical, ListMusic, Lock, LockOpen, Minus, Moon, Play, Plus, Redo2, RotateCcw, Square, Sun, Trash2, Undo2, Volume2, VolumeX } from "lucide-react";
+import { AudioLines, Dices, Cable, Eraser, GripVertical, ListMusic, Lock, LockOpen, Minus, Play, Plus, RotateCcw, Square, Trash2, Volume2, VolumeX } from "lucide-react";
 import { SequencerEngine } from "@/audio/engine";
+import { InstrumentHeader } from "@/components/instrument-header";
 import { ExportDialog } from "@/components/export-dialog";
 import { EffectsDialog } from "@/components/effects-dialog";
 import { PatchPanel } from "@/components/patch-panel";
@@ -118,14 +119,6 @@ export default function App() {
   });
   const [draggedSongPart, setDraggedSongPart] = useState<string | null>(null);
   const [randomizationLocks, setRandomizationLocks] = useState<BlockRandomizationLocks[]>(() => createRandomizationLocks());
-  const [theme, setTheme] = useState<"light" | "dark">(() =>
-    window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light",
-  );
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-  }, [theme]);
-
   useEffect(() => {
     try { localStorage.setItem("beatling-show-cables", String(showCables)); }
     catch { /* The toggle still works when browser storage is unavailable. */ }
@@ -515,19 +508,7 @@ export default function App() {
 
   return (
     <div className="instrument">
-      <header className="instrument-header">
-        <div className="brand"><span className="brand-mark" aria-hidden="true"><i /><i /><i /><i /></span><h1>beatling<span>Euclidean rhythm instrument</span></h1></div>
-        <span className="model-label">EG–16 <span>/</span> 808 + 909 + 303 + 101</span>
-        <div className="header-actions">
-          <span className={cn("transport-status", playing && "running")}><i />{playing ? "Running" : "Standby"}</span>
-          <div className="history-actions" aria-label="Edit history">
-            <button className="icon-button" onClick={undo} disabled={history.past.length === 0} aria-label="Undo last change" title="Undo · ⌘/Ctrl Z"><Undo2 size={15} /></button>
-            <button className="icon-button" onClick={redo} disabled={history.future.length === 0} aria-label="Redo last change" title="Redo · ⇧⌘/Ctrl Z"><Redo2 size={15} /></button>
-          </div>
-          <a href="https://www.luading.dev/" target="_blank" rel="noreferrer">Luading <ArrowUpRight size={12} /></a>
-          <button className="icon-button" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label={`Use ${theme === "dark" ? "light" : "dark"} theme`}>{theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}</button>
-        </div>
-      </header>
+      <InstrumentHeader playing={playing} canUndo={history.past.length > 0} canRedo={history.future.length > 0} onUndo={undo} onRedo={redo} />
 
       <section className="transport-bar" aria-label="Transport and global controls">
         <div className="play-controls"><button aria-label={playing ? "Stop" : "Play"} className={cn("play-button", playing && "playing")} onClick={() => void togglePlayback()}>{playing ? <Square size={15} fill="currentColor" /> : <Play size={15} fill="currentColor" />}{playing ? "Stop" : "Play"}<kbd>space</kbd></button><button className="reset-button" onClick={() => engine.reset()} aria-label="Reset all blocks" title="Reset every block to step 1"><RotateCcw size={16} /></button></div>
