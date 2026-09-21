@@ -111,6 +111,41 @@ describe("effects rack", () => {
     expect(panel.getByRole("slider", { name: "Compressor Ratio" })).toHaveAttribute("aria-valuetext", "4.5:1");
   });
 
+  it("offers distinct processor controls and restores every new parameter on reset", () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByRole("button", { name: "Wavefold" }));
+    enterValue("Distortion Output trim value", "-6");
+    expect(screen.getByRole("button", { name: "Wavefold" })).toHaveAttribute("aria-pressed", "true");
+    chooseEffect("Reverb");
+    fireEvent.click(screen.getByRole("button", { name: "Hall · 3.6 s" }));
+    enterValue("Reverb Pre-delay value", "75");
+    enterValue("Reverb Low cut value", "400");
+    expect(screen.getByText(/75 ms before a 3.6 s tail/)).toBeInTheDocument();
+    chooseEffect("Delay");
+    enterValue("Delay Time value", "1250");
+    fireEvent.click(screen.getByRole("button", { name: "Tempo sync" }));
+    expect(screen.queryByRole("slider", { name: "Delay Time" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "1/8 dotted" }));
+    expect(screen.getByText("375 ms between repeats · 120 BPM")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Free time" }));
+    expect(screen.getByRole("slider", { name: "Delay Time" })).toHaveValue("1250");
+    chooseEffect("Karplus");
+    fireEvent.click(screen.getByRole("button", { name: "+1" }));
+    expect(screen.getByText("128.0")).toBeInTheDocument();
+    enterValue("Karplus–Strong Excitation value", "2200");
+    chooseEffect("Compressor");
+    enterValue("Compressor Knee value", "0");
+    enterValue("Compressor Makeup value", "6");
+    expect(screen.getByRole("group", { name: "Envelope & gain" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Reset compressor parameters" }));
+    expect(screen.getByRole("slider", { name: "Compressor Knee" })).toHaveValue("30");
+    expect(screen.getByRole("slider", { name: "Compressor Makeup" })).toHaveValue("0");
+    chooseEffect("Distortion");
+    expect(screen.getByRole("slider", { name: "Distortion Output trim" })).toHaveValue("-6");
+    fireEvent.click(screen.getByRole("button", { name: "Reset distortion parameters" }));
+    expect(screen.getByRole("button", { name: "Soft" })).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("configures the Karplus–Strong waveguide model and per-voice sends", () => {
     render(<Harness />);
     chooseEffect("Karplus");

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useEffectEvent, useId, useMemo, useRef, useState, type SetStateAction } from "react";
-import { AudioLines, Dices, Cable, Eraser, GripVertical, ListMusic, Lock, LockOpen, Minus, Play, Plus, RotateCcw, Square, Trash2, Volume2, VolumeX } from "lucide-react";
+import { Dices, Cable, Eraser, GripVertical, ListMusic, Lock, LockOpen, Minus, Play, Plus, RotateCcw, Square, Trash2, Volume2, VolumeX } from "lucide-react";
 import { SequencerEngine } from "@/audio/engine";
 import { InstrumentHeader } from "@/components/instrument-header";
 import { ExportDialog } from "@/components/export-dialog";
-import { EffectsDialog } from "@/components/effects-dialog";
+import { EffectsMixer } from "@/components/effects-mixer";
 import { PatchPanel } from "@/components/patch-panel";
 import { PatchCables } from "@/components/patch-cables";
 import { OrbitView } from "@/components/orbit-view";
@@ -14,7 +14,6 @@ import { SessionPresetControls } from "@/components/session-preset-controls";
 import { VoiceBank } from "@/components/voice-bank";
 import { RATE_OPTIONS, VOICE_DEFS } from "@/lib/constants";
 import { effectiveBlock, volumeGain } from "@/lib/euclid";
-import { EFFECT_IDS, effectsHaveChanges } from "@/lib/effects";
 import { createDemoPatch, createEmptyPatch, createRandomizationLocks, loadStoredPatch, randomizeBlock, randomizeBlockParameter, savePatch, shufflePatch } from "@/lib/patch";
 import { changedBlockFields, changedVoiceFields, loadStoredArrangement, MAX_VARIATIONS, saveArrangement, variationHasChanges } from "@/lib/variations";
 import { BLOCK_COUNT, type Arrangement, type BlockParam, type BlockRandomizationLocks, type BlockVisualState, type EffectsState, type EngineSnapshot, type Patch, type SequencerBlock, type SongPart, type Variation, type VoiceId, type VoiceState } from "@/lib/types";
@@ -106,7 +105,6 @@ export default function App() {
   const [playing, setPlaying] = useState(false);
   const [openPatch, setOpenPatch] = useState<number | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
-  const [effectsOpen, setEffectsOpen] = useState(false);
   const [view, setView] = useState<"grid" | "circle">(() => {
     try { return localStorage.getItem("beatling-pattern-view") === "circle" ? "circle" : "grid"; }
     catch { return "grid"; }
@@ -136,7 +134,7 @@ export default function App() {
 
   useEffect(() => {
     const timeout = window.setTimeout(() => saveArrangement({
-      format: "euclid-grid.arrangement.v8",
+      format: "euclid-grid.arrangement.v9",
       variations,
       songParts,
       activeIndex: activeVariation,
@@ -464,7 +462,7 @@ export default function App() {
   };
 
   const currentArrangement = useMemo<Arrangement>(() => ({
-    format: "euclid-grid.arrangement.v8",
+    format: "euclid-grid.arrangement.v9",
     variations,
     songParts,
     activeIndex: activeVariation,
@@ -484,8 +482,6 @@ export default function App() {
   const basePatch = variations[0]?.patch ?? patch;
   const blockVariationChanges = useMemo(() => patch.blocks.map((block, index) => activeVariation === 0 ? new Set<keyof SequencerBlock>() : changedBlockFields(block, basePatch.blocks[index])), [activeVariation, basePatch, patch.blocks]);
   const voiceVariationChanges = useMemo(() => Object.fromEntries(VOICE_DEFS.map(({ id }) => [id, activeVariation === 0 ? new Set<keyof VoiceState>() : changedVoiceFields(patch.voices[id], basePatch.voices[id])])) as Record<VoiceId, Set<keyof VoiceState>>, [activeVariation, basePatch, patch.voices]);
-  const effectsVariationChanged = activeVariation > 0 && effectsHaveChanges(patch.effects, basePatch.effects);
-  const enabledEffectCount = EFFECT_IDS.filter((effect) => patch.effects[effect].enabled).length;
   const allSettingsLocked = randomizationLocks.every((blockLocks) => Object.values(blockLocks).every(Boolean));
   const allVoicesMuted = Object.values(patch.voices).every((voice) => voice.mute);
   const currentSongPart = songParts[activeSongPart] ?? songParts[0];
@@ -516,7 +512,7 @@ export default function App() {
         <div className="clock-section"><span className="eyebrow">Clock division</span><div className="rate-options">{RATE_OPTIONS.map((option) => <button key={option.value} aria-pressed={patch.rate === option.value} onClick={() => updateGlobal("rate", option.value)}>{option.label}</button>)}</div></div>
         <div className="global-range"><LabeledRange label="Swing" min={0} max={70} value={patch.swing} display={`${patch.swing}%`} onChange={(value) => updateGlobal("swing", value)} /></div>
         <div className="global-range master-range"><LabeledRange label="Master" min={0} max={100} value={patch.vol} display={`${patch.vol === 0 ? "−∞" : Math.round(20 * Math.log10(volumeGain(patch.vol)))} dB`} onChange={(value) => updateGlobal("vol", value)} /></div>
-        <button type="button" className={cn("effects-button", enabledEffectCount > 0 && "has-active-effects", effectsVariationChanged && "variation-changed")} aria-haspopup="dialog" aria-label={`Open effects mixer, ${enabledEffectCount} ${enabledEffectCount === 1 ? "effect" : "effects"} enabled`} onClick={() => setEffectsOpen(true)}><AudioLines size={15} /><span>Effects</span><small>{enabledEffectCount || "off"}</small></button>
+        <EffectsMixer value={patch.effects} baseValue={activeVariation > 0 ? basePatch.effects : undefined} bpm={patch.bpm} onChange={updateEffects} />
         <SessionPresetControls arrangement={currentArrangement} onApply={applyArrangement} onExport={() => setExportOpen(true)} />
       </section>
 
@@ -612,7 +608,6 @@ export default function App() {
         {view === "grid" && showCables && <PatchCables connections={connections} />}
       </main>
       <footer className="instrument-footer"><span><kbd>space</kbd> play / stop</span><span><kbd>↑</kbd> <kbd>↓</kbd> or drag to adjust · <kbd>shift</kbd> for larger steps</span><a className="footer-copyright" href="https://fredibach.com">(c) 2026 Fredi Bach</a><span className="footer-signoff">RHYTHM, BY DESIGN. <span>EG–16</span></span></footer>
-      {effectsOpen && <EffectsDialog open onOpenChange={setEffectsOpen} value={patch.effects} onChange={updateEffects} />}
       {exportOpen && <ExportDialog open onOpenChange={setExportOpen} patch={patch} onLoad={applyPatch} />}
     </div>
   );

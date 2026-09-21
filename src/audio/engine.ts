@@ -4,7 +4,7 @@ import { clamp, effectiveBlock, euclidHit, volumeGain } from "@/lib/euclid";
 import { effectiveVoiceModulation } from "@/lib/modulation";
 import { quantizeVoiceCv } from "@/lib/quantizer";
 import { sampleLfo, type LfoFrame } from "@/lib/lfo";
-import { EFFECT_IDS, effectGain, waveguideDamping, waveguideFeedback, waveguideFrequency } from "@/lib/effects";
+import { EFFECT_IDS, effectGain, waveguideDamping, waveguideFeedback, waveguideFrequency, delaySeconds, distortionSample, REVERB_SECONDS } from "@/lib/effects";
 import { rhythmAt, rhythmsFor } from "@/lib/rhythm-series";
 
 interface QueuedVisualEvent {
@@ -37,6 +37,9 @@ interface RuntimeBlock {
 type AudioContextConstructor = typeof AudioContext;
 
 const LOOKAHEAD_SECONDS = 0.14;
+// Web Audio low/highpass Q is in dB, not a linear quality factor.
+// https://www.w3.org/TR/webaudio/#dom-biquadfilternode-q
+const BUTTERWORTH_Q_DB = 20 * Math.log10(Math.SQRT1_2);
 
 export interface OutputAnalysis {
   sampleRate: number;
@@ -65,7 +68,17 @@ export class SequencerEngine {
   private karplusDelay: DelayNode | null = null;
   private karplusDamping: BiquadFilterNode | null = null;
   private karplusFeedback: GainNode | null = null;
-  private distortionDrive = -1;
+  private distortionShape = "";
+  private distortionTrim: GainNode | null = null;
+  private reverbPreDelay: DelayNode | null = null;
+  private reverbLowCut: BiquadFilterNode | null = null;
+  private delayLowCut: BiquadFilterNode | null = null;
+  private karplusExcitation: BiquadFilterNode | null = null;
+  private compressorMakeup: GainNode | null = null;
+  private reverbImpulses = new Map<string, AudioBuffer>();
+  private reverbSpace = "";
+  private appliedBpm = -1;
+  private parameterTargets = new WeakMap<AudioParam, number>();
   private appliedEffects: EffectsState | null = null;
   private runtime: RuntimeBlock[] = [];
   private voiceHitAt = new Map<VoiceId, number>();
@@ -167,6 +180,10 @@ export class SequencerEngine {
     this.stop();
     void this.context?.close();
     this.context = null;
+    this.reverbImpulses.clear();
+    this.appliedEffects = null;
+    this.distortionShape = "";
+    this.reverbSpace = "";
   }
 
   snapshot(): EngineSnapshot {
@@ -246,33 +263,49 @@ export class SequencerEngine {
     this.distortion.oversample = "2x";
     this.distortionTone = this.context.createBiquadFilter();
     this.distortionTone.type = "lowpass";
-    distortionInput.connect(this.distortion).connect(this.distortionTone).connect(createReturn("distortion"));
+    this.distortionTrim = this.context.createGain();
+    distortionInput.connect(this.distortion).connect(this.distortionTone).connect(this.distortionTrim).connect(createReturn("distortion"));
 
     const reverbInput = this.context.createGain();
     this.reverb = this.context.createConvolver();
-    this.reverb.buffer = this.createReverbImpulse(1.8);
+    // Three bounded impulses are prepared once, outside the scheduler. Space changes only swap buffers.
+    for (const [space, seconds] of Object.entries(REVERB_SECONDS)) this.reverbImpulses.set(space, this.createReverbImpulse(seconds));
+    this.reverbPreDelay = this.context.createDelay(0.2);
+    this.reverbLowCut = this.context.createBiquadFilter();
+    this.reverbLowCut.type = "highpass";
+    this.reverbLowCut.Q.value = BUTTERWORTH_Q_DB;
     this.reverbDamping = this.context.createBiquadFilter();
     this.reverbDamping.type = "lowpass";
-    reverbInput.connect(this.reverb).connect(this.reverbDamping).connect(createReturn("reverb"));
+    reverbInput.connect(this.reverbPreDelay).connect(this.reverbLowCut).connect(this.reverb).connect(this.reverbDamping).connect(createReturn("reverb"));
 
     const delayInput = this.context.createGain();
-    this.delay = this.context.createDelay(1);
+    this.delay = this.context.createDelay(6);
+    this.delayLowCut = this.context.createBiquadFilter();
+    this.delayLowCut.type = "highpass";
+    this.delayLowCut.Q.value = BUTTERWORTH_Q_DB;
     this.delayTone = this.context.createBiquadFilter();
     this.delayTone.type = "lowpass";
+    this.delayTone.Q.value = BUTTERWORTH_Q_DB;
     this.delayFeedback = this.context.createGain();
-    delayInput.connect(this.delay).connect(this.delayTone).connect(createReturn("delay"));
+    delayInput.connect(this.delay).connect(this.delayLowCut).connect(this.delayTone).connect(createReturn("delay"));
     this.delayTone.connect(this.delayFeedback).connect(this.delay);
 
     const compressorInput = this.context.createGain();
     this.parallelCompressor = this.context.createDynamicsCompressor();
-    compressorInput.connect(this.parallelCompressor).connect(createReturn("compressor"));
+    this.compressorMakeup = this.context.createGain();
+    compressorInput.connect(this.parallelCompressor).connect(this.compressorMakeup).connect(createReturn("compressor"));
 
     const karplusInput = this.context.createGain();
+    this.karplusExcitation = this.context.createBiquadFilter();
+    this.karplusExcitation.type = "lowpass";
+    this.karplusExcitation.Q.value = BUTTERWORTH_Q_DB;
     this.karplusDelay = this.context.createDelay(1);
     this.karplusDamping = this.context.createBiquadFilter();
     this.karplusDamping.type = "lowpass";
+    // No resonant boost inside a near-unity feedback loop.
+    this.karplusDamping.Q.value = BUTTERWORTH_Q_DB;
     this.karplusFeedback = this.context.createGain();
-    karplusInput.connect(this.karplusDelay).connect(this.karplusDamping).connect(createReturn("karplus"));
+    karplusInput.connect(this.karplusExcitation).connect(this.karplusDelay).connect(this.karplusDamping).connect(createReturn("karplus"));
     this.karplusDamping.connect(this.karplusFeedback).connect(this.karplusDelay);
 
     const inputs: Record<EffectId, GainNode> = {
@@ -308,12 +341,15 @@ export class SequencerEngine {
 
   private applyEffects(): void {
     if (!this.context) return;
-    const effects = this.getPatch().effects;
-    if (effects === this.appliedEffects) return;
+    const { effects, bpm } = this.getPatch();
+    if (effects === this.appliedEffects && bpm === this.appliedBpm) return;
+    this.appliedBpm = bpm;
     this.appliedEffects = effects;
     const now = this.context.currentTime;
     const smooth = (parameter: AudioParam | undefined, next: number, timeConstant = 0.015) => {
-      parameter?.setTargetAtTime(next, now, timeConstant);
+      if (!parameter || this.parameterTargets.get(parameter) === next) return;
+      this.parameterTargets.set(parameter, next);
+      parameter.setTargetAtTime(next, now, timeConstant);
     };
     for (const { id } of VOICE_DEFS) {
       for (const effect of EFFECT_IDS) {
@@ -325,22 +361,32 @@ export class SequencerEngine {
       smooth(this.effectReturns.get(effect)?.gain, effects[effect].enabled ? effectGain(effects[effect].return) : 0);
     }
 
-    if (this.distortion && effects.distortion.drive !== this.distortionDrive) {
-      this.distortionDrive = effects.distortion.drive;
-      const amount = 1 + effects.distortion.drive * 4;
-      const curve = new Float32Array(2048);
+    const shape = `${effects.distortion.mode}:${effects.distortion.drive}`;
+    if (this.distortion && shape !== this.distortionShape) {
+      this.distortionShape = shape;
+      const curve = new Float32Array(2049);
       for (let index = 0; index < curve.length; index += 1) {
-        const input = index * 2 / (curve.length - 1) - 1;
-        curve[index] = Math.tanh(input * amount) / Math.tanh(amount);
+        curve[index] = distortionSample(index * 2 / (curve.length - 1) - 1, effects.distortion);
       }
       this.distortion.curve = curve;
     }
+    if (this.reverb && effects.reverb.space !== this.reverbSpace) {
+      this.reverbSpace = effects.reverb.space;
+      this.reverb.buffer = this.reverbImpulses.get(this.reverbSpace)!;
+    }
+    smooth(this.distortionTrim?.gain, 10 ** (effects.distortion.trim / 20));
+    smooth(this.reverbPreDelay?.delayTime, effects.reverb.preDelay / 1000);
+    smooth(this.reverbLowCut?.frequency, effects.reverb.lowCut);
+    smooth(this.delayLowCut?.frequency, effects.delay.lowCut);
+    smooth(this.karplusExcitation?.frequency, effects.karplus.excitation === 16000 ? this.context.sampleRate / 2 : effects.karplus.excitation);
+    smooth(this.compressorMakeup?.gain, 10 ** (effects.compressor.makeup / 20));
+    smooth(this.parallelCompressor?.knee, effects.compressor.knee);
     smooth(this.distortionTone?.frequency, effects.distortion.tone);
     smooth(this.reverbDamping?.frequency, effects.reverb.damping);
-    smooth(this.delay?.delayTime, effects.delay.time / 1000);
+    smooth(this.delay?.delayTime, delaySeconds(effects.delay, bpm));
     smooth(this.delayFeedback?.gain, effects.delay.feedback / 100);
     smooth(this.delayTone?.frequency, effects.delay.tone);
-    const waveguideHz = waveguideFrequency(effects.karplus.tune);
+    const waveguideHz = waveguideFrequency(effects.karplus.tune) * 2 ** effects.karplus.octave;
     const waveguideDelay = effects.karplus.model === "tube" ? 1 / (waveguideHz * 2) : 1 / waveguideHz;
     smooth(this.karplusDelay?.delayTime, waveguideDelay);
     smooth(this.karplusDamping?.frequency, waveguideDamping(effects.karplus.body));

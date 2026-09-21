@@ -134,7 +134,7 @@ describe("application shell", () => {
     await waitFor(() => expect(screen.getByLabelText("Beats per minute")).toHaveValue("137"));
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(write).toHaveBeenCalledWith(expect.stringContaining('"format": "euclid-grid.arrangement.v8"')));
+    await waitFor(() => expect(write).toHaveBeenCalledWith(expect.stringContaining('"format": "euclid-grid.arrangement.v9"')));
     expect(close).toHaveBeenCalledOnce();
   });
 
@@ -204,13 +204,13 @@ describe("application shell", () => {
     expect(screen.getByLabelText("Kick Body frequency")).toHaveValue("64");
   });
 
-  it("configures shared effects and independent voice sends as undoable changes", () => {
+  it("configures shared effects and independent voice sends as undoable changes", async () => {
     vi.spyOn(window.localStorage.__proto__, "getItem").mockReturnValue(null);
     render(<App />);
     const effectsButton = screen.getByRole("button", { name: "Open effects mixer, 1 effect enabled" });
     fireEvent.click(effectsButton);
 
-    const dialog = screen.getByRole("dialog");
+    const dialog = await screen.findByRole("dialog");
     expect(dialog).toHaveTextContent("Effects mixer");
     fireEvent.click(within(dialog).getByRole("button", { name: "Enable distortion" }));
     fireEvent.change(within(dialog).getByLabelText("Kick Distortion send"), { target: { value: "64" } });

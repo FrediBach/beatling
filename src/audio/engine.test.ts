@@ -40,9 +40,9 @@ it("maps Karplus–Strong controls onto a stable String/Tube feedback waveguide"
       sends: { ...patch.effects.sends, rim: { ...patch.effects.sends.rim, karplus: 50 } },
     };
     engine.setPatch({ ...patch, effects });
-    expect(delayNodes).toHaveLength(2);
-    expect(delayNodes[1].delayTime.setTargetAtTime).toHaveBeenLastCalledWith(1 / (waveguideFrequency(24) * 2), 2, 0.015);
-    expect(filterNodes[3].frequency.setTargetAtTime).toHaveBeenLastCalledWith(waveguideDamping(50), 2, 0.015);
+    expect(delayNodes).toHaveLength(3);
+    expect(delayNodes[2].delayTime.setTargetAtTime).toHaveBeenLastCalledWith(1 / (waveguideFrequency(24) * 2), 2, 0.015);
+    expect(filterNodes[6].frequency.setTargetAtTime).toHaveBeenLastCalledWith(waveguideDamping(50), 2, 0.015);
     expect(gainNodes.some((gain) => gain.gain.setTargetAtTime.mock.calls.some(([next]) => next === -waveguideFeedback(80)))).toBe(true);
     expect(gainNodes.some((gain) => gain.gain.setTargetAtTime.mock.calls.some(([next]) => next === 0.25))).toBe(true);
   } finally { engine.destroy(); }
@@ -285,4 +285,78 @@ it("plays a block's Euclidean rhythms in series for their configured cycle count
   engine.reset();
   expect(engine.snapshot().blocks[0]).toMatchObject({ rhythmIndex: 0, position: -1 });
   engine.destroy();
+});
+
+it("updates expanded effects and tempo sync without rebuilding the shared graph or impulses", async () => {
+  vi.useFakeTimers();
+  const parameter = () => ({ value: 0, setTargetAtTime: vi.fn() });
+  const node = () => ({ connect: vi.fn((destination: unknown) => destination), gain: parameter(), frequency: parameter(), Q: parameter(), delayTime: parameter(), threshold: parameter(), ratio: parameter(), knee: parameter(), attack: parameter(), release: parameter(), curve: null as Float32Array | null, buffer: null as object | null });
+  const filters: ReturnType<typeof node>[] = [];
+  const delays: ReturnType<typeof node>[] = [];
+  const compressors: ReturnType<typeof node>[] = [];
+  const shaper = node();
+  const convolver = node();
+  const createGain = vi.fn(node);
+  const createBuffer = vi.fn((_channels: number, length: number) => ({ getChannelData: () => new Float32Array(length) }));
+  const close = vi.fn().mockResolvedValue(undefined);
+  vi.stubGlobal("AudioContext", class {
+    currentTime = 2;
+    state = "running";
+    sampleRate = 100;
+    destination = {};
+    createGain = createGain;
+    createDynamicsCompressor() { const value = node(); compressors.push(value); return value; }
+    createBiquadFilter() { const value = node(); filters.push(value); return value; }
+    createDelay() { const value = node(); delays.push(value); return value; }
+    createWaveShaper() { return shaper; }
+    createConvolver() { return convolver; }
+    createBuffer = createBuffer;
+    close = close;
+  });
+  const patch = createEmptyPatch();
+  const engine = new SequencerEngine(patch);
+  expect(createGain).not.toHaveBeenCalled();
+  try {
+    await engine.start();
+    const gainCount = createGain.mock.calls.length;
+    const bufferCount = createBuffer.mock.calls.length;
+    const studioImpulse = convolver.buffer;
+    const oldCurve = shaper.curve;
+    const effects = {
+      ...patch.effects,
+      distortion: { ...patch.effects.distortion, mode: "fold" as const, trim: -6 },
+      reverb: { ...patch.effects.reverb, space: "hall" as const, preDelay: 80, lowCut: 400 },
+      delay: { ...patch.effects.delay, sync: true, division: "1/8D" as const, lowCut: 600 },
+      karplus: { ...patch.effects.karplus, octave: 1, excitation: 2400 },
+      compressor: { ...patch.effects.compressor, knee: 6, makeup: 12 },
+    };
+    engine.setPatch({ ...patch, bpm: 120, effects });
+    expect(shaper.curve).not.toBe(oldCurve);
+    expect(delays[0].delayTime.setTargetAtTime).toHaveBeenLastCalledWith(0.08, 2, 0.015);
+    expect(delays[1].delayTime.setTargetAtTime).toHaveBeenLastCalledWith(0.375, 2, 0.015);
+    expect(delays[2].delayTime.setTargetAtTime).toHaveBeenLastCalledWith(1 / 128, 2, 0.015);
+    expect(filters[1].frequency.setTargetAtTime).toHaveBeenLastCalledWith(400, 2, 0.015);
+    expect(filters[3].frequency.setTargetAtTime).toHaveBeenLastCalledWith(600, 2, 0.015);
+    expect(filters[5].frequency.setTargetAtTime).toHaveBeenLastCalledWith(2400, 2, 0.015);
+    // The native API interprets low/highpass Q in dB. Both feedback filters must be non-boosting.
+    expect(10 ** (filters[4].Q.value / 20)).toBeCloseTo(Math.SQRT1_2);
+    expect(10 ** (filters[6].Q.value / 20)).toBeCloseTo(Math.SQRT1_2);
+    expect(compressors[1].knee.setTargetAtTime).toHaveBeenLastCalledWith(6, 2, 0.015);
+    const makeup = compressors[1].connect.mock.calls[0][0] as ReturnType<typeof node>;
+    expect(makeup.gain.setTargetAtTime).toHaveBeenLastCalledWith(10 ** (12 / 20), 2, 0.015);
+    const newCurve = shaper.curve;
+    const kneeUpdates = compressors[1].knee.setTargetAtTime.mock.calls.length;
+    engine.setPatch({ ...patch, bpm: 60, effects });
+    expect(delays[1].delayTime.setTargetAtTime).toHaveBeenLastCalledWith(0.75, 2, 0.015);
+    engine.setPatch({ ...patch, effects: { ...effects, reverb: { ...effects.reverb, space: "studio" } } });
+    expect(convolver.buffer).toBe(studioImpulse);
+    expect(shaper.curve).toBe(newCurve);
+    expect(compressors[1].knee.setTargetAtTime).toHaveBeenCalledTimes(kneeUpdates);
+    expect(createGain).toHaveBeenCalledTimes(gainCount);
+    expect(createBuffer).toHaveBeenCalledTimes(bufferCount);
+    expect(filters).toHaveLength(7);
+    expect(delays).toHaveLength(3);
+  } finally { engine.destroy(); }
+  expect(close).toHaveBeenCalledOnce();
+  expect(vi.getTimerCount()).toBe(0);
 });

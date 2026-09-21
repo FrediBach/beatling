@@ -91,7 +91,13 @@ export interface VoiceState {
 
 export type VoiceBank = Record<VoiceId, VoiceState>;
 
+export type DistortionMode = "soft" | "hard" | "fold";
+export type ReverbSpace = "room" | "studio" | "hall";
+export type DelayDivision = "1/16" | "1/8" | "1/8D" | "1/8T" | "1/4" | "1/2";
+
 export interface DistortionSettings {
+  mode: DistortionMode;
+  trim: number;
   enabled: boolean;
   drive: number;
   tone: number;
@@ -99,12 +105,18 @@ export interface DistortionSettings {
 }
 
 export interface ReverbSettings {
+  space: ReverbSpace;
+  preDelay: number;
+  lowCut: number;
   enabled: boolean;
   damping: number;
   return: number;
 }
 
 export interface DelaySettings {
+  sync: boolean;
+  division: DelayDivision;
+  lowCut: number;
   enabled: boolean;
   time: number;
   feedback: number;
@@ -113,6 +125,8 @@ export interface DelaySettings {
 }
 
 export interface CompressorSettings {
+  knee: number;
+  makeup: number;
   enabled: boolean;
   threshold: number;
   ratio: number;
@@ -124,6 +138,8 @@ export interface CompressorSettings {
 export type WaveguideModel = "string" | "tube";
 
 export interface KarplusSettings {
+  octave: number;
+  excitation: number;
   enabled: boolean;
   model: WaveguideModel;
   tune: number;
@@ -144,7 +160,7 @@ export interface EffectsState {
 }
 
 export interface Patch {
-  format: "euclid-grid.v8";
+  format: "euclid-grid.v9";
   bpm: number;
   rate: number;
   swing: number;
@@ -167,7 +183,7 @@ export interface SongPart {
 }
 
 export interface Arrangement {
-  format: "euclid-grid.arrangement.v8";
+  format: "euclid-grid.arrangement.v9";
   variations: Variation[];
   songParts: SongPart[];
   activeIndex: number;
