@@ -21,6 +21,7 @@ export type EffectId = "distortion" | "reverb" | "delay" | "compressor";
 export type CustomVoiceSettings = Record<string, number>;
 export type LfoShape = "ramp" | "tri" | "sqr" | "rnd";
 export type ModDestination = "" | "pulses" | "rot" | "prob" | "div" | "tune" | "decay" | "level";
+export type VoiceModDestination = "tune" | "decay" | "level";
 export type ClockSource = "G" | `${number}`;
 export type ResetSource = "" | "G" | "BAR" | `${number}`;
 export type BlockSource = "" | `${number}`;
@@ -31,6 +32,12 @@ export type BlockRandomizationLocks = Record<BlockParam, boolean>;
 export interface ModulationRoute {
   source: BlockSource;
   destination: Exclude<ModDestination, "">;
+  amount: number;
+}
+
+export interface VoiceModulationRoute {
+  source: BlockSource;
+  destination: VoiceModDestination;
   amount: number;
 }
 
@@ -58,6 +65,7 @@ export interface VoiceState {
   tune: number;
   decay: number;
   mute: boolean;
+  modulations: VoiceModulationRoute[];
   custom: CustomVoiceSettings;
 }
 
@@ -104,7 +112,7 @@ export interface EffectsState {
 }
 
 export interface Patch {
-  format: "euclid-grid.v4";
+  format: "euclid-grid.v5";
   bpm: number;
   rate: number;
   swing: number;
@@ -127,7 +135,7 @@ export interface SongPart {
 }
 
 export interface Arrangement {
-  format: "euclid-grid.arrangement.v4";
+  format: "euclid-grid.arrangement.v5";
   variations: Variation[];
   songParts: SongPart[];
   activeIndex: number;

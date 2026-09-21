@@ -144,7 +144,7 @@ export default function App() {
 
   useEffect(() => {
     const timeout = window.setTimeout(() => saveArrangement({
-      format: "euclid-grid.arrangement.v4",
+      format: "euclid-grid.arrangement.v5",
       variations,
       songParts,
       activeIndex: activeVariation,
@@ -480,7 +480,7 @@ export default function App() {
     return visual;
   };
 
-  const connections = useMemo(() => connectionsFor(patch.blocks), [patch.blocks]);
+  const connections = useMemo(() => connectionsFor(patch), [patch]);
   const basePatch = variations[0]?.patch ?? patch;
   const blockVariationChanges = useMemo(() => patch.blocks.map((block, index) => activeVariation === 0 ? new Set<keyof SequencerBlock>() : changedBlockFields(block, basePatch.blocks[index])), [activeVariation, basePatch, patch.blocks]);
   const voiceVariationChanges = useMemo(() => Object.fromEntries(VOICE_DEFS.map(({ id }) => [id, activeVariation === 0 ? new Set<keyof VoiceState>() : changedVoiceFields(patch.voices[id], basePatch.voices[id])])) as Record<VoiceId, Set<keyof VoiceState>>, [activeVariation, basePatch, patch.voices]);
@@ -504,7 +504,7 @@ export default function App() {
     setOpenPatch(null);
   };
 
-  const renderCard = (index: number, showDial = true, key?: string) => <SequencerCard key={key} showDial={showDial} index={index} block={patch.blocks[index]} blocks={patch.blocks} visual={visualFor(index)} patchOpen={showDial && openPatch === index} related={showDial && openPatch !== null && connections.some((connection) => (connection.source === openPatch && connection.target === index) || (connection.target === openPatch && connection.source === index))} locks={randomizationLocks[index]} changedFields={blockVariationChanges[index]} onPatchOpen={showDial ? setOpenPatch : () => document.getElementById("circle-routing")?.scrollIntoView({ behavior: "instant", block: "nearest" })} onChange={(next) => updateBlock(index, next)} onRandomize={() => updateBlock(index, randomizeBlock(patch.blocks[index], index, randomizationLocks[index]))} onLockToggle={() => setBlockLocks(index, !Object.values(randomizationLocks[index]).every(Boolean))} onParameterRandomize={(parameter) => updateBlock(index, randomizeBlockParameter(patch.blocks[index], index, parameter))} onParameterLockToggle={(parameter) => toggleParameterLock(index, parameter)} />;
+  const renderCard = (index: number, showDial = true, key?: string) => <SequencerCard key={key} showDial={showDial} index={index} block={patch.blocks[index]} blocks={patch.blocks} connections={connections} visual={visualFor(index)} patchOpen={showDial && openPatch === index} related={showDial && openPatch !== null && connections.some((connection) => (connection.source === openPatch && connection.target === index) || (connection.target === openPatch && connection.source === index))} locks={randomizationLocks[index]} changedFields={blockVariationChanges[index]} onPatchOpen={showDial ? setOpenPatch : () => document.getElementById("circle-routing")?.scrollIntoView({ behavior: "instant", block: "nearest" })} onChange={(next) => updateBlock(index, next)} onRandomize={() => updateBlock(index, randomizeBlock(patch.blocks[index], index, randomizationLocks[index]))} onLockToggle={() => setBlockLocks(index, !Object.values(randomizationLocks[index]).every(Boolean))} onParameterRandomize={(parameter) => updateBlock(index, randomizeBlockParameter(patch.blocks[index], index, parameter))} onParameterLockToggle={(parameter) => toggleParameterLock(index, parameter)} />;
 
   return (
     <div className="instrument">
@@ -622,7 +622,6 @@ export default function App() {
           </div>
           <div className={cn("sequencer-grid", showCables && "cables-visible")}>
             {BLOCK_SLOTS.map(({ index, key }) => renderCard(index, true, key))}
-            {showCables && <PatchCables connections={connections} />}
           </div>
           </> : <OrbitView blocks={patch.blocks} visuals={patch.blocks.map((_block, index) => visualFor(index))} clockPulse={playing ? snapshot.clockPulse : -1} selected={selectedRhythm} onSelect={selectRhythm} />}
           <div className="grid-legend"><span><i className="legend-dot" /> Hit <i className="legend-dot hollow" /> Rest <i className="legend-dot accent" /> Playhead</span><span><Cable size={12} />{connections.length} block connections · Select Patch to trace a signal</span></div>
@@ -635,9 +634,10 @@ export default function App() {
             <div id="circle-routing"><PatchPanel visual={visualFor(selectedRhythm)} voice={blockVoiceState(patch, selectedRhythm)} embedded index={selectedRhythm} blocks={patch.blocks} onChange={(next) => updateBlock(selectedRhythm, next)} onSelect={selectRhythm} onClose={() => undefined} /></div>
           </div> : <>
 
-          {openPatch !== null ? <PatchPanel visual={visualFor(openPatch)} voice={blockVoiceState(patch, openPatch)} index={openPatch} blocks={patch.blocks} onChange={(next) => updateBlock(openPatch, next)} onSelect={setOpenPatch} onClose={() => setOpenPatch(null)} /> : <><div className="section-heading voice-bank-heading"><div><h2>Voice bank</h2><span className="section-meta">12 voices</span></div><button className="voice-bank-master" aria-pressed={allVoicesMuted} onClick={() => setAllVoicesMuted(!allVoicesMuted)}>{allVoicesMuted ? <Volume2 size={12} /> : <VolumeX size={12} />}{allVoicesMuted ? "Unmute all" : "Mute all"}</button></div><VoiceBank voices={patch.voices} activeVoices={snapshot.activeVoices} changedFields={voiceVariationChanges} onChange={updateVoice} /><div className="voice-bank-note"><span className="jack" />808 / 909 / CST · CST opens detailed synthesis controls</div></>}
+          {openPatch !== null ? <PatchPanel visual={visualFor(openPatch)} voice={blockVoiceState(patch, openPatch)} index={openPatch} blocks={patch.blocks} connections={connections} onChange={(next) => updateBlock(openPatch, next)} onSelect={setOpenPatch} onClose={() => setOpenPatch(null)} /> : <><div className="section-heading voice-bank-heading"><div><h2>Voice bank</h2><span className="section-meta">12 voices</span></div><button className="voice-bank-master" aria-pressed={allVoicesMuted} onClick={() => setAllVoicesMuted(!allVoicesMuted)}>{allVoicesMuted ? <Volume2 size={12} /> : <VolumeX size={12} />}{allVoicesMuted ? "Unmute all" : "Mute all"}</button></div><VoiceBank voices={patch.voices} blocks={patch.blocks} connections={connections} lfoValues={playing ? snapshot.blocks.map((block) => block.lfo) : patch.blocks.map(() => 0.5)} activeVoices={snapshot.activeVoices} changedFields={voiceVariationChanges} onChange={updateVoice} /><div className="voice-bank-note"><span className="jack" />808 / 909 / CST · CST opens detailed synthesis controls</div></>}
           </>}
         </aside>
+        {view === "grid" && showCables && <PatchCables connections={connections} />}
       </main>
       <footer className="instrument-footer"><span><kbd>space</kbd> play / stop</span><span><kbd>↑</kbd> <kbd>↓</kbd> or drag to adjust · <kbd>shift</kbd> for larger steps</span><span className="footer-signoff">RHYTHM, BY DESIGN. <span>EG–16</span></span></footer>
       {effectsOpen && <EffectsDialog open onOpenChange={setEffectsOpen} value={patch.effects} onChange={updateEffects} />}

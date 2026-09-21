@@ -35,7 +35,7 @@ describe("patches", () => {
     legacy.format = "euclid-grid.v1";
     delete legacy.effects;
     const migrated = normalizePatch(legacy)!;
-    expect(migrated.format).toBe("euclid-grid.v4");
+    expect(migrated.format).toBe("euclid-grid.v5");
     expect(migrated.effects.distortion.enabled).toBe(false);
     expect(migrated.effects.sends.kick.reverb).toBe(0);
 

@@ -26,9 +26,9 @@ describe("patch cable interaction", () => {
     const connection: Connection = { source: 0, target: 1, input: "Clock", output: "Trigger" };
     function Fixture({ connections }: { connections: Connection[] }) {
       return <div>
-        <article data-block-index="0"><i data-cable-port="out-Trigger" /></article>
-        <article data-block-index="1"><i data-cable-port="in-Clock" /></article>
-        <article data-block-index="2" data-testid="crossed-block"><button>Adjust steps</button></article>
+        <article data-routing-node data-block-index="0"><i data-cable-port="out-Trigger" /></article>
+        <article data-routing-node data-block-index="1"><i data-cable-port="in-Clock" /></article>
+        <article data-routing-node data-block-index="2" data-testid="crossed-block"><button>Adjust steps</button></article>
         <PatchCables connections={connections} />
       </div>;
     }

@@ -13,25 +13,25 @@ interface SequencerRoutingProps {
   patchOpen: boolean;
   changedFields: ReadonlySet<keyof SequencerBlock>;
   onPatchOpen: (index: number | null) => void;
+  connections?: Connection[];
 }
 
 const ROUTING_FIELDS: Array<keyof SequencerBlock> = ["clk", "rst", "mut", "gate", "modulations", "shape"];
 
-export function SequencerRouting({ index, block, blocks, patchOpen, changedFields, onPatchOpen }: SequencerRoutingProps) {
-  const connections = connectionsFor(blocks);
+export function SequencerRouting({ index, block, blocks, patchOpen, changedFields, onPatchOpen, connections = connectionsFor(blocks) }: SequencerRoutingProps) {
   const incoming = connections.filter((connection) => connection.target === index);
   const outgoing = connections.filter((connection) => connection.source === index);
   return <div className={cn("routing-strip", ROUTING_FIELDS.some((field) => changedFields.has(field)) && "variation-changed")}>
-    {incoming.length > 0 ? <PortBank index={index} connections={incoming} end="target" onOpen={() => onPatchOpen(index)} /> : <span className="route-summary">{block.clk.includes("G") ? "Global clock" : "No clock"}</span>}
+    {incoming.length > 0 ? <RoutingPorts ownerLabel={`block ${padBlock(index)}`} connections={incoming} end="target" onOpen={() => onPatchOpen(index)} /> : <span className="route-summary">{block.clk.includes("G") ? "Global clock" : "No clock"}</span>}
     {block.kind === "bernoulli" && <span className="route-summary" title={`Euclidean hits route to A at ${block.prob}% probability, or B otherwise`}>A {voiceName(block.branchVoices[0])} / B {voiceName(block.branchVoices[1])}</span>}
-    {outgoing.length > 0 && <PortBank index={index} connections={outgoing} end="source" onOpen={() => onPatchOpen(index)} />}
+    {outgoing.length > 0 && <RoutingPorts ownerLabel={`block ${padBlock(index)}`} connections={outgoing} end="source" onOpen={() => onPatchOpen(index)} />}
     <button className="patch-action" aria-label={`Patch block ${padBlock(index)}`} aria-expanded={patchOpen} onClick={() => onPatchOpen(patchOpen ? null : index)}>
       Patch <ArrowUpRight size={11} />
     </button>
   </div>;
 }
 
-function PortBank({ index, connections, end, onOpen }: { index: number; connections: Connection[]; end: "source" | "target"; onOpen: () => void }) {
+export function RoutingPorts({ ownerLabel, connections, end, onOpen }: { ownerLabel: string; connections: Connection[]; end: "source" | "target"; onOpen: () => void }) {
   const groups = new Map<string, Connection[]>();
   for (const connection of connections) {
     const port = cablePort(connection, end);
@@ -40,7 +40,7 @@ function PortBank({ index, connections, end, onOpen }: { index: number; connecti
     groups.set(port, group);
   }
   const input = end === "target";
-  const label = `${input ? "Inputs to" : "Outputs from"} block ${padBlock(index)}: ${connections.length} ${connections.length === 1 ? "connection" : "connections"}`;
+  const label = `${input ? "Inputs to" : "Outputs from"} ${ownerLabel}: ${connections.length} ${connections.length === 1 ? "connection" : "connections"}`;
   const details = connections.map(describeConnection).join("\n");
   return <button type="button" className="routing-ports" title={`${label}\n${details}\nOpen patch settings`} aria-label={`${label}. ${details}. Open patch settings.`} onClick={onOpen}>
     {input ? <ArrowDown size={10} aria-hidden="true" /> : <ArrowUpRight size={10} aria-hidden="true" />}
@@ -54,5 +54,5 @@ function PortBank({ index, connections, end, onOpen }: { index: number; connecti
 }
 
 function describeConnection(route: Connection) {
-  return `Block ${padBlock(route.source)} ${route.output} → block ${padBlock(route.target)} ${route.input}`;
+  return `Block ${padBlock(route.source)} ${route.output} → ${typeof route.target === "string" ? `voice ${voiceName(route.target)}` : `block ${padBlock(route.target)}`} ${route.input}`;
 }

@@ -2,10 +2,11 @@ import { BLOCK_COUNT, type BlockKind, type BlockParam, type BlockRandomizationLo
 import { ROW_PARAMS, VOICE_DEFS } from "@/lib/constants";
 import { clamp } from "@/lib/euclid";
 import { createCustomVoiceSettings, normalizeCustomVoiceSettings } from "@/lib/voice-config";
-import { normalizeModulations } from "@/lib/modulation";
+import { normalizeModulations, normalizeVoiceModulations } from "@/lib/modulation";
 import { createEffects, normalizeEffects } from "@/lib/effects";
 
-const STORAGE_KEY = "egs.patch.v4";
+const STORAGE_KEY = "egs.patch.v5";
+const V4_STORAGE_KEY = "egs.patch.v4";
 const V3_STORAGE_KEY = "egs.patch.v3";
 const V2_STORAGE_KEY = "egs.patch.v2";
 const LEGACY_STORAGE_KEY = "egs.patch.v1";
@@ -37,6 +38,7 @@ export function createVoice(id: VoiceId): VoiceState {
     tune: 0,
     decay: 50,
     mute: false,
+    modulations: [],
     custom: createCustomVoiceSettings(id),
   };
 }
@@ -81,12 +83,12 @@ export function createDemoPatch(volume = 72): Patch {
     if ("mod" in demo) block.modulations = [{ source: demo.mod.src, destination: demo.mod.dst, amount: demo.mod.amt }];
     return block;
   });
-  return { format: "euclid-grid.v4", bpm: 124, rate: 4, swing: 12, vol: volume, blocks, voices: createVoices(), effects: createEffects() };
+  return { format: "euclid-grid.v5", bpm: 124, rate: 4, swing: 12, vol: volume, blocks, voices: createVoices(), effects: createEffects() };
 }
 
 export function createEmptyPatch(volume = 72): Patch {
   return {
-    format: "euclid-grid.v4",
+    format: "euclid-grid.v5",
     bpm: 124,
     rate: 4,
     swing: 0,
@@ -137,6 +139,7 @@ export function normalizePatch(value: unknown): Patch | null {
         ...base.voices[id],
         ...source,
         machine: ["808", "909", "custom"].includes(source.machine) ? source.machine : base.voices[id].machine,
+        modulations: normalizeVoiceModulations(source.modulations),
         custom: normalizeCustomVoiceSettings(id, source.custom),
       };
     }
@@ -147,7 +150,7 @@ export function normalizePatch(value: unknown): Patch | null {
 
 export function loadStoredPatch(): Patch | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(V3_STORAGE_KEY) ?? localStorage.getItem(V2_STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(V4_STORAGE_KEY) ?? localStorage.getItem(V3_STORAGE_KEY) ?? localStorage.getItem(V2_STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
     return raw ? normalizePatch(JSON.parse(raw)) : null;
   } catch {
     return null;

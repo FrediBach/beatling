@@ -233,7 +233,7 @@ export function createPresetPatch(id: string, volume = 72): Patch {
   const voices = createVoices();
   applyPresetCharacter(preset, voices);
   return {
-    format: "euclid-grid.v4",
+    format: "euclid-grid.v5",
     bpm: preset.bpm,
     rate: preset.rate ?? 4,
     swing: preset.swing,
@@ -246,8 +246,8 @@ export function createPresetPatch(id: string, volume = 72): Patch {
 
 const clonePatch = (patch: Patch): Patch => ({
   ...patch,
-  blocks: patch.blocks.map((block) => ({ ...block, clk: [...block.clk], branchVoices: [...block.branchVoices] })),
-  voices: Object.fromEntries(Object.entries(patch.voices).map(([id, voice]) => [id, { ...voice, custom: { ...voice.custom } }])) as VoiceBank,
+  blocks: patch.blocks.map((block) => ({ ...block, clk: [...block.clk], branchVoices: [...block.branchVoices], modulations: block.modulations.map((route) => ({ ...route })) })),
+  voices: Object.fromEntries(Object.entries(patch.voices).map(([id, voice]) => [id, { ...voice, modulations: voice.modulations.map((route) => ({ ...route })), custom: { ...voice.custom } }])) as VoiceBank,
   effects: {
     ...patch.effects,
     distortion: { ...patch.effects.distortion },
@@ -323,6 +323,7 @@ function createFillVariation(base: Patch, preset: DrumPreset): Patch {
       if (source !== "" && source !== "G" && source !== "BAR") referenced.add(Number(source));
     }
   });
+  Object.values(patch.voices).forEach((voice) => voice.modulations.forEach((route) => { if (route.source !== "") referenced.add(Number(route.source)); }));
   const empty = patch.blocks.map((block, index) => ({ block, index })).filter(({ block, index }) => block.pulses === 0 && !referenced.has(index));
   const replaceable = patch.blocks.map((block, index) => ({ block, index })).filter(({ block, index }) => block.pulses > 0 && block.voice !== "kick" && !referenced.has(index));
   const fallback = patch.blocks.map((block, index) => ({ block, index })).filter(({ block, index }) => block.voice !== "" && !referenced.has(index));
@@ -351,7 +352,7 @@ export function createPresetArrangement(id: string, volume = 72): Arrangement {
     patch,
   }));
   return {
-    format: "euclid-grid.arrangement.v4",
+    format: "euclid-grid.arrangement.v5",
     variations,
     songParts: variations.map((variation, index) => ({ id: `preset-${id}-part-${index + 1}`, variationId: variation.id, bars: repeats[index] })),
     activeIndex: 0,

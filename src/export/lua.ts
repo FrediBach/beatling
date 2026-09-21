@@ -66,6 +66,9 @@ export function buildLua(patch: Patch, date = new Date()): string {
     const mods = block.modulations.filter((route) => route.source !== "" && DESTINATION_NUMBER[route.destination] > 0).map((route) => `{ src=${Number(route.source) + 1}, dst=${DESTINATION_NUMBER[route.destination]}, amt=${route.amount.toFixed(2)} }`).join(", ");
     return `\t{ steps=${block.steps}, pulses=${block.pulses}, rot=${block.rot}, div=${block.div}, prob=${block.prob}, gate=${block.gate}, clk={${block.clk.map(sourceNumber).join(", ")}}, rst=${sourceNumber(block.rst)}, mut=${block.mut === "" ? 0 : Number(block.mut) + 1}, mn=${block.mute}, shape=${SHAPE_NUMBER[block.shape]}, euclidean=${!voiceBlock}, mods={${mods}}, out=${outputIndexes[index]}, lout=${lfoIndexes[index]}, tag=${luaString(voiceBlock ? voiceTag(block.voice) : "--")} },${browserOnly}`;
   });
+  const voiceRoutingNotes = Object.entries(patch.voices).flatMap(([id, voice]) => voice.modulations
+    .filter((route) => route.source !== "")
+    .map((route) => `-- browser voice routing: ${id} ${route.destination} <- block ${Number(route.source) + 1} (${Math.round(route.amount * 100)}%) not exported`));
 
   return `-- Euclid Grid
 --[[
@@ -84,6 +87,7 @@ local BAR = ${patch.rate * 4}\t\t-- clock pulses per bar
 local blocks = {
 ${rows.join("\n")}
 }
+${voiceRoutingNotes.length ? `\n${voiceRoutingNotes.join("\n")}\n` : ""}
 
 local NB = #blocks
 local pos, cnt, gate, lfo, rnd = {}, {}, {}, {}, {}

@@ -2,7 +2,8 @@ import { normalizePatch } from "@/lib/patch";
 import type { Arrangement, Patch, SequencerBlock, SongPart, Variation, VoiceId, VoiceState } from "@/lib/types";
 import { effectsHaveChanges } from "@/lib/effects";
 
-const STORAGE_KEY = "egs.arrangement.v4";
+const STORAGE_KEY = "egs.arrangement.v5";
+const V4_STORAGE_KEY = "egs.arrangement.v4";
 const V3_STORAGE_KEY = "egs.arrangement.v3";
 const V2_STORAGE_KEY = "egs.arrangement.v2";
 const LEGACY_STORAGE_KEY = "egs.arrangement.v1";
@@ -10,7 +11,7 @@ export const MAX_VARIATIONS = 8;
 
 export function createArrangement(patch: Patch): Arrangement {
   return {
-    format: "euclid-grid.arrangement.v4",
+    format: "euclid-grid.arrangement.v5",
     variations: [{ id: "variation-1", name: "A", patch }],
     songParts: [{ id: "song-part-1", variationId: "variation-1", bars: 1 }],
     activeIndex: 0,
@@ -53,7 +54,7 @@ export function normalizeArrangement(value: unknown, fallback: Patch): Arrangeme
     bars: Math.min(16, Math.max(1, Math.round(Number((input.variations?.[index] as { repeats?: number } | undefined)?.repeats) || 1))),
   }));
   return {
-    format: "euclid-grid.arrangement.v4",
+    format: "euclid-grid.arrangement.v5",
     variations,
     songParts: migratedSongParts,
     activeIndex: Math.min(variations.length - 1, Math.max(0, Math.round(Number(input.activeIndex) || 0))),
@@ -64,7 +65,7 @@ export function normalizeArrangement(value: unknown, fallback: Patch): Arrangeme
 
 export function loadStoredArrangement(fallback: Patch): Arrangement {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(V3_STORAGE_KEY) ?? localStorage.getItem(V2_STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(V4_STORAGE_KEY) ?? localStorage.getItem(V3_STORAGE_KEY) ?? localStorage.getItem(V2_STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
     return raw ? normalizeArrangement(JSON.parse(raw), fallback) : createArrangement(fallback);
   } catch {
     return createArrangement(fallback);
@@ -89,7 +90,7 @@ export function changedBlockFields(block: SequencerBlock, base: SequencerBlock):
 
 export function changedVoiceFields(voice: VoiceState, base: VoiceState): Set<keyof VoiceState> {
   return new Set((Object.keys(voice) as Array<keyof VoiceState>).filter((key) => {
-    if (key === "custom") return JSON.stringify(voice.custom) !== JSON.stringify(base.custom);
+    if (key === "custom" || key === "modulations") return JSON.stringify(voice[key]) !== JSON.stringify(base[key]);
     return voice[key] !== base[key];
   }));
 }

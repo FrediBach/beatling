@@ -1,6 +1,7 @@
 import { BLOCK_COUNT, type CustomVoiceSettings, type EffectId, type EffectsState, type EffectiveBlock, type EngineSnapshot, type Machine, type Patch, type VoiceId } from "@/lib/types";
 import { VOICE_DEFS } from "@/lib/constants";
 import { clamp, effectiveBlock, euclidHit, volumeGain } from "@/lib/euclid";
+import { effectiveVoiceModulation } from "@/lib/modulation";
 import { sampleLfo, type LfoFrame } from "@/lib/lfo";
 import { EFFECT_IDS, effectGain } from "@/lib/effects";
 
@@ -361,11 +362,13 @@ export class SequencerEngine {
 
   private effective(index: number, time: number): EffectiveBlock {
     const block = this.getPatch().blocks[index];
-    return effectiveBlock(block, (source) => {
-      const wave = this.runtime[source]?.wave;
-      const sourceBlock = this.getPatch().blocks[source];
-      return wave ? sampleLfo(wave, time).value : sourceBlock?.kind === "voice" && sourceBlock.voice ? 0 : 0.5;
-    });
+    return effectiveBlock(block, (source) => this.sourceLfo(source, time));
+  }
+
+  private sourceLfo(source: number, time: number): number {
+    const wave = this.runtime[source]?.wave;
+    const sourceBlock = this.getPatch().blocks[source];
+    return wave ? sampleLfo(wave, time).value : sourceBlock?.kind === "voice" && sourceBlock.voice ? 0 : 0.5;
   }
 
   private advance(index: number, time: number): boolean {
@@ -462,11 +465,12 @@ export class SequencerEngine {
     if (!this.context) return;
     const voice = this.getPatch().voices[id];
     if (!voice || voice.mute) return;
+    const routed = effectiveVoiceModulation(voice, (source) => this.sourceLfo(source, time));
     const parameters = {
       machine: voice.machine,
-      tune: clamp(voice.tune + modulation.tune * 12, -24, 24),
-      decay: clamp(0.25 + (voice.decay + modulation.decay * 50) / 100 * 1.6, 0.15, 2.4),
-      amplitude: clamp(voice.level / 100 * (1 + modulation.level * 0.6), 0, 1.4),
+      tune: clamp(voice.tune + (modulation.tune + routed.tune) * 12, -24, 24),
+      decay: clamp(0.25 + (voice.decay + (modulation.decay + routed.decay) * 50) / 100 * 1.6, 0.15, 2.4),
+      amplitude: clamp(voice.level / 100 * (1 + (modulation.level + routed.level) * 0.6), 0, 1.4),
       custom: voice.custom,
     };
     if (parameters.amplitude <= 0.001) return;

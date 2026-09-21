@@ -20,8 +20,8 @@ export const PatchCables = memo(function PatchCables({ connections }: { connecti
     let accumulator = 0;
     let width = 0;
     let height = 0;
-    let hovered: Element | null = grid.querySelector("[data-block-index]:hover");
-    let focused: Element | null = document.activeElement?.closest("[data-block-index]") ?? null;
+    let hovered: Element | null = grid.querySelector("[data-routing-node]:hover");
+    let focused: Element | null = document.activeElement?.closest("[data-routing-node]") ?? null;
     const bounds = new Map<Element, Rectangle>();
     let cables: Cable[] = [];
 
@@ -64,21 +64,24 @@ export const PatchCables = memo(function PatchCables({ connections }: { connecti
       canvas!.height = Math.round(height * ratio);
       context!.setTransform(ratio, 0, 0, ratio, 0, 0);
       bounds.clear();
-      grid!.querySelectorAll<HTMLElement>("[data-block-index]").forEach((block) => {
+      grid!.querySelectorAll<HTMLElement>("[data-routing-node]").forEach((block) => {
         const box = block.getBoundingClientRect();
         bounds.set(block, { left: box.left - rect.left, top: box.top - rect.top, right: box.right - rect.left, bottom: box.bottom - rect.top });
       });
       const next = new Map<string, Cable>();
       for (const connection of connections) {
         const anchors = (["source", "target"] as const).map((end) => {
-          const port = grid!.querySelector(`[data-block-index="${connection[end]}"] [data-cable-port="${cablePort(connection, end)}"]`);
+          const endpoint = end === "source" || typeof connection.target === "number"
+            ? `[data-block-index="${connection[end]}"]`
+            : `[data-voice-id="${connection.target}"]`;
+          const port = grid!.querySelector(`${endpoint} [data-cable-port="${cablePort(connection, end)}"]`);
           if (!port) return null;
           const box = port.getBoundingClientRect();
           return { x: box.left + box.width / 2 - rect.left, y: box.top + box.height / 2 - rect.top };
         });
         const [start, end] = anchors;
         if (!start || !end) continue;
-        const key = `${connection.source}-${connection.target}-${connection.input}`;
+        const key = `${connection.source}-${String(connection.target)}-${connection.input}`;
         let cable = cablesRef.current.get(key);
         if (!cable || Math.hypot(cable.rope.start.x - start.x, cable.rope.start.y - start.y, cable.rope.end.x - end.x, cable.rope.end.y - end.y) > 0.5) {
           cable = { rope: createRope(start, end, height - 10), color: cableSignal(connection).color, opacity: 1, quietSteps: 0 };
@@ -96,7 +99,7 @@ export const PatchCables = memo(function PatchCables({ connections }: { connecti
       wake();
     }
 
-    const blockAt = (target: EventTarget | null) => target instanceof Element ? target.closest("[data-block-index]") : null;
+    const blockAt = (target: EventTarget | null) => target instanceof Element ? target.closest("[data-routing-node]") : null;
     const onPointerOver = (event: PointerEvent) => { hovered = blockAt(event.target); wake(); };
     const onPointerOut = (event: PointerEvent) => { hovered = blockAt(event.relatedTarget); wake(); };
     const onPointerLeave = () => { hovered = null; wake(); };
@@ -105,7 +108,7 @@ export const PatchCables = memo(function PatchCables({ connections }: { connecti
     const onVisibility = () => { lastTime = 0; wake(); };
     const observer = new ResizeObserver(measure);
     observer.observe(grid);
-    grid.querySelectorAll("[data-block-index]").forEach((block) => observer.observe(block));
+    grid.querySelectorAll("[data-routing-node]").forEach((block) => observer.observe(block));
     grid.addEventListener("pointerover", onPointerOver);
     grid.addEventListener("pointerout", onPointerOut);
     grid.addEventListener("pointerleave", onPointerLeave);

@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { effectiveBlock } from "./euclid";
+import { effectiveVoiceModulation } from "./modulation";
 import { createEmptyPatch, loadStoredPatch, normalizePatch, savePatch } from "./patch";
-import { changedBlockFields, createArrangement, loadStoredArrangement, normalizeArrangement, saveArrangement } from "./variations";
+import { changedBlockFields, changedVoiceFields, createArrangement, loadStoredArrangement, normalizeArrangement, saveArrangement } from "./variations";
 import { connectionsFor } from "./routing";
 import { buildLua } from "@/export/lua";
 
@@ -27,11 +28,11 @@ describe("multiple modulation targets", () => {
     expect(effectiveBlock(block, () => 0)).toMatchObject({ pulses: 4, prob: 0 });
   });
 
-  it("migrates legacy patch and arrangement routing and preserves v4 round trips", () => {
+  it("migrates legacy patch and arrangement routing and preserves v5 round trips", () => {
     const legacy = { ...createEmptyPatch(), format: "euclid-grid.v2", blocks: [{ pulses: 4, modSrc: "12", modDst: "prob", modAmt: -0.65 }] };
     localStorage.setItem("egs.patch.v2", JSON.stringify(legacy));
     const patch = loadStoredPatch()!;
-    expect(patch.format).toBe("euclid-grid.v4");
+    expect(patch.format).toBe("euclid-grid.v5");
     expect(patch.blocks[0].modulations).toEqual([{ source: "12", destination: "prob", amount: -0.65 }]);
     expect(patch.blocks[0]).not.toHaveProperty("modSrc");
     patch.blocks[0].modulations.push({ source: "13", destination: "rot", amount: 0.4 });
@@ -43,7 +44,7 @@ describe("multiple modulation targets", () => {
     expect(loaded.variations[0].patch.blocks[0].modulations).toEqual([{ source: "12", destination: "prob", amount: -0.65 }]);
     saveArrangement(createArrangement(patch));
     expect(loadStoredArrangement(patch).variations[0].patch).toEqual(patch);
-    expect(normalizeArrangement(arrangement, patch).format).toBe("euclid-grid.arrangement.v4");
+    expect(normalizeArrangement(arrangement, patch).format).toBe("euclid-grid.arrangement.v5");
   });
 
   it("normalizes invalid routes, duplicate targets, depths and step bounds", () => {
@@ -64,6 +65,27 @@ describe("multiple modulation targets", () => {
     expect(changedBlockFields(changed, patch.blocks[0])).toEqual(new Set(["modulations"]));
   });
 
+  it("normalizes and resolves shared voice modulation independently of block hits", () => {
+    const patch = normalizePatch({ ...createEmptyPatch(), voices: {
+      ...createEmptyPatch().voices,
+      kick: { ...createEmptyPatch().voices.kick, modulations: [
+        { source: "12", destination: "tune", amount: 0.5 },
+        { source: "13", destination: "decay", amount: -2 },
+        { source: "14", destination: "level", amount: 0.25 },
+        { source: "15", destination: "level", amount: 1 },
+        { source: "99", destination: "tune", amount: 1 },
+      ] },
+    } })!;
+    expect(patch.voices.kick.modulations).toEqual([
+      { source: "12", destination: "tune", amount: 0.5 },
+      { source: "13", destination: "decay", amount: -1 },
+      { source: "14", destination: "level", amount: 0.25 },
+    ]);
+    expect(effectiveVoiceModulation(patch.voices.kick, (source) => source === 12 ? 1 : source === 13 ? 0 : 0.75)).toEqual({ tune: 0.5, decay: 1, level: 0.125 });
+    const base = createEmptyPatch().voices.kick;
+    expect(changedVoiceFields(patch.voices.kick, base)).toContain("modulations");
+  });
+
   it("traces and exports every rhythm target without dropping routes", () => {
     const patch = createEmptyPatch();
     patch.blocks[0].modulations = [{ source: "12", destination: "prob", amount: -0.65 }, { source: "12", destination: "rot", amount: 0.5 }, { source: "13", destination: "tune", amount: 0.3 }];
@@ -75,5 +97,12 @@ describe("multiple modulation targets", () => {
     const lua = buildLua(patch);
     expect(lua).toContain("mods={{ src=13, dst=3, amt=-0.65 }, { src=13, dst=2, amt=0.50 }}");
     expect(lua).toContain("browser voice mod (tune) not exported");
+  });
+
+  it("traces voice destinations and marks browser-only voice routes in Lua", () => {
+    const patch = createEmptyPatch();
+    patch.voices.kick.modulations = [{ source: "12", destination: "tune", amount: 0.5 }];
+    expect(connectionsFor(patch)).toContainEqual({ source: 12, target: "kick", output: "LFO", input: "Tune" });
+    expect(buildLua(patch)).toContain("browser voice routing: kick tune <- block 13 (50%) not exported");
   });
 });

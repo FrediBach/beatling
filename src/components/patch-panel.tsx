@@ -1,15 +1,15 @@
 import { ArrowRight, X } from "lucide-react";
 import { LFO_SHAPES, VOICE_DEFS, blockName, padBlock, voiceName } from "@/lib/constants";
 import type { BlockVisualState, VoiceState, ClockSource, SequencerBlock, VoiceId } from "@/lib/types";
-import { connectionsFor } from "@/lib/routing";
+import { connectionsFor, type Connection } from "@/lib/routing";
 import { ModulationScope } from "./modulation-scope";
 import { ModulationEditor } from "./modulation-editor";
 import { cn } from "@/lib/utils";
 
-export function PatchPanel({ index, blocks, onChange, onSelect, onClose, visual, voice, embedded = false }: { index: number; blocks: SequencerBlock[]; onChange: (block: SequencerBlock) => void; onSelect: (index: number) => void; onClose: () => void; embedded?: boolean; visual?: BlockVisualState; voice?: VoiceState }) {
+export function PatchPanel({ index, blocks, onChange, onSelect, onClose, visual, voice, embedded = false, connections: allConnections }: { index: number; blocks: SequencerBlock[]; onChange: (block: SequencerBlock) => void; onSelect: (index: number) => void; onClose: () => void; embedded?: boolean; visual?: BlockVisualState; voice?: VoiceState; connections?: Connection[] }) {
   const block = blocks[index];
   const update = <K extends keyof SequencerBlock>(key: K, value: SequencerBlock[K]) => onChange({ ...block, [key]: value });
-  const connections = connectionsFor(blocks).filter((connection) => connection.source === index || connection.target === index);
+  const connections = (allConnections ?? connectionsFor(blocks)).filter((connection) => connection.source === index || connection.target === index);
   const clockSources = new Set<ClockSource>(block.clk);
   return <section className="patch-panel" aria-label={`Routing for block ${padBlock(index)}`}>
     {!embedded && <div className="panel-heading"><div><span className="eyebrow">Patch bay / {padBlock(index)}</span><h2>{blockName(block)}</h2></div><button className="icon-button" aria-label="Close patch bay" onClick={onClose}><X size={16} /></button></div>}
@@ -67,8 +67,8 @@ export function PatchPanel({ index, blocks, onChange, onSelect, onClose, visual,
     <div className="connection-heading"><span className="eyebrow">Signal flow</span><span>{connections.length} connections</span></div>
     <div className="connection-list">
       {connections.length === 0 && <p className="empty-routing">No block connections yet. Choose a clock or modulation source above.</p>}
-      {connections.map((connection) => <button className="connection" aria-label={`Block ${padBlock(connection.source)} ${connection.output} to block ${padBlock(connection.target)} ${connection.input}`} key={`${connection.source}-${connection.target}-${connection.input}`} onClick={() => onSelect(connection.source === index ? connection.target : connection.source)}>
-        <span><b>{padBlock(connection.source)}</b> {connection.output}</span><ArrowRight size={13} /><span><b>{padBlock(connection.target)}</b> {connection.input}</span>
+      {connections.map((connection) => <button className="connection" aria-label={`Block ${padBlock(connection.source)} ${connection.output} to ${typeof connection.target === "string" ? `voice ${voiceName(connection.target)}` : `block ${padBlock(connection.target)}`} ${connection.input}`} key={`${connection.source}-${connection.target}-${connection.input}`} onClick={() => { const other = connection.source === index ? connection.target : connection.source; if (typeof other === "number") onSelect(other); }}>
+        <span><b>{padBlock(connection.source)}</b> {connection.output}</span><ArrowRight size={13} /><span><b>{typeof connection.target === "string" ? voiceName(connection.target) : padBlock(connection.target)}</b> {connection.input}</span>
       </button>)}
     </div>
     {block.kind === "bernoulli" && <p className="patch-help">Every filled Euclidean step routes to A at the Chance percentage, or to B otherwise. No hit is discarded.</p>}
