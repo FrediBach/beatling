@@ -12,5 +12,5 @@ export function cableSignal(connection: Connection) {
 }
 
 export function cablePort(connection: Connection, end: "source" | "target") {
-  return end === "source" ? `out-${connection.output}` : `in-${cableSignal(connection).input}`;
+  return end === "source" ? `out-${connection.output}` : `in-${connection.output === "LFO" ? "Mod-" : ""}${connection.input}`;
 }

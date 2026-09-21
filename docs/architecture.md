@@ -48,6 +48,8 @@ Pure domain modules in `src/lib` support both the UI and audio engine.
 
 The small components under `src/components/ui/` wrap reusable Radix primitives or styling variants. Feature components should depend on these primitives rather than reproduce dialog and button mechanics.
 
+`SequencerRouting` derives each card's routing summary and connected input/output controls. With cables enabled, inputs show the source block and destination parameter; outputs show the signal and destination blocks. These keyboard-accessible controls open the card's patch settings. Only assigned ports are rendered, and modulation destinations have separate cable anchors. `PatchCables` measures these anchors without owning routing state.
+
 `EffectsDialog` owns only the selected processor tab. Its editor and per-voice send controls emit immutable effect updates through the existing patch history. `EffectControl` owns transient numeric-entry drafts and pointer gestures (vertical dial dragging, Shift fine adjustment, and reset); committed values remain in the patch. Bypass preserves parameters and sends. These controls do not create audio resources or change routing semantics.
 
 ## State model and data flow

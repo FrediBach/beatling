@@ -152,10 +152,25 @@ button { transition: background-color 120ms, color 120ms, border-color 120ms; }
 .cable-hint { margin-left: auto; }
 .sequencer-grid { position: relative; isolation: isolate; }
 .patch-cables { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
-.cable-ports { position: absolute; top: 34px; display: flex; flex-direction: column; gap: 5px; opacity: 0; pointer-events: none; }
-.cables-visible .cable-ports { opacity: 1; }
-.cable-inputs { left: 0; }.cable-outputs { right: 0; }
-.cable-ports i { width: 5px; height: 5px; border-radius: 50%; background: var(--ink); border: 1px solid var(--muted); }
+.connection-ports { display: none; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 10px; padding: 4px 5px 5px; border-top: 1px solid var(--rule-soft); }
+.cables-visible .connection-ports { display: grid; }
+.sequencer-grid.cables-visible { grid-template-rows: repeat(4,minmax(min-content,1fr)); grid-auto-rows: auto; }
+.instrument:has(.cables-visible) { height: auto; min-height: 100dvh; }
+.cables-visible .card-body { flex: 1 0 auto; min-height: 94px; }
+.cables-visible .connection-ports { flex-shrink: 0; }
+.port-bank { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.port-direction { padding: 0 3px; color: var(--muted); font: 7px/1.4 var(--font-mono); text-transform: uppercase; letter-spacing: .08em; }
+.port-outputs .port-direction { text-align: right; }
+.connection-port { display: flex; align-items: center; gap: 4px; min-height: 21px; padding: 2px 3px; border-radius: 3px; color: var(--ink); background: color-mix(in srgb,var(--port-color) 9%,var(--sheet)); font: 8px/1.3 var(--font-mono); text-align: left; }
+.connection-port:hover { background: color-mix(in srgb,var(--port-color) 22%,var(--sheet)); }
+.connection-port:focus-visible { outline: 2px solid var(--port-color); outline-offset: 1px; }
+.connection-port i { width: 6px; height: 6px; flex-shrink: 0; border: 1px solid var(--port-color); background: var(--port-color); border-radius: 50%; box-shadow: inset 0 0 0 1px var(--sheet); }
+.port-label { text-transform: capitalize; overflow-wrap: anywhere; }
+.port-peers { color: var(--muted); overflow-wrap: anywhere; min-width: 0; }
+.port-arrow { flex-shrink: 0; color: var(--muted); }
+.port-inputs .port-peers { order: 1; }.port-inputs .port-arrow { order: 2; }.port-inputs .port-label { order: 3; }
+.port-outputs .connection-port { justify-content: flex-end; }.port-outputs i { order: 4; }
+@media (max-width:1200px) { .sequencer-grid.cables-visible { grid-template-rows: none; grid-auto-rows: minmax(164px,auto); } }
 @media (max-width:1200px) { .cable-hint { display: none; } }
 .sequencer-card { display: flex; flex-direction: column; min-width: 0; border: 1px solid var(--rule); border-radius: 4px; background: var(--sheet); box-shadow: 0 1px 2px #00000004; overflow: hidden; position: relative; transition: border-color 120ms; }.sequencer-card.is-selected { border-color: var(--signal); box-shadow: 0 0 0 1px var(--signal); }.sequencer-card.is-related { border-color: var(--signal); border-style: dashed; }.sequencer-card.is-firing .block-number { color: var(--signal); }.sequencer-card.is-muted .card-body { opacity: .35; }.sequencer-card.is-muted .mute-button { color: var(--signal); }
 .card-heading { height: 34px; display: flex; align-items: center; gap: 5px; padding: 0 8px; flex-shrink: 0; }.block-number { font: 10px var(--font-mono); color: var(--muted); }.is-selected .block-number { color: var(--signal); }.voice-select { position: relative; min-width: 0; flex: 1; }.voice-select select { appearance: none; background: transparent; border: 0; width: 100%; padding: 3px 43px 3px 0; font-size: 12px; font-weight: 600; cursor: pointer; }.voice-select > svg { position: absolute; right: 0; top: 7px; pointer-events: none; color: var(--muted); }.voice-select > .voice-tag-badge { position: absolute; right: 14px; top: 4px; pointer-events: none; }.voice-tag-badge { display: inline-flex; align-items: center; justify-content: center; min-width: 23px; height: 15px; padding: 0 4px; border: 1px solid var(--rule); border-radius: 4px; background: var(--paper); color: var(--ink); font: 700 8px/1 var(--font-mono); letter-spacing: .07em; text-decoration: none; box-shadow: inset 0 1px 0 color-mix(in srgb,white 30%,transparent); }.card-tools { display: flex; align-items: center; gap: 1px; }.card-tool-button, .mute-button { display: grid; place-items: center; width: 21px; height: 21px; color: var(--muted); border: 1px solid transparent; border-radius: 2px; }.card-tool-button:hover, .mute-button:hover { border-color: var(--rule); color: var(--ink); }.card-tool-button:disabled { cursor: not-allowed; opacity: .3; }.lock-button[aria-pressed=true] { color: var(--signal); background: color-mix(in srgb,var(--signal) 7%,transparent); }
