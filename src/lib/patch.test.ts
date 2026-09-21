@@ -3,6 +3,7 @@ import { createDemoPatch, createEmptyPatch, createRandomizationLocks, normalizeP
 import { createPresetArrangement, createPresetPatch, DRUM_PRESETS } from "@/lib/presets";
 import { euclidHit } from "@/lib/euclid";
 import { variationHasChanges } from "@/lib/variations";
+import type { SequencerBlock } from "@/lib/types";
 
 describe("patches", () => {
   it("creates the complete 16-block demo", () => {
@@ -34,7 +35,7 @@ describe("patches", () => {
     legacy.format = "euclid-grid.v1";
     delete legacy.effects;
     const migrated = normalizePatch(legacy)!;
-    expect(migrated.format).toBe("euclid-grid.v3");
+    expect(migrated.format).toBe("euclid-grid.v4");
     expect(migrated.effects.distortion.enabled).toBe(false);
     expect(migrated.effects.sends.kick.reverb).toBe(0);
 
@@ -49,6 +50,23 @@ describe("patches", () => {
     expect(imported.effects.distortion).toMatchObject({ enabled: true, drive: 100, tone: 400, return: 100 });
     expect(imported.effects.delay).toMatchObject({ enabled: true, time: 750, feedback: 85 });
     expect(imported.effects.sends.kick).toMatchObject({ distortion: 100, delay: 0, reverb: 0, compressor: 0 });
+  });
+
+  it("migrates block kinds and normalizes Bernoulli voice branches", () => {
+    const legacyVoice = { ...createEmptyPatch().blocks[0] } as Partial<SequencerBlock> & Record<string, unknown>;
+    delete legacyVoice.kind;
+    delete legacyVoice.branchVoices;
+    const legacyModulator = { ...legacyVoice, voice: "" };
+    const patch = normalizePatch({
+      blocks: [
+        legacyVoice,
+        legacyModulator,
+        { ...legacyModulator, kind: "bernoulli", branchVoices: ["kick", "kick"] },
+      ],
+    })!;
+    expect(patch.blocks[0]).toMatchObject({ kind: "voice", voice: "kick", branchVoices: ["kick", "snare"] });
+    expect(patch.blocks[1]).toMatchObject({ kind: "modulator", voice: "" });
+    expect(patch.blocks[2]).toMatchObject({ kind: "bernoulli", voice: "", branchVoices: ["kick", "snare"] });
   });
 
   it("keeps routing when patterns are shuffled", () => {

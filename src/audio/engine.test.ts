@@ -85,3 +85,45 @@ it("shows audible clock pulses and effective divisions, respecting lookahead, sw
     expect(engine.snapshot().clockPulse).toBe(-1);
   } finally { engine.destroy(); }
 });
+
+it("routes every Euclidean hit to one Bernoulli voice without dropping it", async () => {
+  vi.useFakeTimers();
+  let now = 0;
+  const parameter = () => ({ value: 0, setTargetAtTime: vi.fn() });
+  const node = () => ({ connect: vi.fn((destination: unknown) => destination), gain: parameter(), frequency: parameter(), Q: parameter(), delayTime: parameter(), threshold: parameter(), ratio: parameter(), attack: parameter(), release: parameter() });
+  vi.stubGlobal("AudioContext", class {
+    get currentTime() { return now; }
+    state = "running";
+    sampleRate = 1;
+    destination = {};
+    createGain = node;
+    createDynamicsCompressor = node;
+    createWaveShaper = node;
+    createBiquadFilter = node;
+    createConvolver = node;
+    createDelay = node;
+    createBuffer() { return { getChannelData: () => new Float32Array(2) }; }
+    close() { return Promise.resolve(); }
+  });
+  const patch = createEmptyPatch();
+  patch.blocks.forEach((block) => { block.clk = []; });
+  Object.assign(patch.blocks[0], { kind: "bernoulli", voice: "", branchVoices: ["kick", "snare"], steps: 4, pulses: 2, rot: 0, prob: 50, clk: ["G"] });
+  patch.blocks[1].clk = ["0"];
+  const engine = new SequencerEngine(patch);
+  const playVoice = vi.spyOn(engine as unknown as { playVoice: (id: string, time: number, effective: unknown) => void }, "playVoice").mockImplementation(() => undefined);
+  const random = vi.spyOn(Math, "random").mockReturnValue(0.1);
+  try {
+    await engine.start();
+    expect(playVoice.mock.calls.map(([voice]) => voice)).toEqual(["kick"]);
+    random.mockReturnValue(0.9);
+    now = 0.1;
+    vi.advanceTimersByTime(20);
+    expect(playVoice.mock.calls.map(([voice]) => voice)).toEqual(["kick"]);
+    now = 0.23;
+    vi.advanceTimersByTime(20);
+    expect(playVoice.mock.calls.map(([voice]) => voice)).toEqual(["kick", "snare"]);
+    now = 0.36;
+    vi.advanceTimersByTime(20);
+    expect(playVoice.mock.calls.map(([voice]) => voice)).toEqual(["kick", "snare"]);
+  } finally { engine.destroy(); }
+});

@@ -25,7 +25,7 @@ function waveformPath(shape: LfoShape, steps: number, pulses: number, rot: numbe
 
 function scopeLabels(block: SequencerBlock, visual: BlockVisualState | undefined, compact: boolean) {
   const { steps, pulses, rot, div } = visual?.effective ?? block;
-  const euclidean = !block.voice;
+  const euclidean = block.kind !== "voice" || !block.voice;
   const active = (visual?.position ?? -1) >= 0;
   const shape = LFO_SHAPES.find(([value]) => value === block.shape)?.[1];
   return {

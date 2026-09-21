@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { Plus, X } from "lucide-react";
-import { padBlock, voiceName } from "@/lib/constants";
+import { blockName, padBlock } from "@/lib/constants";
 import { MODULATION_TARGETS, signedAmount, targetValue } from "@/lib/modulation";
 import type { BlockVisualState, ModulationRoute, SequencerBlock, VoiceState } from "@/lib/types";
 
@@ -30,7 +30,7 @@ export function ModulationEditor({ index, blocks, visual, voice, onChange }: Mod
         <div className="modulation-route-top">
           <select className="control" aria-label={`Modulation source for ${label}`} value={route.source} onChange={(event) => update(route.destination, { ...route, source: event.target.value as ModulationRoute["source"] })}>
             <option value="">Choose source…</option>
-            {blocks.map((source, sourceIndex) => sourceIndex !== index && <option key={sourceIndex} value={sourceIndex}>{padBlock(sourceIndex)} {voiceName(source.voice) || "Modulator"}</option>)}
+            {blocks.map((source, sourceIndex) => sourceIndex !== index && <option key={sourceIndex} value={sourceIndex}>{padBlock(sourceIndex)} {blockName(source)}</option>)}
           </select>
           <span aria-hidden="true">→</span>
           <select ref={(node) => { if (node && focusDestination.current === route.destination) { node.focus(); focusDestination.current = null; } }} className="control" aria-label={`Modulation destination for ${label}`} value={route.destination} onChange={(event) => { const destination = event.target.value as ModulationRoute["destination"]; focusDestination.current = destination; update(route.destination, { ...route, destination }); }}>
@@ -41,7 +41,8 @@ export function ModulationEditor({ index, blocks, visual, voice, onChange }: Mod
         <div className="modulation-depth"><span>Depth</span><input type="range" className="range" min={-100} max={100} value={Math.round(route.amount * 100)} aria-label={`Modulation amount for ${label}`} onChange={(event) => update(route.destination, { ...route, amount: Number(event.target.value) / 100 })} /><output>{signedAmount(route.amount)}</output></div>
         <div className="modulation-result"><span>{label} <b>{targetValue(route.destination, block, voice)}</b><span aria-hidden="true"> → </span><b>{targetValue(route.destination, block, voice, live)}</b></span><span>{route.source === "" ? "Select a source" : route.amount === 0 ? "Depth is zero" : live ? "Live" : "Base → live"}</span></div>
         {route.source !== "" && blocks[Number(route.source)].clk.length === 0 && <p className="modulation-note">Source {padBlock(Number(route.source))} has no clock. Enable its G clock to move the LFO.</p>}
-        {!block.voice && ["tune", "decay", "level"].includes(route.destination) && <p className="modulation-note">Assign a voice to this block to hear this target.</p>}
+        {block.kind === "modulator" && ["tune", "decay", "level"].includes(route.destination) && <p className="modulation-note">Assign a voice or Bernoulli gate to this block to hear this target.</p>}
+        {block.kind === "bernoulli" && ["tune", "decay", "level"].includes(route.destination) && <p className="modulation-note">Both Bernoulli outputs receive this modulation; the displayed base value uses output A.</p>}
       </fieldset>;
     })}
     <button ref={(node) => { if (node && focusAddButton.current) { node.focus(); focusAddButton.current = false; } }} type="button" className="add-modulation" disabled={available.length === 0} onClick={() => onChange({ ...block, modulations: [...block.modulations, { source: block.modulations[0]?.source ?? "", destination: available[0][0], amount: 0.5 }] })}><Plus size={12} />Add modulation target</button>

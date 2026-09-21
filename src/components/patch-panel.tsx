@@ -1,6 +1,6 @@
 import { ArrowRight, X } from "lucide-react";
-import { LFO_SHAPES, padBlock, voiceName } from "@/lib/constants";
-import type { BlockVisualState, VoiceState, ClockSource, SequencerBlock } from "@/lib/types";
+import { LFO_SHAPES, VOICE_DEFS, blockName, padBlock, voiceName } from "@/lib/constants";
+import type { BlockVisualState, VoiceState, ClockSource, SequencerBlock, VoiceId } from "@/lib/types";
 import { connectionsFor } from "@/lib/routing";
 import { ModulationScope } from "./modulation-scope";
 import { ModulationEditor } from "./modulation-editor";
@@ -12,7 +12,7 @@ export function PatchPanel({ index, blocks, onChange, onSelect, onClose, visual,
   const connections = connectionsFor(blocks).filter((connection) => connection.source === index || connection.target === index);
   const clockSources = new Set<ClockSource>(block.clk);
   return <section className="patch-panel" aria-label={`Routing for block ${padBlock(index)}`}>
-    {!embedded && <div className="panel-heading"><div><span className="eyebrow">Patch bay / {padBlock(index)}</span><h2>{voiceName(block.voice) || "Modulator"}</h2></div><button className="icon-button" aria-label="Close patch bay" onClick={onClose}><X size={16} /></button></div>}
+    {!embedded && <div className="panel-heading"><div><span className="eyebrow">Patch bay / {padBlock(index)}</span><h2>{blockName(block)}</h2></div><button className="icon-button" aria-label="Close patch bay" onClick={onClose}><X size={16} /></button></div>}
     <div className="patch-target"><span className="jack" /><span>Editing inputs to block <b>{padBlock(index)}</b></span></div>
     <div className="patch-editor">
           <div>
@@ -32,6 +32,14 @@ export function PatchPanel({ index, blocks, onChange, onSelect, onClose, visual,
           </div>
 
           <div className="patch-fields">
+            {block.kind === "bernoulli" && <>
+              <PatchLabel>Output A · chance</PatchLabel>
+              <BranchVoiceSelect label="Output A voice" value={block.branchVoices[0]} onChange={(voice) => update("branchVoices", [voice, voice === block.branchVoices[1] ? block.branchVoices[0] : block.branchVoices[1]])} />
+
+              <PatchLabel>Output B · remainder</PatchLabel>
+              <BranchVoiceSelect label="Output B voice" value={block.branchVoices[1]} onChange={(voice) => update("branchVoices", [voice === block.branchVoices[0] ? block.branchVoices[1] : block.branchVoices[0], voice])} />
+            </>}
+
             <PatchLabel>Reset in</PatchLabel>
             <select aria-label="Reset source" className="control" value={block.rst} onChange={(event) => update("rst", event.target.value as SequencerBlock["rst"])}>
               <option value="">none</option>
@@ -63,8 +71,15 @@ export function PatchPanel({ index, blocks, onChange, onSelect, onClose, visual,
         <span><b>{padBlock(connection.source)}</b> {connection.output}</span><ArrowRight size={13} /><span><b>{padBlock(connection.target)}</b> {connection.input}</span>
       </button>)}
     </div>
+    {block.kind === "bernoulli" && <p className="patch-help">Every filled Euclidean step routes to A at the Chance percentage, or to B otherwise. No hit is discarded.</p>}
     <p className="patch-help">Trigger → clock / reset<br />Gate → mute · LFO → modulation<br /><span>Select a connection to follow its signal.</span></p>
   </section>;
+}
+
+function BranchVoiceSelect({ label, value, onChange }: { label: string; value: VoiceId; onChange: (voice: VoiceId) => void }) {
+  return <select aria-label={label} className="control" value={value} onChange={(event) => onChange(event.target.value as VoiceId)}>
+    {VOICE_DEFS.map((voice) => <option key={voice.id} value={voice.id}>{voice.name}</option>)}
+  </select>;
 }
 
 function ClockChip({ label, title, active, onClick }: { label: string; title: string; active: boolean; onClick: () => void }) {

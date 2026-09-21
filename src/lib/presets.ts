@@ -168,6 +168,7 @@ function patternedBlock(index: number, voice: VoiceId | "", steps: number, hits:
   const [part] = decomposeLane({ voice: voice || "kick", hits, steps: steps as 16 | 32 });
   if (!part) throw new Error(`Could not create ${steps}-step Euclidean component`);
   const block = createBlock(index);
+  block.kind = voice ? "voice" : "modulator";
   block.voice = voice;
   block.steps = part.steps;
   block.pulses = part.pulses;
@@ -200,6 +201,7 @@ function createAcidTomFillBlocks(): SequencerBlock[] {
   blocks.push(patternedBlock(9, "lt", 32, [31]));
   while (blocks.length < BLOCK_COUNT) {
     const block = createBlock(blocks.length);
+    block.kind = "modulator";
     block.voice = "";
     block.pulses = 0;
     blocks.push(block);
@@ -216,6 +218,7 @@ export function createPresetPatch(id: string, volume = 72): Patch {
     const block = createBlock(index);
     const component = components[index];
     if (!component) {
+      block.kind = "modulator";
       block.voice = "";
       block.pulses = 0;
       return block;
@@ -230,7 +233,7 @@ export function createPresetPatch(id: string, volume = 72): Patch {
   const voices = createVoices();
   applyPresetCharacter(preset, voices);
   return {
-    format: "euclid-grid.v3",
+    format: "euclid-grid.v4",
     bpm: preset.bpm,
     rate: preset.rate ?? 4,
     swing: preset.swing,
@@ -243,7 +246,7 @@ export function createPresetPatch(id: string, volume = 72): Patch {
 
 const clonePatch = (patch: Patch): Patch => ({
   ...patch,
-  blocks: patch.blocks.map((block) => ({ ...block, clk: [...block.clk] })),
+  blocks: patch.blocks.map((block) => ({ ...block, clk: [...block.clk], branchVoices: [...block.branchVoices] })),
   voices: Object.fromEntries(Object.entries(patch.voices).map(([id, voice]) => [id, { ...voice, custom: { ...voice.custom } }])) as VoiceBank,
   effects: {
     ...patch.effects,
@@ -348,7 +351,7 @@ export function createPresetArrangement(id: string, volume = 72): Arrangement {
     patch,
   }));
   return {
-    format: "euclid-grid.arrangement.v3",
+    format: "euclid-grid.arrangement.v4",
     variations,
     songParts: variations.map((variation, index) => ({ id: `preset-${id}-part-${index + 1}`, variationId: variation.id, bars: repeats[index] })),
     activeIndex: 0,

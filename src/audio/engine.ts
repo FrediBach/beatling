@@ -141,7 +141,7 @@ export class SequencerEngine {
         if (event.fire) runtime.fireUntil = now + 0.11;
       }
       const block = patch.blocks[index];
-      const lfo = runtime.displayWave ? sampleLfo(runtime.displayWave, now) : { value: block.voice ? 0 : 0.5, position: -1 };
+      const lfo = runtime.displayWave ? sampleLfo(runtime.displayWave, now) : { value: block.kind === "voice" && block.voice ? 0 : 0.5, position: -1 };
       return {
         position: runtime.displayPosition,
         lfo: lfo.value,
@@ -363,7 +363,8 @@ export class SequencerEngine {
     const block = this.getPatch().blocks[index];
     return effectiveBlock(block, (source) => {
       const wave = this.runtime[source]?.wave;
-      return wave ? sampleLfo(wave, time).value : this.getPatch().blocks[source]?.voice ? 0 : 0.5;
+      const sourceBlock = this.getPatch().blocks[source];
+      return wave ? sampleLfo(wave, time).value : sourceBlock?.kind === "voice" && sourceBlock.voice ? 0 : 0.5;
     });
   }
 
@@ -378,10 +379,11 @@ export class SequencerEngine {
     if (runtime.count % effective.div !== 0) return false;
     runtime.position = (runtime.position + 1) % effective.steps;
     const hit = euclidHit(runtime.position, effective.steps, effective.pulses, effective.rot);
-    if (block.voice ? runtime.position === 0 : hit) runtime.random = Math.random();
+    const euclideanLfo = block.kind !== "voice" || !block.voice;
+    if (euclideanLfo ? hit : runtime.position === 0) runtime.random = Math.random();
     runtime.wave = {
       time, position: runtime.position, stepDuration: interval * effective.div,
-      rhythm: effective, shape: block.shape, random: runtime.random, euclidean: !block.voice,
+      rhythm: effective, shape: block.shape, random: runtime.random, euclidean: euclideanLfo,
     };
     const event: QueuedVisualEvent = {
       time,
@@ -390,11 +392,7 @@ export class SequencerEngine {
       wave: runtime.wave,
       fire: false,
     };
-    if (
-      !hit
-      || this.isMuted(index, time)
-      || Math.random() * 100 >= effective.prob
-    ) {
+    if (!hit || this.isMuted(index, time) || (block.kind !== "bernoulli" && Math.random() * 100 >= effective.prob)) {
       runtime.queue.push(event);
       return false;
     }
@@ -402,7 +400,8 @@ export class SequencerEngine {
     runtime.gateTo = time + Math.max(0.005, interval * block.gate / 100);
     event.fire = true;
     runtime.queue.push(event);
-    if (block.voice) this.playVoice(block.voice, time, effective);
+    if (block.kind === "voice" && block.voice) this.playVoice(block.voice, time, effective);
+    if (block.kind === "bernoulli") this.playVoice(block.branchVoices[Math.random() * 100 < effective.prob ? 0 : 1], time, effective);
     return true;
   }
 

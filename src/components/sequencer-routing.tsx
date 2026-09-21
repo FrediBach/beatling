@@ -1,7 +1,7 @@
 import { ArrowDown, ArrowUpRight } from "lucide-react";
 import type { CSSProperties } from "react";
 import { cablePort, cableSignal, CABLE_SIGNALS } from "@/lib/cables";
-import { padBlock } from "@/lib/constants";
+import { padBlock, voiceName } from "@/lib/constants";
 import { connectionsFor, type Connection } from "@/lib/routing";
 import type { SequencerBlock } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -23,6 +23,7 @@ export function SequencerRouting({ index, block, blocks, patchOpen, changedField
   const outgoing = connections.filter((connection) => connection.source === index);
   return <div className={cn("routing-strip", ROUTING_FIELDS.some((field) => changedFields.has(field)) && "variation-changed")}>
     {incoming.length > 0 ? <PortBank index={index} connections={incoming} end="target" onOpen={() => onPatchOpen(index)} /> : <span className="route-summary">{block.clk.includes("G") ? "Global clock" : "No clock"}</span>}
+    {block.kind === "bernoulli" && <span className="route-summary" title={`Euclidean hits route to A at ${block.prob}% probability, or B otherwise`}>A {voiceName(block.branchVoices[0])} / B {voiceName(block.branchVoices[1])}</span>}
     {outgoing.length > 0 && <PortBank index={index} connections={outgoing} end="source" onOpen={() => onPatchOpen(index)} />}
     <button className="patch-action" aria-label={`Patch block ${padBlock(index)}`} aria-expanded={patchOpen} onClick={() => onPatchOpen(patchOpen ? null : index)}>
       Patch <ArrowUpRight size={11} />

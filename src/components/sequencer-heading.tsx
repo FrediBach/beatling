@@ -1,6 +1,6 @@
 import { ChevronDown, Dices, Lock, LockOpen, Volume2, VolumeX } from "lucide-react";
-import { VOICE_DEFS, padBlock, voiceTag } from "@/lib/constants";
-import type { SequencerBlock } from "@/lib/types";
+import { VOICE_DEFS, blockTag, padBlock } from "@/lib/constants";
+import type { BlockKind, SequencerBlock, VoiceId } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 interface SequencerHeadingProps {
@@ -15,15 +15,21 @@ interface SequencerHeadingProps {
 
 export function SequencerHeading({ index, block, blockLocked, changedFields, onChange, onRandomize, onLockToggle }: SequencerHeadingProps) {
   const update = <K extends keyof SequencerBlock>(key: K, value: SequencerBlock[K]) => onChange({ ...block, [key]: value });
+  const selection = block.kind === "voice" ? block.voice : block.kind;
+  const selectKind = (value: string) => {
+    if (value === "modulator" || value === "bernoulli") onChange({ ...block, kind: value as BlockKind, voice: "" });
+    else onChange({ ...block, kind: "voice", voice: value as VoiceId });
+  };
   return (
       <header className="card-heading">
         <span className="block-number">{padBlock(index)}</span>
         <div className={cn("voice-select", changedFields.has("voice") && "variation-changed")}>
-          <select aria-label={`Voice for block ${padBlock(index)}`} value={block.voice} onChange={(event) => update("voice", event.target.value as SequencerBlock["voice"])}>
-            <option value="">Modulator</option>
+          <select aria-label={`Block type or voice for block ${padBlock(index)}`} value={selection} onChange={(event) => selectKind(event.target.value)}>
+            <option value="modulator">Modulator</option>
+            <option value="bernoulli">Bernoulli gate</option>
             {VOICE_DEFS.map((voice) => <option key={voice.id} value={voice.id}>{voice.name}</option>)}
           </select>
-          {block.voice && <abbr className="voice-tag-badge" title={`Roland voice code for ${VOICE_DEFS.find((voice) => voice.id === block.voice)?.name}`}>{voiceTag(block.voice)}</abbr>}
+          {block.kind !== "modulator" && <abbr className="voice-tag-badge" title={block.kind === "bernoulli" ? "Euclidean A/B voice router" : `Roland voice code for ${VOICE_DEFS.find((voice) => voice.id === block.voice)?.name}`}>{blockTag(block)}</abbr>}
           <ChevronDown size={11} />
         </div>
         <div className="card-tools">

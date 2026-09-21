@@ -14,6 +14,8 @@ export type VoiceId =
   | "cym"
   | "shk";
 
+export type BlockKind = "voice" | "modulator" | "bernoulli";
+
 export type Machine = "808" | "909" | "custom";
 export type EffectId = "distortion" | "reverb" | "delay" | "compressor";
 export type CustomVoiceSettings = Record<string, number>;
@@ -33,7 +35,9 @@ export interface ModulationRoute {
 }
 
 export interface SequencerBlock {
+  kind: BlockKind;
   voice: VoiceId | "";
+  branchVoices: [VoiceId, VoiceId];
   steps: number;
   pulses: number;
   rot: number;
@@ -100,7 +104,7 @@ export interface EffectsState {
 }
 
 export interface Patch {
-  format: "euclid-grid.v3";
+  format: "euclid-grid.v4";
   bpm: number;
   rate: number;
   swing: number;
@@ -123,7 +127,7 @@ export interface SongPart {
 }
 
 export interface Arrangement {
-  format: "euclid-grid.arrangement.v3";
+  format: "euclid-grid.arrangement.v4";
   variations: Variation[];
   songParts: SongPart[];
   activeIndex: number;

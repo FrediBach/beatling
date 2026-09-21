@@ -20,7 +20,7 @@ interface SequencerParametersProps {
 
 export function SequencerParameters({ index, block, visual, locks, changedFields, onChange, onParameterRandomize, onParameterLockToggle }: SequencerParametersProps) {
   const routes = new Map(block.modulations.map((route) => [route.destination, route]));
-  return <div className="parameters">{ROW_PARAMS.map((parameter) => <ParameterRow key={parameter} index={index} parameter={parameter} value={block[parameter]} effectiveValue={visual.effective[parameter]} route={parameter === "steps" ? undefined : routes.get(parameter)} locked={locks[parameter]} changed={changedFields.has(parameter)} onRandomize={() => onParameterRandomize(parameter)} onLockToggle={() => onParameterLockToggle(parameter)} onChange={(value) => {
+  return <div className="parameters">{ROW_PARAMS.map((parameter) => <ParameterRow key={parameter} index={index} parameter={parameter} customLabel={block.kind === "bernoulli" && parameter === "prob" ? "A chance" : undefined} value={block[parameter]} effectiveValue={visual.effective[parameter]} route={parameter === "steps" ? undefined : routes.get(parameter)} locked={locks[parameter]} changed={changedFields.has(parameter)} onRandomize={() => onParameterRandomize(parameter)} onLockToggle={() => onParameterLockToggle(parameter)} onChange={(value) => {
     const definition = PARAMS[parameter];
     const next = clamp(Math.round(value), definition.min, definition.max);
     if (parameter === "steps") onChange({ ...block, steps: next, pulses: Math.min(block.pulses, next) });
@@ -28,9 +28,9 @@ export function SequencerParameters({ index, block, visual, locks, changedFields
   }} />)}</div>;
 }
 
-function ParameterRow({ index, parameter, value, locked, changed, route, effectiveValue, onChange, onRandomize, onLockToggle }: { index: number; parameter: BlockParam; value: number; locked: boolean; changed: boolean; route?: ModulationRoute; effectiveValue: number; onChange: (value: number) => void; onRandomize: () => void; onLockToggle: () => void }) {
+function ParameterRow({ index, parameter, customLabel, value, locked, changed, route, effectiveValue, onChange, onRandomize, onLockToggle }: { index: number; parameter: BlockParam; customLabel?: string; value: number; locked: boolean; changed: boolean; route?: ModulationRoute; effectiveValue: number; onChange: (value: number) => void; onRandomize: () => void; onLockToggle: () => void }) {
   const drag = useDragNumber({ value, onChange });
-  const label = PARAMS[parameter].label;
+  const label = customLabel ?? PARAMS[parameter].label;
   const modulated = route?.source !== "" && route !== undefined;
   const description = useId();
   return <div className={cn("parameter-row", modulated && "is-modulated", locked && "is-locked", changed && "variation-changed")}>

@@ -1,5 +1,5 @@
 import { BLOCK_COUNT, type LfoShape, type ModDestination, type Patch } from "@/lib/types";
-import { padBlock, voiceName, voiceTag } from "@/lib/constants";
+import { blockName, padBlock, voiceTag } from "@/lib/constants";
 
 const SHAPE_NUMBER: Record<LfoShape, number> = { ramp: 1, tri: 2, sqr: 3, rnd: 4 };
 const DESTINATION_NUMBER: Record<ModDestination, number> = {
@@ -37,9 +37,10 @@ export function buildLua(patch: Patch, date = new Date()): string {
   const outputIndexes = new Array(BLOCK_COUNT).fill(0) as number[];
   const lfoIndexes = new Array(BLOCK_COUNT).fill(0) as number[];
   patch.blocks.forEach((block, index) => {
-    if (types.length >= 28 || (!block.voice && !usedTriggers.has(index))) return;
+    const voiceBlock = block.kind === "voice" && block.voice;
+    if (types.length >= 28 || (!voiceBlock && !usedTriggers.has(index))) return;
     types.push("kStepped");
-    names.push(luaString(`${padBlock(index)} ${block.voice ? voiceName(block.voice) : "trig"}`));
+    names.push(luaString(`${padBlock(index)} ${voiceBlock ? blockName(block) : "trig"}`));
     outputIndexes[index] = types.length;
   });
   patch.blocks.forEach((_block, index) => {
@@ -55,10 +56,15 @@ export function buildLua(patch: Patch, date = new Date()): string {
   }
 
   const rows = patch.blocks.map((block, index) => {
+    const voiceBlock = block.kind === "voice" && block.voice;
     const voiceTargets = block.modulations.filter((route) => ["tune", "decay", "level"].includes(route.destination));
-    const browserOnly = voiceTargets.length ? `  -- browser voice mod (${voiceTargets.map((route) => route.destination).join(", ")}) not exported` : "";
+    const browserNotes = [
+      voiceTargets.length ? `voice mod (${voiceTargets.map((route) => route.destination).join(", ")})` : "",
+      block.kind === "bernoulli" ? `Bernoulli voices ${block.branchVoices.join("/")}` : "",
+    ].filter(Boolean);
+    const browserOnly = browserNotes.length ? `  -- browser ${browserNotes.join("; ")} not exported` : "";
     const mods = block.modulations.filter((route) => route.source !== "" && DESTINATION_NUMBER[route.destination] > 0).map((route) => `{ src=${Number(route.source) + 1}, dst=${DESTINATION_NUMBER[route.destination]}, amt=${route.amount.toFixed(2)} }`).join(", ");
-    return `\t{ steps=${block.steps}, pulses=${block.pulses}, rot=${block.rot}, div=${block.div}, prob=${block.prob}, gate=${block.gate}, clk={${block.clk.map(sourceNumber).join(", ")}}, rst=${sourceNumber(block.rst)}, mut=${block.mut === "" ? 0 : Number(block.mut) + 1}, mn=${block.mute}, shape=${SHAPE_NUMBER[block.shape]}, euclidean=${!block.voice}, mods={${mods}}, out=${outputIndexes[index]}, lout=${lfoIndexes[index]}, tag=${luaString(block.voice ? voiceTag(block.voice) : "--")} },${browserOnly}`;
+    return `\t{ steps=${block.steps}, pulses=${block.pulses}, rot=${block.rot}, div=${block.div}, prob=${block.prob}, gate=${block.gate}, clk={${block.clk.map(sourceNumber).join(", ")}}, rst=${sourceNumber(block.rst)}, mut=${block.mut === "" ? 0 : Number(block.mut) + 1}, mn=${block.mute}, shape=${SHAPE_NUMBER[block.shape]}, euclidean=${!voiceBlock}, mods={${mods}}, out=${outputIndexes[index]}, lout=${lfoIndexes[index]}, tag=${luaString(voiceBlock ? voiceTag(block.voice) : "--")} },${browserOnly}`;
   });
 
   return `-- Euclid Grid

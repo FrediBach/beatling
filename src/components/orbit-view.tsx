@@ -1,5 +1,5 @@
 import type { CSSProperties, KeyboardEvent } from "react";
-import { padBlock, voiceName } from "@/lib/constants";
+import { blockName, padBlock } from "@/lib/constants";
 import { euclidHit } from "@/lib/euclid";
 import { divisionColor, divisionPhase, ringOffset } from "@/lib/orbit";
 import type { BlockVisualState, SequencerBlock } from "@/lib/types";
@@ -58,7 +58,7 @@ export function OrbitView({ blocks, visuals, clockPulse, selected, onSelect }: O
           const radius = radiusFor(index);
           const phase = divisionPhase(clockPulse, div);
           const offset = clockPulse < 0 ? 0 : ringOffset(phase, visual.position, steps);
-          const label = `Block ${padBlock(index)} ${voiceName(block.voice) || "Modulator"}, ${pulses} of ${steps}, divide ${div}`;
+          const label = `Block ${padBlock(index)} ${blockName(block)}, ${pulses} of ${steps}, divide ${div}`;
           return <g key={key} className={cn("orbit-ring", selected === index && "is-selected", visual.muted && "is-muted", pulses === 0 && "is-empty")} style={{ "--division-color": divisionColor(div) } as CSSProperties} role="button" tabIndex={-1} aria-label={`Select ring ${label}`} aria-pressed={selected === index} onClick={() => onSelect(index)} onKeyDown={(event) => onKeyDown(event, index)} data-testid={`orbit-ring-${index}`}>
             <title>{label}</title>
             <circle cx={center} cy={center} r={radius} className="orbit-ring-target" />
@@ -92,8 +92,8 @@ export function OrbitView({ blocks, visuals, clockPulse, selected, onSelect }: O
     <div className="orbit-selector" role="group" aria-label="Select a rhythm">
       {ORBIT_SLOTS.map(({ index, key }) => {
         const block = blocks[index];
-        return <button type="button" id={`orbit-select-${index}`} key={key} aria-pressed={selected === index} aria-label={`Select block ${padBlock(index)} ${voiceName(block.voice) || "Modulator"}`} onClick={() => onSelect(index)} onKeyDown={(event) => onKeyDown(event, index)} className={cn(visuals[index].fire && "is-firing", visuals[index].muted && "is-muted")} style={{ "--division-color": divisionColor(visuals[index].effective.div) } as CSSProperties}>
-          <span className="orbit-block-number">{padBlock(index)}</span><span className="orbit-block-name">{voiceName(block.voice) || "Modulator"}</span><span className="orbit-block-pattern">{visuals[index].effective.pulses}/{visuals[index].effective.steps}</span>
+        return <button type="button" id={`orbit-select-${index}`} key={key} aria-pressed={selected === index} aria-label={`Select block ${padBlock(index)} ${blockName(block)}`} onClick={() => onSelect(index)} onKeyDown={(event) => onKeyDown(event, index)} className={cn(visuals[index].fire && "is-firing", visuals[index].muted && "is-muted")} style={{ "--division-color": divisionColor(visuals[index].effective.div) } as CSSProperties}>
+          <span className="orbit-block-number">{padBlock(index)}</span><span className="orbit-block-name">{blockName(block)}</span><span className="orbit-block-pattern">{visuals[index].effective.pulses}/{visuals[index].effective.steps}</span>
         </button>;
       })}
     </div>

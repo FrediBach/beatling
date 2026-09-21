@@ -1,17 +1,20 @@
-import { BLOCK_COUNT, type BlockParam, type BlockRandomizationLocks, type Patch, type SequencerBlock, type VoiceBank, type VoiceId, type VoiceState } from "@/lib/types";
+import { BLOCK_COUNT, type BlockKind, type BlockParam, type BlockRandomizationLocks, type Patch, type SequencerBlock, type VoiceBank, type VoiceId, type VoiceState } from "@/lib/types";
 import { ROW_PARAMS, VOICE_DEFS } from "@/lib/constants";
 import { clamp } from "@/lib/euclid";
 import { createCustomVoiceSettings, normalizeCustomVoiceSettings } from "@/lib/voice-config";
 import { normalizeModulations } from "@/lib/modulation";
 import { createEffects, normalizeEffects } from "@/lib/effects";
 
-const STORAGE_KEY = "egs.patch.v3";
+const STORAGE_KEY = "egs.patch.v4";
+const V3_STORAGE_KEY = "egs.patch.v3";
 const V2_STORAGE_KEY = "egs.patch.v2";
 const LEGACY_STORAGE_KEY = "egs.patch.v1";
 
 export function createBlock(index: number): SequencerBlock {
   return {
+    kind: VOICE_DEFS[index]?.id ? "voice" : "modulator",
     voice: VOICE_DEFS[index]?.id ?? "",
+    branchVoices: ["kick", "snare"],
     steps: 16,
     pulses: 0,
     rot: 0,
@@ -78,12 +81,12 @@ export function createDemoPatch(volume = 72): Patch {
     if ("mod" in demo) block.modulations = [{ source: demo.mod.src, destination: demo.mod.dst, amount: demo.mod.amt }];
     return block;
   });
-  return { format: "euclid-grid.v3", bpm: 124, rate: 4, swing: 12, vol: volume, blocks, voices: createVoices(), effects: createEffects() };
+  return { format: "euclid-grid.v4", bpm: 124, rate: 4, swing: 12, vol: volume, blocks, voices: createVoices(), effects: createEffects() };
 }
 
 export function createEmptyPatch(volume = 72): Patch {
   return {
-    format: "euclid-grid.v3",
+    format: "euclid-grid.v4",
     bpm: 124,
     rate: 4,
     swing: 0,
@@ -107,6 +110,15 @@ export function normalizePatch(value: unknown): Patch | null {
     const source = input.blocks?.[index];
     if (!source || typeof source !== "object") return fallback;
     const merged = { ...fallback, ...source, clk: Array.isArray(source.clk) ? [...source.clk] : [...fallback.clk] };
+    const raw = source as Partial<SequencerBlock>;
+    const voice = VOICE_DEFS.some(({ id }) => id === raw.voice) ? raw.voice as VoiceId : "";
+    const legacyKind: BlockKind = voice ? "voice" : "modulator";
+    merged.kind = ["voice", "modulator", "bernoulli"].includes(String(raw.kind)) ? raw.kind as BlockKind : legacyKind;
+    merged.voice = merged.kind === "voice" ? voice || fallback.voice || "kick" : "";
+    const branches = Array.isArray(raw.branchVoices) ? raw.branchVoices : fallback.branchVoices;
+    const first = VOICE_DEFS.some(({ id }) => id === branches[0]) ? branches[0] as VoiceId : "kick";
+    const secondCandidate = VOICE_DEFS.some(({ id }) => id === branches[1]) ? branches[1] as VoiceId : "snare";
+    merged.branchVoices = [first, secondCandidate === first ? (first === "snare" ? "kick" : "snare") : secondCandidate];
     merged.steps = clamp(Math.round(Number(source.steps) || fallback.steps), 1, 32);
     merged.pulses = clamp(Math.round(Number(source.pulses) || 0), 0, merged.steps);
     merged.modulations = normalizeModulations(source, index);
@@ -135,7 +147,7 @@ export function normalizePatch(value: unknown): Patch | null {
 
 export function loadStoredPatch(): Patch | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(V2_STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(V3_STORAGE_KEY) ?? localStorage.getItem(V2_STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
     return raw ? normalizePatch(JSON.parse(raw)) : null;
   } catch {
     return null;

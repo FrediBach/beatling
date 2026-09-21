@@ -40,6 +40,23 @@ describe("application shell", () => {
     expect(screen.getByText("Clock in — sources add up")).toBeInTheDocument();
   });
 
+  it("turns a block into an Euclidean Bernoulli voice router", () => {
+    vi.spyOn(window.localStorage.__proto__, "getItem").mockReturnValue(null);
+    render(<App />);
+    fireEvent.change(screen.getAllByLabelText("Block type or voice for block 01")[0], { target: { value: "bernoulli" } });
+    const block = screen.getAllByTestId("block-1")[0];
+    expect(within(block).getByTitle("Euclidean A/B voice router")).toHaveTextContent("A/B");
+    expect(within(block).getByText("A Kick / B Snare")).toBeInTheDocument();
+    fireEvent.click(within(block).getByRole("button", { name: "Patch block 01" }));
+    expect(screen.getByLabelText("Output A voice")).toHaveValue("kick");
+    expect(screen.getByLabelText("Output B voice")).toHaveValue("snare");
+    fireEvent.change(screen.getByLabelText("Output A voice"), { target: { value: "snare" } });
+    expect(screen.getByLabelText("Output A voice")).toHaveValue("snare");
+    expect(screen.getByLabelText("Output B voice")).toHaveValue("kick");
+    expect(within(block).getByText("A chance")).toBeInTheDocument();
+    expect(screen.getByText(/Every filled Euclidean step routes to A/)).toBeInTheDocument();
+  });
+
   it("loads a factory preset from the transport dropdown", () => {
     vi.spyOn(window.localStorage.__proto__, "getItem").mockReturnValue(null);
     render(<App />);
