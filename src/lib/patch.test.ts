@@ -57,21 +57,25 @@ describe("patches", () => {
     legacy.format = "euclid-grid.v1";
     delete legacy.effects;
     const migrated = normalizePatch(legacy)!;
-    expect(migrated.format).toBe("euclid-grid.v7");
+    expect(migrated.format).toBe("euclid-grid.v8");
     expect(migrated.effects.distortion.enabled).toBe(false);
     expect(migrated.effects.sends.kick.reverb).toBe(0);
+    expect(migrated.effects.karplus).toMatchObject({ enabled: false, model: "string", tune: 48, body: 60, decay: 65 });
+    expect(migrated.effects.sends.kick.karplus).toBe(0);
 
     const imported = normalizePatch({
       ...createEmptyPatch(),
       effects: {
         distortion: { enabled: true, drive: 200, tone: 5, return: 120 },
         delay: { enabled: true, time: 900, feedback: 99 },
-        sends: { kick: { distortion: 140, delay: -20 } },
+        karplus: { enabled: true, model: "invalid", tune: -30, body: 300, decay: 88, return: 101 },
+        sends: { kick: { distortion: 140, delay: -20, karplus: 64 } },
       },
     })!;
     expect(imported.effects.distortion).toMatchObject({ enabled: true, drive: 100, tone: 400, return: 100 });
     expect(imported.effects.delay).toMatchObject({ enabled: true, time: 750, feedback: 85 });
-    expect(imported.effects.sends.kick).toMatchObject({ distortion: 100, delay: 0, reverb: 0, compressor: 0 });
+    expect(imported.effects.karplus).toMatchObject({ enabled: true, model: "string", tune: 0, body: 100, decay: 88, return: 100 });
+    expect(imported.effects.sends.kick).toMatchObject({ distortion: 100, delay: 0, reverb: 0, karplus: 64, compressor: 0 });
   });
 
   it("migrates block kinds and normalizes Bernoulli voice branches", () => {

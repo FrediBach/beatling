@@ -136,7 +136,7 @@ export default function App() {
 
   useEffect(() => {
     const timeout = window.setTimeout(() => saveArrangement({
-      format: "euclid-grid.arrangement.v7",
+      format: "euclid-grid.arrangement.v8",
       variations,
       songParts,
       activeIndex: activeVariation,
@@ -464,7 +464,7 @@ export default function App() {
   };
 
   const currentArrangement = useMemo<Arrangement>(() => ({
-    format: "euclid-grid.arrangement.v7",
+    format: "euclid-grid.arrangement.v8",
     variations,
     songParts,
     activeIndex: activeVariation,

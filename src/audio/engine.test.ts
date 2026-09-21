@@ -1,8 +1,52 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { SequencerEngine } from "./engine";
 import { createEmptyPatch } from "@/lib/patch";
+import { waveguideDamping, waveguideFeedback, waveguideFrequency } from "@/lib/effects";
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+
+it("maps Karplus–Strong controls onto a stable String/Tube feedback waveguide", async () => {
+  vi.useFakeTimers();
+  const parameter = () => ({ value: 0, setTargetAtTime: vi.fn() });
+  const gainNodes: ReturnType<typeof node>[] = [];
+  const delayNodes: ReturnType<typeof node>[] = [];
+  const filterNodes: ReturnType<typeof node>[] = [];
+  function node() {
+    const value = { connect: vi.fn(), gain: parameter(), frequency: parameter(), Q: parameter(), delayTime: parameter(), threshold: parameter(), ratio: parameter(), attack: parameter(), release: parameter() };
+    value.connect.mockImplementation((destination?: unknown) => destination ?? value);
+    return value;
+  }
+  vi.stubGlobal("AudioContext", class {
+    currentTime = 2;
+    state = "running";
+    sampleRate = 48000;
+    destination = {};
+    createGain() { const value = node(); gainNodes.push(value); return value; }
+    createDelay() { const value = node(); delayNodes.push(value); return value; }
+    createBiquadFilter() { const value = node(); filterNodes.push(value); return value; }
+    createDynamicsCompressor = node;
+    createWaveShaper = node;
+    createConvolver = node;
+    createBuffer() { return { getChannelData: () => new Float32Array(2) }; }
+    close() { return Promise.resolve(); }
+  });
+  const patch = createEmptyPatch();
+  const engine = new SequencerEngine(patch);
+  try {
+    await engine.start();
+    const effects = {
+      ...patch.effects,
+      karplus: { ...patch.effects.karplus, enabled: true, model: "tube" as const, tune: 24, body: 50, decay: 80 },
+      sends: { ...patch.effects.sends, rim: { ...patch.effects.sends.rim, karplus: 50 } },
+    };
+    engine.setPatch({ ...patch, effects });
+    expect(delayNodes).toHaveLength(2);
+    expect(delayNodes[1].delayTime.setTargetAtTime).toHaveBeenLastCalledWith(1 / (waveguideFrequency(24) * 2), 2, 0.015);
+    expect(filterNodes[3].frequency.setTargetAtTime).toHaveBeenLastCalledWith(waveguideDamping(50), 2, 0.015);
+    expect(gainNodes.some((gain) => gain.gain.setTargetAtTime.mock.calls.some(([next]) => next === -waveguideFeedback(80)))).toBe(true);
+    expect(gainNodes.some((gain) => gain.gain.setTargetAtTime.mock.calls.some(([next]) => next === 0.25))).toBe(true);
+  } finally { engine.destroy(); }
+});
 
 it("observes post-master audio lazily without changing the audible path and releases analysis on stop/destroy", async () => {
   vi.useFakeTimers();

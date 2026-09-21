@@ -4,7 +4,7 @@ import { clamp, effectiveBlock, euclidHit, volumeGain } from "@/lib/euclid";
 import { effectiveVoiceModulation } from "@/lib/modulation";
 import { quantizeVoiceCv } from "@/lib/quantizer";
 import { sampleLfo, type LfoFrame } from "@/lib/lfo";
-import { EFFECT_IDS, effectGain } from "@/lib/effects";
+import { EFFECT_IDS, effectGain, waveguideDamping, waveguideFeedback, waveguideFrequency } from "@/lib/effects";
 import { rhythmAt, rhythmsFor } from "@/lib/rhythm-series";
 
 interface QueuedVisualEvent {
@@ -62,6 +62,9 @@ export class SequencerEngine {
   private delayTone: BiquadFilterNode | null = null;
   private delayFeedback: GainNode | null = null;
   private parallelCompressor: DynamicsCompressorNode | null = null;
+  private karplusDelay: DelayNode | null = null;
+  private karplusDamping: BiquadFilterNode | null = null;
+  private karplusFeedback: GainNode | null = null;
   private distortionDrive = -1;
   private appliedEffects: EffectsState | null = null;
   private runtime: RuntimeBlock[] = [];
@@ -264,10 +267,19 @@ export class SequencerEngine {
     this.parallelCompressor = this.context.createDynamicsCompressor();
     compressorInput.connect(this.parallelCompressor).connect(createReturn("compressor"));
 
+    const karplusInput = this.context.createGain();
+    this.karplusDelay = this.context.createDelay(1);
+    this.karplusDamping = this.context.createBiquadFilter();
+    this.karplusDamping.type = "lowpass";
+    this.karplusFeedback = this.context.createGain();
+    karplusInput.connect(this.karplusDelay).connect(this.karplusDamping).connect(createReturn("karplus"));
+    this.karplusDamping.connect(this.karplusFeedback).connect(this.karplusDelay);
+
     const inputs: Record<EffectId, GainNode> = {
       distortion: distortionInput,
       reverb: reverbInput,
       delay: delayInput,
+      karplus: karplusInput,
       compressor: compressorInput,
     };
     for (const { id } of VOICE_DEFS) {
@@ -328,6 +340,11 @@ export class SequencerEngine {
     smooth(this.delay?.delayTime, effects.delay.time / 1000);
     smooth(this.delayFeedback?.gain, effects.delay.feedback / 100);
     smooth(this.delayTone?.frequency, effects.delay.tone);
+    const waveguideHz = waveguideFrequency(effects.karplus.tune);
+    const waveguideDelay = effects.karplus.model === "tube" ? 1 / (waveguideHz * 2) : 1 / waveguideHz;
+    smooth(this.karplusDelay?.delayTime, waveguideDelay);
+    smooth(this.karplusDamping?.frequency, waveguideDamping(effects.karplus.body));
+    smooth(this.karplusFeedback?.gain, waveguideFeedback(effects.karplus.decay) * (effects.karplus.model === "tube" ? -1 : 1));
     smooth(this.parallelCompressor?.threshold, effects.compressor.threshold);
     smooth(this.parallelCompressor?.ratio, effects.compressor.ratio);
     smooth(this.parallelCompressor?.attack, effects.compressor.attack / 1000);

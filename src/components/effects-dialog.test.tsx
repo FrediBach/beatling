@@ -110,6 +110,23 @@ describe("effects rack", () => {
     enterValue("Compressor Ratio value", "4.5");
     expect(panel.getByRole("slider", { name: "Compressor Ratio" })).toHaveAttribute("aria-valuetext", "4.5:1");
   });
+
+  it("configures the Karplus–Strong waveguide model and per-voice sends", () => {
+    render(<Harness />);
+    chooseEffect("Karplus");
+    expect(screen.getByRole("button", { name: /string/i })).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: /tube/i }));
+    expect(screen.getByRole("button", { name: /tube/i })).toHaveAttribute("aria-pressed", "true");
+    enterValue("Karplus–Strong Tune value", "24");
+    enterValue("Karplus–Strong Body value", "73");
+    enterValue("Karplus–Strong Decay value", "88");
+    fireEvent.click(screen.getByRole("button", { name: "Enable karplus–strong" }));
+    fireEvent.change(screen.getByRole("slider", { name: "Rim Karplus–Strong send" }), { target: { value: "62" } });
+    expect(screen.getByRole("slider", { name: "Karplus–Strong Tune" })).toHaveValue("24");
+    expect(screen.getByRole("slider", { name: "Karplus–Strong Body" })).toHaveValue("73");
+    expect(screen.getByRole("slider", { name: "Karplus–Strong Decay" })).toHaveValue("88");
+    expect(screen.getByRole("status")).toHaveTextContent("Sends follow voice level");
+  });
 });
 
 describe("effect dial", () => {

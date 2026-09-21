@@ -6,7 +6,8 @@ import { normalizeModulations, normalizeVoiceModulations } from "@/lib/modulatio
 import { createEffects, normalizeEffects } from "@/lib/effects";
 import { MAX_RHYTHMS, normalizeRhythmPattern } from "@/lib/rhythm-series";
 
-const STORAGE_KEY = "egs.patch.v7";
+const STORAGE_KEY = "egs.patch.v8";
+const V7_STORAGE_KEY = "egs.patch.v7";
 const V6_STORAGE_KEY = "egs.patch.v6";
 const V5_STORAGE_KEY = "egs.patch.v5";
 const V4_STORAGE_KEY = "egs.patch.v4";
@@ -97,12 +98,12 @@ export function createDemoPatch(volume = 72): Patch {
   const effects = createEffects();
   effects.reverb = { ...effects.reverb, enabled: true, return: 95 };
   effects.sends.lead.reverb = 78;
-  return { format: "euclid-grid.v7", bpm: 124, rate: 4, swing: 12, vol: volume, blocks, voices, effects };
+  return { format: "euclid-grid.v8", bpm: 124, rate: 4, swing: 12, vol: volume, blocks, voices, effects };
 }
 
 export function createEmptyPatch(volume = 72): Patch {
   return {
-    format: "euclid-grid.v7",
+    format: "euclid-grid.v8",
     bpm: 124,
     rate: 4,
     swing: 0,
@@ -181,7 +182,7 @@ export function normalizePatch(value: unknown): Patch | null {
 
 export function loadStoredPatch(): Patch | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(V6_STORAGE_KEY) ?? localStorage.getItem(V5_STORAGE_KEY) ?? localStorage.getItem(V4_STORAGE_KEY) ?? localStorage.getItem(V3_STORAGE_KEY) ?? localStorage.getItem(V2_STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(V7_STORAGE_KEY) ?? localStorage.getItem(V6_STORAGE_KEY) ?? localStorage.getItem(V5_STORAGE_KEY) ?? localStorage.getItem(V4_STORAGE_KEY) ?? localStorage.getItem(V3_STORAGE_KEY) ?? localStorage.getItem(V2_STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
     return raw ? normalizePatch(JSON.parse(raw)) : null;
   } catch {
     return null;

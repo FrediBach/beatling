@@ -19,7 +19,7 @@ export type VoiceId =
 export type BlockKind = "voice" | "modulator" | "bernoulli";
 
 export type Machine = "808" | "909" | "custom";
-export type EffectId = "distortion" | "reverb" | "delay" | "compressor";
+export type EffectId = "distortion" | "reverb" | "delay" | "karplus" | "compressor";
 export type CustomVoiceSettings = Record<string, number>;
 export type LfoShape = "ramp" | "tri" | "sqr" | "rnd";
 export type ModDestination = "" | "pulses" | "rot" | "prob" | "div" | "tune" | "decay" | "level";
@@ -121,18 +121,30 @@ export interface CompressorSettings {
   return: number;
 }
 
+export type WaveguideModel = "string" | "tube";
+
+export interface KarplusSettings {
+  enabled: boolean;
+  model: WaveguideModel;
+  tune: number;
+  body: number;
+  decay: number;
+  return: number;
+}
+
 export type VoiceEffectSends = Record<EffectId, number>;
 
 export interface EffectsState {
   distortion: DistortionSettings;
   reverb: ReverbSettings;
   delay: DelaySettings;
+  karplus: KarplusSettings;
   compressor: CompressorSettings;
   sends: Record<VoiceId, VoiceEffectSends>;
 }
 
 export interface Patch {
-  format: "euclid-grid.v7";
+  format: "euclid-grid.v8";
   bpm: number;
   rate: number;
   swing: number;
@@ -155,7 +167,7 @@ export interface SongPart {
 }
 
 export interface Arrangement {
-  format: "euclid-grid.arrangement.v7";
+  format: "euclid-grid.arrangement.v8";
   variations: Variation[];
   songParts: SongPart[];
   activeIndex: number;

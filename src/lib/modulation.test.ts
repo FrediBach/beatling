@@ -28,11 +28,11 @@ describe("multiple modulation targets", () => {
     expect(effectiveBlock(block, () => 0)).toMatchObject({ pulses: 4, prob: 0 });
   });
 
-  it("migrates legacy patch and arrangement routing and preserves v7 round trips", () => {
+  it("migrates legacy patch and arrangement routing and preserves v8 round trips", () => {
     const legacy = { ...createEmptyPatch(), format: "euclid-grid.v2", blocks: [{ pulses: 4, modSrc: "12", modDst: "prob", modAmt: -0.65 }] };
     localStorage.setItem("egs.patch.v2", JSON.stringify(legacy));
     const patch = loadStoredPatch()!;
-    expect(patch.format).toBe("euclid-grid.v7");
+    expect(patch.format).toBe("euclid-grid.v8");
     expect(patch.blocks[0].modulations).toEqual([{ source: "12", destination: "prob", amount: -0.65 }]);
     expect(patch.blocks[0]).not.toHaveProperty("modSrc");
     patch.blocks[0].modulations.push({ source: "13", destination: "rot", amount: 0.4 });
@@ -44,7 +44,32 @@ describe("multiple modulation targets", () => {
     expect(loaded.variations[0].patch.blocks[0].modulations).toEqual([{ source: "12", destination: "prob", amount: -0.65 }]);
     saveArrangement(createArrangement(patch));
     expect(loadStoredArrangement(patch).variations[0].patch).toEqual(patch);
-    expect(normalizeArrangement(arrangement, patch).format).toBe("euclid-grid.arrangement.v7");
+    expect(normalizeArrangement(arrangement, patch).format).toBe("euclid-grid.arrangement.v8");
+  });
+
+  it("loads v7 storage with silent default Karplus–Strong sends", () => {
+    const legacyPatch = structuredClone(createEmptyPatch()) as unknown as {
+      format: string;
+      effects: { karplus?: unknown; sends: Record<string, Record<string, unknown>> };
+    };
+    legacyPatch.format = "euclid-grid.v7";
+    delete legacyPatch.effects.karplus;
+    Object.values(legacyPatch.effects.sends).forEach((sends) => { delete sends.karplus; });
+    localStorage.setItem("egs.patch.v7", JSON.stringify(legacyPatch));
+
+    const patch = loadStoredPatch()!;
+    expect(patch.format).toBe("euclid-grid.v8");
+    expect(patch.effects.karplus).toMatchObject({ enabled: false, model: "string" });
+    expect(patch.effects.sends.rim.karplus).toBe(0);
+
+    localStorage.setItem("egs.arrangement.v7", JSON.stringify({
+      ...createArrangement(patch),
+      format: "euclid-grid.arrangement.v7",
+      variations: [{ id: "legacy", name: "A", patch: legacyPatch }],
+    }));
+    const arrangement = loadStoredArrangement(patch);
+    expect(arrangement.format).toBe("euclid-grid.arrangement.v8");
+    expect(arrangement.variations[0].patch.effects.sends.rim.karplus).toBe(0);
   });
 
   it("normalizes invalid routes, duplicate targets, depths and step bounds", () => {

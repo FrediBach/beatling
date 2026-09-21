@@ -234,7 +234,7 @@ export function createPresetPatch(id: string, volume = 72): Patch {
   const voices = createVoices();
   applyPresetCharacter(preset, voices);
   return {
-    format: "euclid-grid.v7",
+    format: "euclid-grid.v8",
     bpm: preset.bpm,
     rate: preset.rate ?? 4,
     swing: preset.swing,
@@ -254,6 +254,7 @@ const clonePatch = (patch: Patch): Patch => ({
     distortion: { ...patch.effects.distortion },
     reverb: { ...patch.effects.reverb },
     delay: { ...patch.effects.delay },
+    karplus: { ...patch.effects.karplus },
     compressor: { ...patch.effects.compressor },
     sends: Object.fromEntries(Object.entries(patch.effects.sends).map(([id, sends]) => [id, { ...sends }])) as Patch["effects"]["sends"],
   },
@@ -353,7 +354,7 @@ export function createPresetArrangement(id: string, volume = 72): Arrangement {
     patch,
   }));
   return {
-    format: "euclid-grid.arrangement.v7",
+    format: "euclid-grid.arrangement.v8",
     variations,
     songParts: variations.map((variation, index) => ({ id: `preset-${id}-part-${index + 1}`, variationId: variation.id, bars: repeats[index] })),
     activeIndex: 0,

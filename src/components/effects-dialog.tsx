@@ -19,14 +19,16 @@ const EFFECT_INFO = {
   distortion: { label: "Distortion", type: "Saturation", description: "Add weight, grit and harmonic edge." },
   reverb: { label: "Reverb", type: "Convolution", description: "Place your drums in a shared acoustic space." },
   delay: { label: "Delay", type: "Feedback echo", description: "Build rhythmic echoes with a filtered tail." },
+  karplus: { label: "Karplus–Strong", type: "Waveguide resonator", description: "Add tuned string or hollow tube resonances to selected voices." },
   compressor: { label: "Compressor", type: "Parallel dynamics", description: "Blend in punch and sustain alongside the dry drums." },
 };
 
-type Parameter<Id extends EffectId> = { key: Exclude<keyof EffectsState[Id], "enabled">; label: string; min: number; max: number; step?: number; suffix: string };
+type Parameter<Id extends EffectId> = { key: Exclude<keyof EffectsState[Id], "enabled" | "model">; label: string; min: number; max: number; step?: number; suffix: string };
 const PARAMETERS: { [Id in EffectId]: Parameter<Id>[] } = {
   distortion: [{ key: "drive", label: "Drive", min: 0, max: 100, suffix: "%" }, { key: "tone", label: "Tone", min: 400, max: 16000, step: 100, suffix: "Hz" }],
   reverb: [{ key: "damping", label: "Damping", min: 1000, max: 16000, step: 100, suffix: "Hz" }],
   delay: [{ key: "time", label: "Time", min: 40, max: 750, step: 5, suffix: "ms" }, { key: "feedback", label: "Feedback", min: 0, max: 85, suffix: "%" }, { key: "tone", label: "Tone", min: 500, max: 12000, step: 100, suffix: "Hz" }],
+  karplus: [{ key: "tune", label: "Tune", min: 0, max: 100, suffix: "%" }, { key: "body", label: "Body", min: 0, max: 100, suffix: "%" }, { key: "decay", label: "Decay", min: 0, max: 100, suffix: "%" }],
   compressor: [{ key: "threshold", label: "Threshold", min: -60, max: 0, suffix: "dB" }, { key: "ratio", label: "Ratio", min: 1, max: 20, step: 0.5, suffix: ":1" }, { key: "attack", label: "Attack", min: 0, max: 100, suffix: "ms" }, { key: "release", label: "Release", min: 50, max: 1000, step: 10, suffix: "ms" }],
 };
 const DEFAULTS = createEffects();
@@ -37,8 +39,8 @@ export function EffectsDialog({ open, onOpenChange, value, onChange }: EffectsDi
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="effects-dialog" aria-describedby="effects-description">
       <header className="effects-header">
-        <div><span className="eyebrow">Sound shaping / FX–04</span><DialogTitle>Effects mixer</DialogTitle>
-          <DialogDescription id="effects-description">Four shared effects. An individual send for every voice.</DialogDescription></div>
+        <div><span className="eyebrow">Sound shaping / FX–05</span><DialogTitle>Effects mixer</DialogTitle>
+          <DialogDescription id="effects-description">Five shared effects. An individual send for every voice.</DialogDescription></div>
         <Button type="button" variant="outline" onClick={() => onChange(createEffects())}><RotateCcw size={13} />Reset effects</Button>
       </header>
       <Tabs className="effects-rack" value={selected} onValueChange={(id) => {
@@ -58,7 +60,7 @@ export function EffectsDialog({ open, onOpenChange, value, onChange }: EffectsDi
           <VoiceSends id={id} value={value} onChange={onChange} />
         </TabsContent>)}
       </Tabs>
-      <footer className="effects-footer"><span className="effects-signal-path">Voice <ArrowRight size={12} /> Send <ArrowRight size={12} /> Effect <ArrowRight size={12} /> Return</span><span>Dry signal preserved · {enabledCount}/4 effects on</span></footer>
+      <footer className="effects-footer"><span className="effects-signal-path">Voice <ArrowRight size={12} /> Send <ArrowRight size={12} /> Effect <ArrowRight size={12} /> Return</span><span>Dry signal preserved · {enabledCount}/{EFFECT_IDS.length} effects on</span></footer>
     </DialogContent>
   </Dialog>;
 }
@@ -72,6 +74,7 @@ function EffectEditor<Id extends EffectId>({ id, value, onChange }: EditorProps<
     <header className="effect-editor-heading"><div><span className="eyebrow">Processor</span><h3>{info.label}</h3></div>
       <button type="button" className="effect-enable" aria-label={`${effect.enabled ? "Disable" : "Enable"} ${info.label.toLowerCase()}`} aria-pressed={effect.enabled} onClick={() => update({ enabled: !effect.enabled } as Partial<EffectsState[Id]>)}><Power size={14} />{effect.enabled ? "On" : "Bypassed"}</button></header>
     <p className="effect-description">{info.description}</p>
+    {id === "karplus" && <WaveguideModelControl value={value} onChange={onChange} />}
     <div className="effect-parameters">
       {PARAMETERS[id].map(({ key, ...parameter }, index) => <EffectControl key={String(key)} {...parameter} accessibleLabel={`${info.label} ${parameter.label}`} knob={index === 0}
         value={Number(effect[key])} defaultValue={Number(DEFAULTS[id][key])}
@@ -80,6 +83,14 @@ function EffectEditor<Id extends EffectId>({ id, value, onChange }: EditorProps<
     <div className="effect-return"><EffectControl label="Return level" accessibleLabel={`${info.label} Return`} value={effect.return} defaultValue={DEFAULTS[id].return} onChange={(next) => update({ return: next } as Partial<EffectsState[Id]>)} /><p>Amount of processed sound in the mix.</p></div>
     <div className="effect-editor-bottom"><span>Drag dial ↕ · Shift for fine control</span><button type="button" onClick={() => onChange({ ...value, [id]: { ...DEFAULTS[id], enabled: effect.enabled } })} aria-label={`Reset ${info.label.toLowerCase()} parameters`}><RotateCcw size={11} />Reset</button></div>
   </section>;
+}
+
+function WaveguideModelControl({ value, onChange }: Omit<EditorProps<"karplus">, "id">) {
+  return <fieldset className="waveguide-model">
+    <legend>Model</legend>
+    {(["string", "tube"] as const).map((model) => <button type="button" key={model} aria-pressed={value.karplus.model === model}
+      onClick={() => onChange({ ...value, karplus: { ...value.karplus, model } })}>{model}</button>)}
+  </fieldset>;
 }
 
 function VoiceSends({ id, value, onChange }: EditorProps<EffectId>) {

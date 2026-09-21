@@ -2,7 +2,7 @@ import { VOICE_DEFS } from "@/lib/constants";
 import { clamp } from "@/lib/euclid";
 import type { EffectId, EffectsState, VoiceEffectSends, VoiceId } from "@/lib/types";
 
-export const EFFECT_IDS: EffectId[] = ["distortion", "reverb", "delay", "compressor"];
+export const EFFECT_IDS: EffectId[] = ["distortion", "reverb", "delay", "karplus", "compressor"];
 
 const createSends = (): Record<VoiceId, VoiceEffectSends> => Object.fromEntries(
   VOICE_DEFS.map(({ id }) => [id, Object.fromEntries(EFFECT_IDS.map((effect) => [effect, 0]))]),
@@ -13,6 +13,7 @@ export function createEffects(): EffectsState {
     distortion: { enabled: false, drive: 35, tone: 8000, return: 60 },
     reverb: { enabled: false, damping: 7000, return: 45 },
     delay: { enabled: false, time: 250, feedback: 30, tone: 6000, return: 45 },
+    karplus: { enabled: false, model: "string", tune: 48, body: 60, decay: 65, return: 50 },
     compressor: { enabled: false, threshold: -24, ratio: 6, attack: 10, release: 250, return: 55 },
     sends: createSends(),
   };
@@ -28,6 +29,7 @@ export function normalizeEffects(value: unknown): EffectsState {
   const distortion = input.distortion;
   const reverb = input.reverb;
   const delay = input.delay;
+  const karplus = input.karplus;
   const compressor = input.compressor;
   const effects: EffectsState = {
     distortion: {
@@ -47,6 +49,14 @@ export function normalizeEffects(value: unknown): EffectsState {
       feedback: number(delay?.feedback, defaults.delay.feedback, 0, 85),
       tone: number(delay?.tone, defaults.delay.tone, 500, 12000),
       return: number(delay?.return, defaults.delay.return, 0, 100),
+    },
+    karplus: {
+      enabled: Boolean(karplus?.enabled),
+      model: karplus?.model === "tube" ? "tube" : "string",
+      tune: number(karplus?.tune, defaults.karplus.tune, 0, 100),
+      body: number(karplus?.body, defaults.karplus.body, 0, 100),
+      decay: number(karplus?.decay, defaults.karplus.decay, 0, 100),
+      return: number(karplus?.return, defaults.karplus.return, 0, 100),
     },
     compressor: {
       enabled: Boolean(compressor?.enabled),
@@ -72,3 +82,10 @@ export function effectsHaveChanges(value: EffectsState, base: EffectsState): boo
 }
 
 export const effectGain = (value: number) => (clamp(value, 0, 100) / 100) ** 2;
+
+/** Volca-style range: the bottom of the control becomes a tempo-like echo. */
+export const waveguideFrequency = (tune: number) => 4 * 2 ** (clamp(tune, 0, 100) / 12);
+
+export const waveguideDamping = (body: number) => 250 * 64 ** (clamp(body, 0, 100) / 100);
+
+export const waveguideFeedback = (decay: number) => 0.35 + clamp(decay, 0, 100) / 100 * 0.645;
