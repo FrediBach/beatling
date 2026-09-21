@@ -611,7 +611,7 @@ export default function App() {
         </aside>
         {view === "grid" && showCables && <PatchCables connections={connections} />}
       </main>
-      <footer className="instrument-footer"><span><kbd>space</kbd> play / stop</span><span><kbd>↑</kbd> <kbd>↓</kbd> or drag to adjust · <kbd>shift</kbd> for larger steps</span><span className="footer-signoff">RHYTHM, BY DESIGN. <span>EG–16</span></span></footer>
+      <footer className="instrument-footer"><span><kbd>space</kbd> play / stop</span><span><kbd>↑</kbd> <kbd>↓</kbd> or drag to adjust · <kbd>shift</kbd> for larger steps</span><a className="footer-copyright" href="https://fredibach.com">(c) 2026 Fredi Bach</a><span className="footer-signoff">RHYTHM, BY DESIGN. <span>EG–16</span></span></footer>
       {effectsOpen && <EffectsDialog open onOpenChange={setEffectsOpen} value={patch.effects} onChange={updateEffects} />}
       {exportOpen && <ExportDialog open onOpenChange={setExportOpen} patch={patch} onLoad={applyPatch} />}
     </div>
