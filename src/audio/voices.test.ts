@@ -262,3 +262,89 @@ it("retains the original bassline envelope with added accent controls disabled",
   expect(f.filters[0].frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(200, 1.1);
   expect(f.gains[0].gain.linearRampToValueAtTime).toHaveBeenCalledWith(1.3, 1.004);
 });
+
+it.each(["bassline", "lead"] as const)("retriggers %s in mono and glides from the sounding pitch", (id) => {
+  const f = fixture(id, { playMode: 1, glide: 100, ampDecay: 1000, release: 1000, pulseMix: 0 });
+  f.trigger();
+  const frequency = f.oscillators[0].frequency.setValueAtTime.mock.calls[0][0];
+  f.trigger(id, 1.1, { tune: 1 });
+  expect(f.oscillators[1].frequency.setValueAtTime).toHaveBeenCalledWith(frequency, 1.1);
+  expect(f.oscillators[1].frequency.exponentialRampToValueAtTime.mock.calls[0][0]).toBeCloseTo(frequency * 2);
+  expect(f.oscillators[1].frequency.exponentialRampToValueAtTime.mock.calls[0][1]).toBeCloseTo(1.2);
+  expect(f.gains[1].gain.linearRampToValueAtTime.mock.calls[0][1]).toBeCloseTo(1.105);
+  // Each hit still gets the original amplitude attack and a fresh filter envelope.
+  expect(f.gains[2].gain.setValueAtTime).toHaveBeenCalledWith(0, 1.1);
+  expect(f.gains[2].gain.linearRampToValueAtTime.mock.calls[0][1]).toBeGreaterThan(1.1);
+  expect(f.filters[1].frequency.exponentialRampToValueAtTime.mock.calls[0][1]).toBeGreaterThan(1.1);
+});
+
+it.each(["bassline", "lead"] as const)("keeps %s polyphonic by default, even with a stored glide value", (id) => {
+  const f = fixture(id, { glide: 100, pulseMix: 0 });
+  f.trigger();
+  f.trigger(id, 1.1, { tune: 1 });
+  expect(f.oscillators[1].frequency.setValueAtTime.mock.calls[0][0]).toBeCloseTo(f.oscillators[0].frequency.setValueAtTime.mock.calls[0][0] * 2);
+  expect(f.oscillators[1].frequency.exponentialRampToValueAtTime).not.toHaveBeenCalled();
+  expect(f.gains[1].gain.cancelScheduledValues).not.toHaveBeenCalled();
+});
+
+it("glides the lead main, sub and companion together while preserving their tuning", () => {
+  const f = fixture("lead", { playMode: 1, glide: 200, subLevel: 30, pulseMix: 25, detune: 12, release: 1000 });
+  f.trigger();
+  f.trigger("lead", 1.1, { tune: 1 });
+  const main = f.oscillators[3];
+  const sub = f.oscillators[4];
+  const companion = f.oscillators[5];
+  const start = main.frequency.setValueAtTime.mock.calls[0][0];
+  const target = main.frequency.exponentialRampToValueAtTime.mock.calls[0][0];
+  expect(sub.frequency.setValueAtTime.mock.calls[0][0]).toBeCloseTo(start / 2);
+  expect(sub.frequency.exponentialRampToValueAtTime.mock.calls[0][0]).toBeCloseTo(target / 2);
+  expect(companion.frequency.setValueAtTime.mock.calls[0][0]).toBeCloseTo(start * 2 ** (12 / 1200));
+  expect(companion.frequency.exponentialRampToValueAtTime.mock.calls[0][0]).toBeCloseTo(target * 2 ** (12 / 1200));
+  for (const oscillator of [main, sub, companion]) expect(oscillator.frequency.exponentialRampToValueAtTime.mock.calls[0][1]).toBeCloseTo(1.3);
+});
+
+it("keeps high-register polyphonic sub tuning independent of the main oscillator's Nyquist limit", () => {
+  const f = fixture("lead", { octave: 6, root: 11, scale: 0, subLevel: 50, pulseMix: 0 });
+  f.patch.voices.lead.tune = 12;
+  f.patch.voices.lead.modulations = [{ source: "0", destination: "vOct", amount: 1 }];
+  // The source's pitch voltage is injected through the existing LFO boundary.
+  vi.spyOn(f.engine as unknown as { sourceLfo: () => number }, "sourceLfo").mockReturnValue(1);
+  f.trigger("lead", 1, { tune: 1 });
+  expect(f.oscillators[0].frequency.setValueAtTime.mock.calls[0][0]).toBe(15680);
+  expect(f.oscillators[1].frequency.setValueAtTime.mock.calls[0][0]).toBeCloseTo(7902.13, 1);
+});
+
+it("keeps bassline and lead ownership independent and ignores muted or silent triggers", () => {
+  const f = fixture("bassline", { playMode: 1, glide: 100, ampDecay: 1000 });
+  f.patch.voices.lead.custom.playMode = 1;
+  f.trigger();
+  f.trigger("lead", 1.1);
+  f.patch.voices.bassline.mute = true;
+  f.trigger("bassline", 1.2);
+  f.patch.voices.bassline.mute = false;
+  f.patch.voices.bassline.level = 0;
+  f.trigger("bassline", 1.3);
+  expect(f.gains[1].gain.cancelScheduledValues).not.toHaveBeenCalled();
+});
+
+it("resolves simultaneous routed synth hits without doubled attacks or an unheard glide source", () => {
+  const f = fixture("bassline", { playMode: 1, glide: 100 });
+  Object.assign(f.patch.blocks[0], { kind: "voice", voice: "bassline", steps: 1, pulses: 1, clk: ["G"] });
+  Object.assign(f.patch.blocks[1], { kind: "bernoulli", voice: "", branchVoices: ["bassline", "kick"], prob: 100, steps: 1, pulses: 1, clk: ["0"] });
+  (f.engine as unknown as { tick: (time: number, pulse: number) => void }).tick(1, 0);
+  expect(f.oscillators).toHaveLength(2);
+  expect(f.gains[1].gain.setValueAtTime).toHaveBeenLastCalledWith(0, 1);
+  expect(f.oscillators[1].frequency.exponentialRampToValueAtTime).not.toHaveBeenCalled();
+});
+
+it.each(["stop", "reset", "resetPattern", "destroy"] as const)("cancels synth notes scheduled ahead on %s", (action) => {
+  const f = fixture("bassline", { playMode: 1, glide: 100 });
+  f.trigger();
+  f.trigger("lead", 1.1);
+  f.context.currentTime = 0.9;
+  f.engine[action]();
+  for (const gate of [f.gains[1], f.gains[3]]) {
+    expect(gate.gain.cancelScheduledValues).toHaveBeenLastCalledWith(0.9);
+    expect(gate.gain.setValueAtTime).toHaveBeenLastCalledWith(0, 0.9);
+  }
+});

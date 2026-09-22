@@ -7,6 +7,7 @@ import { sampleLfo, type LfoFrame } from "@/lib/lfo";
 import { EFFECT_IDS, effectGain, waveguideDamping, waveguideFeedback, waveguideFrequency, delaySeconds, distortionSample, REVERB_SECONDS } from "@/lib/effects";
 import { rhythmAt, rhythmsFor } from "@/lib/rhythm-series";
 import { HatChoke } from "./hat-choke";
+import { SynthArticulation, type SynthNote } from "./synth-articulation";
 
 interface QueuedVisualEvent {
   time: number;
@@ -84,6 +85,7 @@ export class SequencerEngine {
   private runtime: RuntimeBlock[] = [];
   private voiceHitAt = new Map<VoiceId, number>();
   private hatChoke = new HatChoke();
+  private synthArticulation = { bassline: new SynthArticulation(), lead: new SynthArticulation() };
   private timer: number | null = null;
   private nextPulse = 0;
   private pulseIndex = 0;
@@ -401,6 +403,8 @@ export class SequencerEngine {
 
   private resetRuntime(): void {
     this.hatChoke.reset(this.context?.currentTime ?? 0);
+    this.synthArticulation.bassline.reset(this.context?.currentTime ?? 0);
+    this.synthArticulation.lead.reset(this.context?.currentTime ?? 0);
     this.clockQueue = [];
     this.displayClockPulse = -1;
     const patch = this.getPatch?.();
@@ -435,6 +439,8 @@ export class SequencerEngine {
     if (!this._running || !this.context) return;
     const now = this.context.currentTime;
     this.hatChoke.prune(now);
+    this.synthArticulation.bassline.prune(now);
+    this.synthArticulation.lead.prune(now);
     let guard = 0;
     while (this.nextPulse < now + LOOKAHEAD_SECONDS && guard++ < 64) {
       const patch = this.getPatch();
@@ -872,8 +878,10 @@ export class SequencerEngine {
     filter.frequency.exponentialRampToValueAtTime(this.safeFrequency(Math.max(40, cutoff)), time + filterDuration);
     const gain = this.gain(0, time);
     this.attackDecay(gain.gain, time, p.amplitude * (0.72 + accent * 0.28), 0.004, duration);
-    const oscillator = this.oscillator(value(p, "waveform", 0) >= 0.5 ? "square" : "sawtooth", p.frequency, time);
-    oscillator.connect(filter).connect(gain).connect(bus);
+    const note = this.beginSynthNote("bassline", bus, time, duration, p);
+    if (!note) return;
+    const oscillator = this.synthOscillator(value(p, "waveform", 0) >= 0.5 ? "square" : "sawtooth", note);
+    oscillator.connect(filter).connect(gain).connect(note.output);
     oscillator.start(time);
     oscillator.stop(time + duration + 0.04);
   }
@@ -891,14 +899,16 @@ export class SequencerEngine {
     filter.frequency.exponentialRampToValueAtTime(this.safeFrequency(Math.max(80, cutoff)), time + filterDuration);
     const gain = this.gain(0, time);
     this.attackDecay(gain.gain, time, p.amplitude * 0.72, attack, duration);
+    const note = this.beginSynthNote("lead", bus, time, duration, p);
+    if (!note) return;
     const waveforms: OscillatorType[] = ["sawtooth", "square", "triangle"];
-    const main = this.oscillator(waveforms[Math.round(value(p, "waveform", 0))] ?? "sawtooth", p.frequency, time);
+    const main = this.synthOscillator(waveforms[Math.round(value(p, "waveform", 0))] ?? "sawtooth", note);
     main.connect(filter);
     main.start(time);
     main.stop(time + duration + 0.04);
     const subLevel = value(p, "subLevel", 0) / 100;
     if (subLevel > 0) {
-      const sub = this.oscillator("sine", p.frequency / 2, time);
+      const sub = this.synthOscillator("sine", note, 0.5);
       sub.connect(this.gain(subLevel, time)).connect(filter);
       sub.start(time);
       sub.stop(time + duration + 0.04);
@@ -906,13 +916,25 @@ export class SequencerEngine {
     const companionMix = value(p, "pulseMix", 28) / 100;
     if (companionMix > 0) {
       const companionGain = this.gain(companionMix, time);
-      const companionFrequency = p.frequency * 2 ** (value(p, "detune", 7) / 1200);
-      const companion = this.oscillator("square", companionFrequency, time);
+      const companion = this.synthOscillator("square", note, 2 ** (value(p, "detune", 7) / 1200));
       companion.connect(companionGain).connect(filter);
       companion.start(time);
       companion.stop(time + duration + 0.04);
     }
-    filter.connect(gain).connect(bus);
+    filter.connect(gain).connect(note.output);
+  }
+
+  private beginSynthNote(id: "bassline" | "lead", bus: AudioNode, time: number, duration: number, p: SynthParameters): SynthNote | null {
+    const mono = value(p, "playMode", 0) === 1;
+    return this.synthArticulation[id].begin(this.context!, bus, time, duration + 0.005, mono ? this.safeFrequency(p.frequency) : p.frequency, mono, value(p, "glide", 0) / 1000);
+  }
+
+  private synthOscillator(type: OscillatorType, note: SynthNote, ratio = 1): OscillatorNode {
+    const oscillator = this.oscillator(type, note.from * ratio, note.start);
+    if (note.glideEnd > note.start) {
+      oscillator.frequency.exponentialRampToValueAtTime(this.safeFrequency(note.target * ratio), note.glideEnd);
+    }
+    return oscillator;
   }
 }
 

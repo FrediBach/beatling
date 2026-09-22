@@ -37,20 +37,34 @@ Suggested values above are starting points for auditioning, not newly imposed pr
 
 For a starting accent pattern, route a square Modulator to the bassline's Level at full depth, select Level modulation as Accent source, then try Accent 60%, Accent brightness 40% and Accent length 30%. Use the existing modulation controls to place the high and low portions. These controls add filter-envelope articulation; they are not a nonlinear ladder-filter emulation.
 
+## Mono retrigger and glide
+
+**Bassline / Lead → Configure → Articulation** now offers **Playback: Polyphonic / Mono retrigger** and **Glide**, 0–500 ms.
+
+Polyphonic retains independent overlapping notes and ignores Glide. Mono retrigger fades the previous notes over 5 ms and starts a fresh amplitude/filter envelope for each hit. This is a retriggered voice: oscillators still start anew on each hit, rather than remaining phase-continuous through a legato phrase.
+
+Glide runs at a constant rate in semitones over the selected duration, starting from the previous note's current pitch. Interrupting a slide continues from its intermediate pitch. The lead's main, sub and companion oscillators slide together with their existing tuning offsets. After the previous amplitude envelope has finished, the next note starts directly at its target pitch. Short note envelopes may finish before a long glide reaches its target.
+
+Every sequencer and Bernoulli source assigned to a synth shares that synth's mono voice; Bassline and Lead remain independent. At simultaneous hits, the last hit in the scheduler's deterministic traversal order wins. An unheard simultaneous note is not used as a new glide source. Switching from Polyphonic to Mono retrigger closes all older tails of that synth; switching back allows subsequent notes to overlap. Existing reverb/delay tails remain audible.
+
+Try Mono retrigger with Glide around 60–100 ms and an amplitude length longer than the gap between hits. Use the existing V/Oct route for the pitch pattern. Each note continues to apply its own tuning, decay, level and bassline accent modulation.
+
+Stop and pattern reset now fade synth output and cancel scheduled synth notes in both playback modes, clearing glide memory. This fixes pending synth hits continuing after transport reset. Existing shared effect tails are left to decay. Note gates are reclaimed using the actual audio clock and bounded to 256 retained notes per synth; excessive routed bursts skip additional notes until capacity is available. JSON retains the controls; MIDI/Strudel exports do not reproduce this articulation.
+
 ## Shared corrections and compatibility
 
 - Noise loops the existing buffer from a randomized offset and stops explicitly after the requested duration. No new noise buffer is generated per hit.
 - Zero-level layers stay at zero; positive envelopes finish their exponential tail with a short ramp to exact silence.
 - Shaker attack/decay ordering is valid at the full supported range. All sources retain bounded stop times.
 - Voice filter cutoffs and oscillator creation respect the active sample rate's Nyquist limit, including 32 kHz contexts. Low synth pitches remain available below 20 Hz.
-- Patch and arrangement format **v11** stores the numeric custom settings, including hat choking and bassline accent articulation. Readers still migrate v1–v10 storage and JSON. Older patches receive neutral defaults: no added harmonics/overtones/sub, bypassed brightness, centered partial balance, original snare/clap lengths and linked synth envelopes. Choking is off; accent brightness/length are zero and the accent source is Every note.
+- Patch and arrangement format **v12** stores the numeric custom settings, including hat choking, bassline accent articulation and synth playback/glide. Readers still migrate v1–v11 storage and JSON. Older patches receive neutral defaults: no added harmonics/overtones/sub, bypassed brightness, centered partial balance, original snare/clap lengths and linked synth envelopes. Choking is off; accent brightness/length are zero and the accent source is Every note. Both synths default to Polyphonic with zero Glide; all existing voice shaping, accent and choke values are retained.
 - 808/909 drum selections retain their existing circuits; choose Custom for the added shaping controls. Preset rhythms, balances, effect sends, routing and variation histories retain their existing meaning. The shared envelope/noise bug fixes apply to all models.
 
 ## Remaining synthesis opportunities
 
 These require separate behavior decisions or auditioning rather than additional unlabeled knobs:
 
-1. **Monophonic synth articulation.** Bassline and Lead currently create a new one-shot graph per hit. Glide, legato and gate-driven sustain need persistent voice state and explicit retrigger rules; adding a Glide slider alone would not solve this.
+1. **Legato and gate-driven sustain.** Mono retrigger and glide now share persistent note ownership and pitch state, but still create a new synthesis graph per hit. Phase-continuous legato and gate-driven sustain require reusable oscillator/filter graphs, explicit gate overlap semantics and a separate envelope design.
 2. **Nonlinear bassline filter.** Accent now optionally shapes the filter envelope, but the filter itself remains a native Web Audio low-pass. A calibrated nonlinear stage needs reference listening and level-matched comparisons.
 3. **Metallic texture.** Hats and cymbal share a six-square-wave source. Separate stick/bell/wash envelopes or a richer excitation model could produce more distinct cymbal articulation. Brightness provides tonal control but does not replace that source model.
 4. **Model differentiation.** Rim, cowbell and shaker have no separate 808/909 synthesis branches; tom models mainly differ in duration. The UI labels should not be taken as separate accurate emulations. More distinct models need reference listening and level-matched comparisons.
@@ -62,4 +76,6 @@ These require separate behavior decisions or auditioning rather than additional 
 
 `src/audio/hat-choke.test.ts` covers audio-time releases, cleanup, repeated closes, mid-fade reset and bounded tracking. The voice integration tests additionally exercise simultaneous routed/Bernoulli hats in both orders, all hat models, bypass/mute behavior, engine teardown and accent modulation/envelope coupling.
 
-`src/lib/voice-config.test.ts` covers v9/v10 storage migration, neutral defaults, new-control round trips, numeric bounds and malformed values. `src/components/voice-bank.test.tsx` verifies accessible editing, reopening and resetting of every new control, including choking across model changes. The full quality gate also checks the existing preset and routing suite.
+`src/audio/synth-articulation.test.ts` checks note stealing, interrupted glides, simultaneous-hit arbitration, gaps, mode changes, audio-time cleanup, reset and bounded tracking. Voice integration tests exercise both synths, synchronized lead oscillators, independent ownership, muted triggers, routed/Bernoulli hits and transport teardown.
+
+`src/lib/voice-config.test.ts` covers v9/v10/v11 storage migration, neutral defaults, new-control round trips, numeric bounds and malformed values. `src/components/voice-bank.test.tsx` verifies accessible editing, reopening and resetting of every new control, including choking across model changes and synth playback/glide. The full quality gate also checks the existing preset and routing suite.

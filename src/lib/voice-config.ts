@@ -36,6 +36,13 @@ const pitch = (...parameters: VoiceParameterDefinition[]): VoiceParameterSection
 const optionParameter = (key: string, label: string, options: string[], description: string): VoiceParameterDefinition => ({ key, label, min: 0, max: options.length - 1, step: 1, description, options: options.map((name, value) => ({ value, label: name })) });
 const brightness = () => parameter("lowpass", "Brightness", 1500, 20000, 100, "Low-pass cutoff for metal and noise together; 20000 bypasses it.", "Hz");
 const balance = () => parameter("balance", "Partial balance", 0, 100, 1, "Blend from the low partial to the high partial; 50 keeps both equal.", "%");
+const synthArticulation = (): VoiceParameterSection => ({
+  title: "Articulation",
+  parameters: [
+    optionParameter("playMode", "Playback", ["Polyphonic", "Mono retrigger"], "Mono replaces the previous note with a short fade. Each hit restarts both envelopes; simultaneous hits use the last scheduled note."),
+    parameter("glide", "Glide", 0, 500, 5, "Pitch-slide time in Mono retrigger while the previous note is still sounding. Gaps start a fresh pitch; Polyphonic ignores Glide.", "ms"),
+  ],
+});
 const quantizerParameters = () => pitch(
   optionParameter("root", "Root note", [...NOTE_NAMES], "Tonic used by the quantized V/Oct input."),
   optionParameter("scale", "Scale", SCALE_DEFS.map(({ name }) => name), "Allowed notes for incoming control voltage."),
@@ -177,6 +184,7 @@ export const VOICE_PARAMETER_SECTIONS: Record<VoiceId, VoiceParameterSection[]> 
   ],
   bassline: [
     quantizerParameters(),
+    synthArticulation(),
     tone(
       optionParameter("waveform", "Oscillator", ["Saw", "Square"], "Core oscillator shape."),
       parameter("cutoff", "Filter cutoff", 80, 8000, 10, "Resting cutoff of the resonant low-pass filter.", "Hz"),
@@ -199,6 +207,7 @@ export const VOICE_PARAMETER_SECTIONS: Record<VoiceId, VoiceParameterSection[]> 
   ],
   lead: [
     quantizerParameters(),
+    synthArticulation(),
     tone(
       optionParameter("waveform", "Main oscillator", ["Saw", "Square", "Triangle"], "Primary oscillator shape."),
       parameter("subLevel", "Sub oscillator", 0, 100, 1, "Sine one octave below the main oscillator, through the same filter.", "%"),
@@ -248,8 +257,8 @@ export const DEFAULT_CUSTOM_VOICE_SETTINGS: Record<VoiceId, CustomVoiceSettings>
   cow: { balance: 50, lowFrequency: 540, highFrequency: 800, filterFrequency: 2640, filterQ: 1.4, toneLevel: 55, duration: 360 },
   cym: { lowpass: 20000, metalBase: 40, metalLevel: 40, highpass: 4200, noiseLevel: 32, noiseHighpass: 5200, duration: 1400 },
   shk: { noiseLevel: 50, filterFrequency: 6200, filterQ: 1.6, attack: 6, duration: 75 },
-  bassline: { accentSource: 0, accentFilter: 0, accentDecay: 0, ampDecay: 0, root: 0, scale: 2, octave: 2, waveform: 0, cutoff: 700, resonance: 12, envelopeAmount: 82, filterDecay: 260, accent: 30 },
-  lead: { filterDecay: 0, subLevel: 0, root: 0, scale: 1, octave: 4, waveform: 0, pulseMix: 28, detune: 7, cutoff: 3200, resonance: 3.5, envelopeAmount: 38, attack: 8, release: 520 },
+  bassline: { playMode: 0, glide: 0, accentSource: 0, accentFilter: 0, accentDecay: 0, ampDecay: 0, root: 0, scale: 2, octave: 2, waveform: 0, cutoff: 700, resonance: 12, envelopeAmount: 82, filterDecay: 260, accent: 30 },
+  lead: { playMode: 0, glide: 0, filterDecay: 0, subLevel: 0, root: 0, scale: 1, octave: 4, waveform: 0, pulseMix: 28, detune: 7, cutoff: 3200, resonance: 3.5, envelopeAmount: 38, attack: 8, release: 520 },
 };
 
 export function createCustomVoiceSettings(id: VoiceId): CustomVoiceSettings {

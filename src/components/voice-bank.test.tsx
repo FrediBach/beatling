@@ -90,6 +90,7 @@ it.each([
   ["Low tom", "Overtone", "40"], ["Mid tom", "Overtone", "50"], ["Hi tom", "Overtone", "60"],
   ["Bassline", "Amplitude length", "900"], ["Lead", "Filter decay", "200"], ["Lead", "Sub oscillator", "35"],
   ["Open hat", "Choke release", "25"], ["Bassline", "Accent brightness", "70"], ["Bassline", "Accent length", "40"],
+  ["Bassline", "Glide", "125"], ["Lead", "Glide", "200"],
 ])("retains the new %s %s control when reopening its editor", (name, label, value) => {
   render(<Fixture />);
   const card = screen.getByRole("region", { name: `${name} voice` });
@@ -138,4 +139,21 @@ it("offers Level modulation as a bassline accent source and resets it with synth
   fireEvent.click(screen.getByRole("button", { name: "Reset synthesis" }));
   expect(source).toHaveValue("0");
   expect(screen.getByRole("slider", { name: "Bassline Accent brightness" })).toHaveValue("0");
+});
+
+it.each(["Bassline", "Lead"])("retains %s mono playback when reopening, and resets it with synthesis", (name) => {
+  render(<Fixture />);
+  const configure = screen.getByRole("button", { name: `Configure ${name} synthesizer` });
+  fireEvent.click(configure);
+  const mode = screen.getByRole("combobox", { name: `${name} Playback` });
+  expect(mode).toHaveValue("0");
+  fireEvent.change(mode, { target: { value: "1" } });
+  fireEvent.change(screen.getByRole("slider", { name: `${name} Glide` }), { target: { value: "100" } });
+  fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
+  fireEvent.click(configure);
+  expect(screen.getByRole("combobox", { name: `${name} Playback` })).toHaveValue("1");
+  expect(screen.getByRole("slider", { name: `${name} Glide` })).toHaveValue("100");
+  fireEvent.click(screen.getByRole("button", { name: "Reset synthesis" }));
+  expect(screen.getByRole("combobox", { name: `${name} Playback` })).toHaveValue("0");
+  expect(screen.getByRole("slider", { name: `${name} Glide` })).toHaveValue("0");
 });
