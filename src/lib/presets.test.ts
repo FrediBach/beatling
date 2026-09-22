@@ -990,7 +990,84 @@ describe("Deep House Shuffle", () => {
   });
 });
 
-describe.each(["electro-backbeat", "electro-funk-maracas", "stripped-808-breakbeat", "bass-tempo-standard", "double-time-bass", "half-time-bass-groove", "boom-bap", "sparse-808-ballad", "modern-808-hip-hop", "trap-standard", "triplet-trap", "drill-variant", "basic-house", "open-hat-house", "deep-house-shuffle"])("%s persistence", (id) => {
+describe("Jackin' House", () => {
+  it("keeps the kick anticipation and 808 cowbell beneath a short two-bar bass phrase", () => {
+    const patch = createPresetPatch("jackin-house", 62);
+    expect(patch).toMatchObject({ bpm: 126, rate: 4, swing: 8, vol: 62 });
+    expect(patch.voices.kick.machine).toBe("909");
+    expect(patch.voices.clap.machine).toBe("808");
+    expect(patch.voices.cow.machine).toBe("808");
+    expect(hitsFor(patch, "kick", 1)).toEqual([0, 4, 8, 11, 12]);
+    expect(hitsFor(patch, "clap", 2)).toEqual([4, 12, 20, 28]);
+    expect(hitsFor(patch, "ch", 1)).toEqual([0, 2, 4, 6, 8, 10, 12, 14]);
+    expect(hitsFor(patch, "oh", 1)).toEqual([2, 6, 10, 14]);
+    expect(hitsFor(patch, "cow", 1)).toEqual([6, 14]);
+    expect(hitsFor(patch, "oh", 4).filter((step) => step >= 48)).toEqual([50, 58]);
+    expect(hitsFor(patch, "cow", 4).filter((step) => step >= 48)).toEqual([54]);
+    expect(hitsFor(patch, "bassline", 2)).toEqual([1, 5, 9, 13, 18, 22, 26, 30]);
+    expect(hitsFor(patch, "lead", 4)).toEqual([3, 11, 35, 43]);
+    expect(hitsFor(patch, "shk", 4)).toEqual([]);
+    expect(patch.effects.reverb).toMatchObject({ enabled: true, space: "room" });
+    expect(patch.effects.delay).toMatchObject({ enabled: true, sync: true, division: "1/16" });
+    expect(patch.effects.sends.lead.delay).toBeGreaterThan(0);
+    expect(patch.effects.compressor.enabled).toBe(true);
+    expect(patch.effects.sends.cow.compressor).toBeGreaterThan(0);
+    expect(patch.effects.sends.cow.delay).toBe(0);
+    for (const voice of ["kick", "bassline", "ch", "oh", "shk"] as const) {
+      expect(patch.effects.sends[voice].reverb).toBe(0);
+      expect(patch.effects.sends[voice].delay).toBe(0);
+    }
+  });
+
+  it("outlines D Dorian and makes the ending's clap and final cowbell softer", () => {
+    const patch = createPresetPatch("jackin-house");
+    const modulationAt = (voice: VoiceId, step: number) => effectiveVoiceModulation(patch.voices[voice], (source) => {
+      const block = patch.blocks[source];
+      return euclideanLfoValue(block.shape, step, block, 0.5);
+    });
+    const notesFor = (voice: "bassline" | "lead") => hitsFor(patch, voice, 2).map((step) => quantizeVoiceCv(patch.voices[voice].custom, modulationAt(voice, step).vOct).name);
+    expect(notesFor("bassline")).toEqual(["D2", "F2", "G2", "B2", "D2", "F2", "A2", "C3"]);
+    expect(notesFor("lead")).toEqual(["A3", "D3"]);
+    expect(modulationAt("ch", 2).level).toBeLessThan(modulationAt("ch", 0).level);
+    expect(modulationAt("shk", 1).level).toBeLessThan(modulationAt("shk", 3).level);
+    expect(modulationAt("clap", 30).level).toBeLessThan(modulationAt("clap", 28).level);
+    expect(modulationAt("cow", 31).level).toBeLessThan(modulationAt("cow", 29).level);
+    for (const { patch: variation } of createPresetArrangement("jackin-house").variations) {
+      const kicks = new Set(hitsFor(variation, "kick", 4));
+      expect(hitsFor(variation, "bassline", 4).some((step) => kicks.has(step))).toBe(false);
+    }
+  });
+
+  it("adds a shaker lift, strips back the syncopation and closes with a cowbell/clap reply", () => {
+    const [groove, lift, breakdown, fill] = createPresetArrangement("jackin-house").variations.map(({ patch }) => patch);
+    for (const voice of ["kick", "clap", "ch"] as const) {
+      expect(hitsFor(lift, voice, 4)).toEqual(hitsFor(groove, voice, 4));
+    }
+    expect(hitsFor(lift, "lead", 2)).toEqual([3, 11, 23, 31]);
+    expect(hitsFor(lift, "shk", 2)).toEqual(Array.from({ length: 16 }, (_, index) => 1 + index * 2));
+    expect(hitsFor(lift, "cow", 4)).toHaveLength(8);
+    expect(hitsFor(lift, "oh", 4)).toHaveLength(16);
+    expect(hitsFor(breakdown, "kick", 2)).toEqual([0, 4, 8, 12, 16, 20, 24, 28]);
+    expect(hitsFor(breakdown, "clap", 2)).toEqual([4, 12, 20, 28]);
+    expect(hitsFor(breakdown, "ch", 2)).toEqual([0, 4, 8, 12, 16, 20, 24, 28]);
+    expect(hitsFor(breakdown, "oh", 2)).toEqual([]);
+    expect(hitsFor(breakdown, "cow", 2)).toEqual([]);
+    expect(hitsFor(breakdown, "bassline", 2)).toEqual([1, 9, 18, 26]);
+    expect(hitsFor(breakdown, "lead", 2)).toEqual([3, 31]);
+    expect(hitsFor(fill, "kick", 2)).toEqual([0, 4, 8, 11, 12, 16, 20, 24, 28]);
+    expect(hitsFor(fill, "clap", 2)).toEqual([4, 12, 20, 28, 30]);
+    expect(hitsFor(fill, "cow", 2)).toEqual([6, 14, 29, 31]);
+    expect(hitsFor(fill, "bassline", 2)).toEqual([1, 5, 9, 13, 18]);
+    expect(hitsFor(fill, "lead", 2)).toEqual([3, 11]);
+    expect(hitsFor(fill, "ch", 2)).toEqual(Array.from({ length: 14 }, (_, index) => index * 2));
+    expect(hitsFor(fill, "oh", 2)).toEqual([2, 6, 10, 14, 18, 22, 26]);
+    expect(hitsFor(fill, "cow", 4)).toContain(63);
+    expect(hitsFor(fill, "kick", 3)).toContain(43);
+    expect(hitsFor(fill, "oh", 3)).toContain(46);
+  });
+});
+
+describe.each(["electro-backbeat", "electro-funk-maracas", "stripped-808-breakbeat", "bass-tempo-standard", "double-time-bass", "half-time-bass-groove", "boom-bap", "sparse-808-ballad", "modern-808-hip-hop", "trap-standard", "triplet-trap", "drill-variant", "basic-house", "open-hat-house", "deep-house-shuffle", "jackin-house"])("%s persistence", (id) => {
   it("round-trips every variation and keeps series, routes and sends independently editable", () => {
     const arrangement = createPresetArrangement(id);
     for (const { patch } of arrangement.variations) {
@@ -1003,6 +1080,7 @@ describe.each(["electro-backbeat", "electro-funk-maracas", "stripped-808-breakbe
       expect(restored.voices.shk.modulations).toEqual(patch.voices.shk.modulations);
       expect(restored.voices.snare.modulations).toEqual(patch.voices.snare.modulations);
       expect(restored.voices.clap.modulations).toEqual(patch.voices.clap.modulations);
+      expect(restored.voices.cow.modulations).toEqual(patch.voices.cow.modulations);
       expect(restored.voices.ch.modulations).toEqual(patch.voices.ch.modulations);
       expect(restored.voices.oh.modulations).toEqual(patch.voices.oh.modulations);
       expect(restored.voices.lt.modulations).toEqual(patch.voices.lt.modulations);
