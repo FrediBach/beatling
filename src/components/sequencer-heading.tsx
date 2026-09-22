@@ -26,9 +26,13 @@ export function SequencerHeading({ index, block, blockLocked, changedFields, onC
         <span className="block-number">{padBlock(index)}</span>
         <div className={cn("voice-select", changedFields.has("voice") && "variation-changed")}>
           <select aria-label={`Block type or voice for block ${padBlock(index)}`} value={selection} onChange={(event) => selectKind(event.target.value)}>
-            <option value="modulator">Modulator</option>
-            <option value="bernoulli">Bernoulli gate</option>
-            {VOICE_DEFS.map((voice) => <option key={voice.id} value={voice.id}>{voice.name}</option>)}
+            <optgroup label="Block types">
+              <option value="modulator">Modulator</option>
+              <option value="bernoulli">Bernoulli gate</option>
+            </optgroup>
+            <optgroup label="Voices">
+              {VOICE_DEFS.map((voice) => <option key={voice.id} value={voice.id}>{voice.name}</option>)}
+            </optgroup>
           </select>
           {block.kind !== "modulator" && <abbr className="voice-tag-badge" title={block.kind === "bernoulli" ? "Euclidean A/B voice router" : `Roland voice code for ${VOICE_DEFS.find((voice) => voice.id === block.voice)?.name}`}>{blockTag(block)}</abbr>}
           <ChevronDown size={11} />

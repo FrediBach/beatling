@@ -57,6 +57,12 @@ describe("application shell", () => {
     vi.spyOn(window.localStorage.__proto__, "getItem").mockReturnValue(null);
     render(<App />);
     expect(screen.getAllByTestId(/^block-/)).toHaveLength(16);
+    const blockTypeSelect = screen.getAllByLabelText("Block type or voice for block 01")[0];
+    expect(Array.from(blockTypeSelect.querySelectorAll("optgroup"), (group) => group.label)).toEqual(["Block types", "Voices"]);
+    expect(Array.from(blockTypeSelect.querySelectorAll("optgroup")[0].querySelectorAll("option"), (option) => option.text)).toEqual(["Modulator", "Bernoulli gate"]);
+    expect(Array.from(blockTypeSelect.querySelectorAll("optgroup")[1].querySelectorAll("option"), (option) => option.text)).toEqual([
+      "Kick", "Snare", "Clap", "Rim", "Closed hat", "Open hat", "Low tom", "Mid tom", "Hi tom", "Cowbell", "Cymbal", "Shaker", "Bassline", "Lead",
+    ]);
     expect(screen.getAllByTitle("Roland voice code for Kick")).toHaveLength(2);
     expect(screen.getAllByTitle("Roland voice code for Shaker")).toHaveLength(2);
     expect(screen.getAllByTitle("Roland voice code for Shaker")[0]).toHaveTextContent("MA");
