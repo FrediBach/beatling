@@ -16,7 +16,7 @@ import { RATE_OPTIONS, VOICE_DEFS } from "@/lib/constants";
 import { effectiveBlock, volumeGain } from "@/lib/euclid";
 import { createDemoPatch, createEmptyPatch, createRandomizationLocks, loadStoredPatch, randomizeBlock, randomizeBlockParameter, savePatch, shufflePatch } from "@/lib/patch";
 import { changedBlockFields, changedVoiceFields, loadStoredArrangement, MAX_VARIATIONS, saveArrangement, variationHasChanges } from "@/lib/variations";
-import { BLOCK_COUNT, type Arrangement, type BlockParam, type BlockRandomizationLocks, type BlockVisualState, type EffectsState, type EngineSnapshot, type Patch, type SequencerBlock, type SongPart, type Variation, type VoiceId, type VoiceState } from "@/lib/types";
+import { ARRANGEMENT_FORMAT, BLOCK_COUNT, type Arrangement, type BlockParam, type BlockRandomizationLocks, type BlockVisualState, type EffectsState, type EngineSnapshot, type Patch, type SequencerBlock, type SongPart, type Variation, type VoiceId, type VoiceState } from "@/lib/types";
 import { useDragNumber } from "@/hooks/use-drag-number";
 import { cn } from "@/lib/utils";
 
@@ -134,7 +134,7 @@ export default function App() {
 
   useEffect(() => {
     const timeout = window.setTimeout(() => saveArrangement({
-      format: "euclid-grid.arrangement.v10",
+      format: ARRANGEMENT_FORMAT,
       variations,
       songParts,
       activeIndex: activeVariation,
@@ -462,7 +462,7 @@ export default function App() {
   };
 
   const currentArrangement = useMemo<Arrangement>(() => ({
-    format: "euclid-grid.arrangement.v10",
+    format: ARRANGEMENT_FORMAT,
     variations,
     songParts,
     activeIndex: activeVariation,

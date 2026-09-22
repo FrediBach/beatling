@@ -8,12 +8,12 @@ import type { EffectiveBlock, VoiceId } from "@/lib/types";
 // Record only the native Web Audio boundary; exercise the real voice dispatch,
 // synthesis graph and scheduled envelopes without mocking synthesis helpers.
 function parameter() {
-  return { value: 0, setValueAtTime: vi.fn(), linearRampToValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() };
+  return { value: 0, setValueAtTime: vi.fn(), cancelScheduledValues: vi.fn(), linearRampToValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() };
 }
 function node() {
   return {
     type: "", loop: false, buffer: null, gain: parameter(), frequency: parameter(), Q: parameter(), playbackRate: parameter(),
-    connect: vi.fn((target: unknown) => target), start: vi.fn(), stop: vi.fn(),
+    connect: vi.fn((target: unknown) => target), disconnect: vi.fn(), start: vi.fn(), stop: vi.fn(),
   };
 }
 function fixture(id: VoiceId, custom: Record<string, number> = {}) {
@@ -26,13 +26,14 @@ function fixture(id: VoiceId, custom: Record<string, number> = {}) {
   const sources: ReturnType<typeof node>[] = [];
   const create = (nodes: ReturnType<typeof node>[]) => () => { const result = node(); nodes.push(result); return result; };
   const engine = new SequencerEngine(patch);
+  const context = { currentTime: 0, sampleRate: 32000, close: vi.fn(), createGain: create(gains), createBiquadFilter: create(filters), createOscillator: create(oscillators), createBufferSource: create(sources) };
   Object.assign(engine, {
-    context: { sampleRate: 32000, createGain: create(gains), createBiquadFilter: create(filters), createOscillator: create(oscillators), createBufferSource: create(sources) },
+    context,
     noise: { duration: 2 },
     busses: new Map(VOICE_DEFS.map(({ id }) => [id, node()])),
   });
-  const trigger = () => (engine as unknown as { playVoice: (id: VoiceId, time: number, modulation: EffectiveBlock) => void }).playVoice(id, 1, { steps: 16, pulses: 4, rot: 0, div: 1, prob: 100, tune: 0, decay: 0, level: 0 });
-  return { patch, trigger, gains, filters, oscillators, sources };
+  const trigger = (voice = id, time = 1, modulation: Partial<EffectiveBlock> = {}) => (engine as unknown as { playVoice: (id: VoiceId, time: number, modulation: EffectiveBlock) => void }).playVoice(voice, time, { steps: 16, pulses: 4, rot: 0, div: 1, prob: 100, tune: 0, decay: 0, level: 0, ...modulation });
+  return { patch, engine, context, trigger, gains, filters, oscillators, sources };
 }
 
 it.each(VOICE_DEFS)("schedules finite, bounded $id voices at parameter extremes", ({ id }) => {
@@ -164,4 +165,100 @@ it("preserves low synth notes and sub pitches below 20 Hz", () => {
   f.trigger();
   expect(f.oscillators[0].frequency.setValueAtTime.mock.calls[0][0]).toBeCloseTo(16.3516, 3);
   expect(f.oscillators[1].frequency.setValueAtTime.mock.calls[0][0]).toBeCloseTo(8.1758, 3);
+});
+
+it.each(["808", "909", "custom"] as const)("chokes both layers of the %s open hat before its effect sends", (machine) => {
+  const f = fixture("oh", { chokeMode: 1, chokeRelease: 30, lowpass: 6000 });
+  f.patch.voices.oh.machine = machine;
+  f.trigger();
+  const gate = f.gains[0];
+  const destination = machine === "custom" ? f.filters.find((filter) => filter.type === "lowpass")! : gate;
+  const layers = f.gains.filter((gain) => gain.connect.mock.calls.some(([target]) => target === destination));
+  expect(layers).toHaveLength(machine === "808" ? 1 : 2);
+  if (machine === "custom") expect(destination.connect).toHaveBeenCalledWith(gate);
+  f.trigger("ch", 1.1);
+  expect(gate.gain.setValueAtTime).toHaveBeenLastCalledWith(1, 1.1);
+  expect(gate.gain.linearRampToValueAtTime.mock.calls[0][1]).toBeCloseTo(1.13);
+});
+
+it.each([false, true])("lets the closed hat win simultaneous routed hits (closed first: %s)", (closedFirst) => {
+  const f = fixture("oh", { chokeMode: 1 });
+  // Exercise actual routing and traversal order, including the Bernoulli path.
+  Object.assign(f.patch.blocks[0], { kind: "voice", voice: closedFirst ? "ch" : "oh", steps: 1, pulses: 1, clk: ["G"] });
+  Object.assign(f.patch.blocks[1], { kind: "bernoulli", voice: "", branchVoices: [closedFirst ? "oh" : "ch", "kick"], prob: 100, steps: 1, pulses: 1, clk: ["0"] });
+  (f.engine as unknown as { tick: (time: number, pulse: number) => void }).tick(1, 0);
+  if (closedFirst) {
+    // 909 closed hat: one noise gain and the metallic envelope, no open sources.
+    expect(f.gains).toHaveLength(2);
+  } else {
+    expect(f.gains[0].gain.setValueAtTime).toHaveBeenLastCalledWith(0, 1);
+    expect(f.gains[0].gain.linearRampToValueAtTime).not.toHaveBeenCalled();
+  }
+});
+
+it.each(["muted", "zero level"])("does not choke on a %s closed hat", (mode) => {
+  const f = fixture("oh", { chokeMode: 1 });
+  f.trigger();
+  if (mode === "muted") f.patch.voices.ch.mute = true;
+  else f.patch.voices.ch.level = 0;
+  f.trigger("ch", 1.1);
+  expect(f.gains[0].gain.cancelScheduledValues).not.toHaveBeenCalled();
+});
+
+it("preserves layered hats with choke disabled and leaves new disabled hits outside the group", () => {
+  const f = fixture("oh", { chokeMode: 0 });
+  f.trigger();
+  f.trigger("ch", 1.1);
+  expect(f.gains.every((gain) => gain.gain.cancelScheduledValues.mock.calls.length === 0)).toBe(true);
+  f.patch.voices.oh.custom.chokeMode = 1;
+  f.trigger("oh", 1.2);
+  const enabledGate = f.gains[4];
+  f.patch.voices.oh.custom.chokeMode = 0;
+  f.trigger("oh", 1.25);
+  f.trigger("ch", 1.3);
+  expect(enabledGate.gain.cancelScheduledValues).toHaveBeenCalledWith(1.3);
+  expect(f.gains.filter((gain) => gain.gain.cancelScheduledValues.mock.calls.length > 0)).toEqual([enabledGate]);
+});
+
+it.each(["stop", "reset", "resetPattern", "destroy"] as const)("cancels future choked hats on engine %s", (action) => {
+  const f = fixture("oh", { chokeMode: 1 });
+  f.trigger();
+  f.trigger("ch", 1.1);
+  f.context.currentTime = 0.9;
+  f.engine[action]();
+  expect(f.gains[0].gain.cancelScheduledValues).toHaveBeenLastCalledWith(0.9);
+  expect(f.gains[0].gain.setValueAtTime).toHaveBeenLastCalledWith(0, 0.9);
+});
+
+it("couples bassline accents to filter brightness and decay while retaining independent amplitude", () => {
+  const f = fixture("bassline", { accent: 100, accentFilter: 50, accentDecay: 100, filterDecay: 100, cutoff: 200, envelopeAmount: 50, ampDecay: 500 });
+  f.trigger();
+  expect(f.filters[0].frequency.setValueAtTime).toHaveBeenLastCalledWith(2400, 1);
+  expect(f.filters[0].frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(200, 1.2);
+  expect(f.gains[0].gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1.5);
+});
+
+it.each([-1, 0, 0.5, 1, 2])("scales routed bassline accents with positive Level modulation (%s)", (level) => {
+  const f = fixture("bassline", { accentSource: 1, accent: 100, accentFilter: 100, accentDecay: 100, filterDecay: 100, cutoff: 200, envelopeAmount: 50 });
+  f.trigger("bassline", 1, { level });
+  const accent = Math.min(1, Math.max(0, level));
+  expect(f.filters[0].frequency.setValueAtTime).toHaveBeenLastCalledWith(1200 * 2 ** (2 * accent), 1);
+  expect(f.filters[0].frequency.exponentialRampToValueAtTime.mock.calls[0][1]).toBeCloseTo(1.1 + 0.1 * accent);
+  expect(f.gains[0].gain.exponentialRampToValueAtTime.mock.calls[0][1]).toBeCloseTo(1.1 + 0.1 * accent);
+});
+
+it("combines shared-voice and block Level routes before determining the bassline accent", () => {
+  const f = fixture("bassline", { accentSource: 1, accent: 100, accentFilter: 100, cutoff: 200, envelopeAmount: 50 });
+  f.patch.voices.bassline.modulations = [{ source: "0", destination: "level", amount: -0.5 }];
+  // Unstarted voice block 0 has LFO=0, so the negative route contributes +0.5.
+  f.trigger("bassline", 1, { level: 0.5 });
+  expect(f.filters[0].frequency.setValueAtTime).toHaveBeenLastCalledWith(4800, 1);
+});
+
+it("retains the original bassline envelope with added accent controls disabled", () => {
+  const f = fixture("bassline", { accent: 100, accentSource: 0, accentFilter: 0, accentDecay: 0, filterDecay: 100, cutoff: 200, envelopeAmount: 50 });
+  f.trigger("bassline", 1, { level: 0.5 });
+  expect(f.filters[0].frequency.setValueAtTime).toHaveBeenLastCalledWith(1200, 1);
+  expect(f.filters[0].frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(200, 1.1);
+  expect(f.gains[0].gain.linearRampToValueAtTime).toHaveBeenCalledWith(1.3, 1.004);
 });

@@ -32,7 +32,7 @@ export function VoiceEditorDialog({ open, onOpenChange, voiceId, voiceName, valu
             <span className="eyebrow">Voice settings / {voiceId.toUpperCase()}</span>
             <DialogTitle>{voiceName} {hasSynthControls ? "synthesizer" : "settings"}</DialogTitle>
             <DialogDescription id={`voice-editor-description-${voiceId}`}>
-              Adjust tuning and decay{hasSynthControls ? ` and shape the ${voiceName.toLowerCase()} synthesis circuit` : ` for the ${value.machine} ${voiceName.toLowerCase()}`}. Level and mute remain in the voice bank. Changes apply as you play.
+              Adjust tuning and decay{voiceId === "oh" ? ", set hi-hat choking" : ""}{hasSynthControls ? ` and shape the ${voiceName.toLowerCase()} synthesis circuit` : ` for the ${value.machine} ${voiceName.toLowerCase()}`}. Level and mute remain in the voice bank. Changes apply as you play.
             </DialogDescription>
           </div>
           {hasSynthControls && <Button type="button" variant="outline" onClick={() => onChange({ ...value, custom: createCustomVoiceSettings(voiceId) })}>
@@ -48,7 +48,7 @@ export function VoiceEditorDialog({ open, onOpenChange, voiceId, voiceName, valu
             </div>
             <p className="voice-tone-note">Tune in semitones · Decay from short to long</p>
           </fieldset>
-          {hasSynthControls && sections.map((section) => (
+          {sections.filter((section) => hasSynthControls || section.allMachines).map((section) => (
             <fieldset key={section.title} className="voice-editor-section">
               <legend>{section.title}</legend>
               <div className="voice-editor-controls">

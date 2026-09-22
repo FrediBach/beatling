@@ -1,4 +1,6 @@
 export const BLOCK_COUNT = 16;
+export const PATCH_FORMAT = "euclid-grid.v11";
+export const ARRANGEMENT_FORMAT = "euclid-grid.arrangement.v11";
 
 export type VoiceId =
   | "kick"
@@ -160,7 +162,7 @@ export interface EffectsState {
 }
 
 export interface Patch {
-  format: "euclid-grid.v10";
+  format: typeof PATCH_FORMAT;
   bpm: number;
   rate: number;
   swing: number;
@@ -183,7 +185,7 @@ export interface SongPart {
 }
 
 export interface Arrangement {
-  format: "euclid-grid.arrangement.v10";
+  format: typeof ARRANGEMENT_FORMAT;
   variations: Variation[];
   songParts: SongPart[];
   activeIndex: number;

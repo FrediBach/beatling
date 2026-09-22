@@ -1,4 +1,4 @@
-import { BLOCK_COUNT, type BlockKind, type BlockParam, type BlockRandomizationLocks, type Patch, type SequencerBlock, type VoiceBank, type VoiceId, type VoiceState } from "@/lib/types";
+import { PATCH_FORMAT, BLOCK_COUNT, type BlockKind, type BlockParam, type BlockRandomizationLocks, type Patch, type SequencerBlock, type VoiceBank, type VoiceId, type VoiceState } from "@/lib/types";
 import { DRUM_VOICE_DEFS, ROW_PARAMS, SYNTH_VOICE_IDS, VOICE_DEFS } from "@/lib/constants";
 import { clamp } from "@/lib/euclid";
 import { createCustomVoiceSettings, normalizeCustomVoiceSettings } from "@/lib/voice-config";
@@ -6,7 +6,8 @@ import { normalizeModulations, normalizeVoiceModulations } from "@/lib/modulatio
 import { createEffects, normalizeEffects } from "@/lib/effects";
 import { MAX_RHYTHMS, normalizeRhythmPattern } from "@/lib/rhythm-series";
 
-const STORAGE_KEY = "egs.patch.v10";
+const STORAGE_KEY = "egs.patch.v11";
+const V10_STORAGE_KEY = "egs.patch.v10";
 const V9_STORAGE_KEY = "egs.patch.v9";
 const V8_STORAGE_KEY = "egs.patch.v8";
 const V7_STORAGE_KEY = "egs.patch.v7";
@@ -100,12 +101,12 @@ export function createDemoPatch(volume = 72): Patch {
   const effects = createEffects();
   effects.reverb = { ...effects.reverb, enabled: true, return: 95 };
   effects.sends.lead.reverb = 78;
-  return { format: "euclid-grid.v10", bpm: 124, rate: 4, swing: 12, vol: volume, blocks, voices, effects };
+  return { format: PATCH_FORMAT, bpm: 124, rate: 4, swing: 12, vol: volume, blocks, voices, effects };
 }
 
 export function createEmptyPatch(volume = 72): Patch {
   return {
-    format: "euclid-grid.v10",
+    format: PATCH_FORMAT,
     bpm: 124,
     rate: 4,
     swing: 0,
@@ -184,7 +185,7 @@ export function normalizePatch(value: unknown): Patch | null {
 
 export function loadStoredPatch(): Patch | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(V9_STORAGE_KEY) ?? localStorage.getItem(V8_STORAGE_KEY) ?? localStorage.getItem(V7_STORAGE_KEY) ?? localStorage.getItem(V6_STORAGE_KEY) ?? localStorage.getItem(V5_STORAGE_KEY) ?? localStorage.getItem(V4_STORAGE_KEY) ?? localStorage.getItem(V3_STORAGE_KEY) ?? localStorage.getItem(V2_STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(V10_STORAGE_KEY) ?? localStorage.getItem(V9_STORAGE_KEY) ?? localStorage.getItem(V8_STORAGE_KEY) ?? localStorage.getItem(V7_STORAGE_KEY) ?? localStorage.getItem(V6_STORAGE_KEY) ?? localStorage.getItem(V5_STORAGE_KEY) ?? localStorage.getItem(V4_STORAGE_KEY) ?? localStorage.getItem(V3_STORAGE_KEY) ?? localStorage.getItem(V2_STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
     return raw ? normalizePatch(JSON.parse(raw)) : null;
   } catch {
     return null;

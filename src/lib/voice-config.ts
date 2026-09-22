@@ -15,6 +15,7 @@ export interface VoiceParameterDefinition {
 export interface VoiceParameterSection {
   title: string;
   parameters: VoiceParameterDefinition[];
+  allMachines?: boolean;
 }
 
 const parameter = (
@@ -116,6 +117,14 @@ export const VOICE_PARAMETER_SECTIONS: Record<VoiceId, VoiceParameterSection[]> 
     envelope(parameter("duration", "Closed length", 15, 300, 1, "Base hat length before the main Decay control is applied.", "ms")),
   ],
   oh: [
+    {
+      title: "Articulation",
+      allMachines: true,
+      parameters: [
+        optionParameter("chokeMode", "Choke by", ["Off", "Closed hat"], "Closed-hat hits close this voice. Simultaneous hits favor the closed hat; works with every model."),
+        parameter("chokeRelease", "Choke release", 5, 100, 1, "Fade time after a closed-hat hit. Existing effect tails continue ringing.", "ms"),
+      ],
+    },
     tone(
       brightness(),
       parameter("metalLevel", "Metal level", 0, 100, 1, "Level of the six inharmonic oscillators.", "%"),
@@ -177,8 +186,16 @@ export const VOICE_PARAMETER_SECTIONS: Record<VoiceId, VoiceParameterSection[]> 
     envelope(
       parameter("ampDecay", "Amplitude length", 0, 2400, 10, "Independent note decay; 0 follows Filter decay. Scaled by Decay.", "ms"),
       parameter("filterDecay", "Filter decay", 30, 1200, 5, "Time for the filter to return to its cutoff.", "ms"),
-      parameter("accent", "Accent", 0, 100, 1, "Extra bite and level on each triggered note.", "%"),
     ),
+    {
+      title: "Accent",
+      parameters: [
+        parameter("accent", "Accent", 0, 100, 1, "Strength of the level boost and optional filter accent.", "%"),
+        optionParameter("accentSource", "Accent source", ["Every note", "Level modulation"], "Use a block or voice Level route: positive modulation scales Accent; midpoint and below are unaccented."),
+        parameter("accentFilter", "Accent brightness", 0, 100, 1, "At full Accent, raises the filter envelope peak by up to two octaves.", "%"),
+        parameter("accentDecay", "Accent length", 0, 100, 1, "At full Accent, extends filter decay up to twice its length. Linked amplitude follows.", "%"),
+      ],
+    },
   ],
   lead: [
     quantizerParameters(),
@@ -224,14 +241,14 @@ export const DEFAULT_CUSTOM_VOICE_SETTINGS: Record<VoiceId, CustomVoiceSettings>
   clap: { burstDecay: 18, burstCount: 3, burstSpacing: 11, burstLevel: 55, filterFrequency: 1080, filterQ: 1.1, tailLevel: 50, tailDecay: 220 },
   rim: { balance: 50, lowFrequency: 1670, highFrequency: 2350, filterFrequency: 1750, filterQ: 3.5, toneLevel: 70, noiseLevel: 25, duration: 35 },
   ch: { lowpass: 20000, metalLevel: 50, metalBase: 40, highpass: 7400, noiseLevel: 18, noiseHighpass: 7800, duration: 58 },
-  oh: { lowpass: 20000, metalLevel: 48, metalBase: 40, highpass: 7000, noiseLevel: 30, noiseHighpass: 7600, duration: 420 },
+  oh: { chokeMode: 0, chokeRelease: 10, lowpass: 20000, metalLevel: 48, metalBase: 40, highpass: 7000, noiseLevel: 30, noiseHighpass: 7600, duration: 420 },
   lt: { overtoneLevel: 0, bodyFrequency: 92, pitchAmount: 1.7, pitchDecay: 70, bodyLevel: 90, noiseLevel: 18, noiseFilter: 368, duration: 450 },
   mt: { overtoneLevel: 0, bodyFrequency: 138, pitchAmount: 1.7, pitchDecay: 70, bodyLevel: 90, noiseLevel: 18, noiseFilter: 552, duration: 450 },
   ht: { overtoneLevel: 0, bodyFrequency: 196, pitchAmount: 1.7, pitchDecay: 70, bodyLevel: 90, noiseLevel: 18, noiseFilter: 784, duration: 450 },
   cow: { balance: 50, lowFrequency: 540, highFrequency: 800, filterFrequency: 2640, filterQ: 1.4, toneLevel: 55, duration: 360 },
   cym: { lowpass: 20000, metalBase: 40, metalLevel: 40, highpass: 4200, noiseLevel: 32, noiseHighpass: 5200, duration: 1400 },
   shk: { noiseLevel: 50, filterFrequency: 6200, filterQ: 1.6, attack: 6, duration: 75 },
-  bassline: { ampDecay: 0, root: 0, scale: 2, octave: 2, waveform: 0, cutoff: 700, resonance: 12, envelopeAmount: 82, filterDecay: 260, accent: 30 },
+  bassline: { accentSource: 0, accentFilter: 0, accentDecay: 0, ampDecay: 0, root: 0, scale: 2, octave: 2, waveform: 0, cutoff: 700, resonance: 12, envelopeAmount: 82, filterDecay: 260, accent: 30 },
   lead: { filterDecay: 0, subLevel: 0, root: 0, scale: 1, octave: 4, waveform: 0, pulseMix: 28, detune: 7, cutoff: 3200, resonance: 3.5, envelopeAmount: 38, attack: 8, release: 520 },
 };
 

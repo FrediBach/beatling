@@ -89,6 +89,7 @@ it.each([
   ["Open hat", "Brightness", "7000"], ["Cymbal", "Brightness", "8000"],
   ["Low tom", "Overtone", "40"], ["Mid tom", "Overtone", "50"], ["Hi tom", "Overtone", "60"],
   ["Bassline", "Amplitude length", "900"], ["Lead", "Filter decay", "200"], ["Lead", "Sub oscillator", "35"],
+  ["Open hat", "Choke release", "25"], ["Bassline", "Accent brightness", "70"], ["Bassline", "Accent length", "40"],
 ])("retains the new %s %s control when reopening its editor", (name, label, value) => {
   render(<Fixture />);
   const card = screen.getByRole("region", { name: `${name} voice` });
@@ -106,4 +107,35 @@ it.each([
   expect(screen.getByRole("slider", { name: `${name} ${label}` })).toHaveValue(value);
   fireEvent.click(screen.getByRole("button", { name: "Reset synthesis" }));
   expect(screen.getByRole("slider", { name: `${name} ${label}` })).toHaveValue(original);
+});
+
+it("edits and retains open-hat choking across 909, Custom and 808 models", () => {
+  render(<Fixture />);
+  const card = screen.getByRole("region", { name: "Open hat voice" });
+  for (const next of ["custom", "808", "909"]) {
+    fireEvent.click(within(card).getByRole("button", { name: /^Configure/ }));
+    const mode = screen.getByRole("combobox", { name: "Open hat Choke by" });
+    expect(mode).toHaveValue(next === "custom" ? "0" : "1");
+    fireEvent.change(mode, { target: { value: "1" } });
+    fireEvent.change(screen.getByRole("slider", { name: "Open hat Choke release" }), { target: { value: "35" } });
+    fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
+    fireEvent.click(within(card).getByRole("button", { name: `Use ${next} Open hat` }));
+  }
+  fireEvent.click(within(card).getByRole("button", { name: /^Configure/ }));
+  expect(screen.getByRole("combobox", { name: "Open hat Choke by" })).toHaveValue("1");
+  expect(screen.getByRole("slider", { name: "Open hat Choke release" })).toHaveValue("35");
+  expect(screen.queryByRole("slider", { name: "Open hat Metal level" })).not.toBeInTheDocument();
+});
+
+it("offers Level modulation as a bassline accent source and resets it with synthesis", () => {
+  render(<Fixture />);
+  fireEvent.click(screen.getByRole("button", { name: "Configure Bassline synthesizer" }));
+  const source = screen.getByRole("combobox", { name: "Bassline Accent source" });
+  expect(source).toHaveValue("0");
+  fireEvent.change(source, { target: { value: "1" } });
+  expect(source).toHaveValue("1");
+  fireEvent.change(screen.getByRole("slider", { name: "Bassline Accent brightness" }), { target: { value: "75" } });
+  fireEvent.click(screen.getByRole("button", { name: "Reset synthesis" }));
+  expect(source).toHaveValue("0");
+  expect(screen.getByRole("slider", { name: "Bassline Accent brightness" })).toHaveValue("0");
 });

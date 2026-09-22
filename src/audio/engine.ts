@@ -6,6 +6,7 @@ import { quantizeVoiceCv } from "@/lib/quantizer";
 import { sampleLfo, type LfoFrame } from "@/lib/lfo";
 import { EFFECT_IDS, effectGain, waveguideDamping, waveguideFeedback, waveguideFrequency, delaySeconds, distortionSample, REVERB_SECONDS } from "@/lib/effects";
 import { rhythmAt, rhythmsFor } from "@/lib/rhythm-series";
+import { HatChoke } from "./hat-choke";
 
 interface QueuedVisualEvent {
   time: number;
@@ -82,6 +83,7 @@ export class SequencerEngine {
   private appliedEffects: EffectsState | null = null;
   private runtime: RuntimeBlock[] = [];
   private voiceHitAt = new Map<VoiceId, number>();
+  private hatChoke = new HatChoke();
   private timer: number | null = null;
   private nextPulse = 0;
   private pulseIndex = 0;
@@ -398,6 +400,7 @@ export class SequencerEngine {
   }
 
   private resetRuntime(): void {
+    this.hatChoke.reset(this.context?.currentTime ?? 0);
     this.clockQueue = [];
     this.displayClockPulse = -1;
     const patch = this.getPatch?.();
@@ -431,6 +434,7 @@ export class SequencerEngine {
   private scheduler(): void {
     if (!this._running || !this.context) return;
     const now = this.context.currentTime;
+    this.hatChoke.prune(now);
     let guard = 0;
     while (this.nextPulse < now + LOOKAHEAD_SECONDS && guard++ < 64) {
       const patch = this.getPatch();
@@ -629,6 +633,7 @@ export class SequencerEngine {
       tune,
       decay: clamp(0.25 + (voice.decay + (modulation.decay + routed.decay) * 50) / 100 * 1.6, 0.15, 2.4),
       amplitude: clamp(voice.level / 100 * (1 + (modulation.level + routed.level) * 0.6), 0, 1.4),
+      levelModulation: modulation.level + routed.level,
       custom: voice.custom,
       frequency: quantizeVoiceCv(voice.custom, routed.vOct, tune).frequency,
     };
@@ -757,9 +762,17 @@ export class SequencerEngine {
   }
 
   private hat(time: number, p: SynthParameters, open: boolean): void {
-    const bus = this.brightnessDestination(time, p, this.busses.get(open ? "oh" : "ch")!);
     const custom = p.machine === "custom";
     const duration = (custom ? value(p, "duration", open ? 420 : 58) / 1000 : open ? 0.42 : 0.058) * p.decay;
+    let destination: AudioNode = this.busses.get(open ? "oh" : "ch")!;
+    if (!open) {
+      this.hatChoke.close(time, (this.getPatch().voices.oh.custom.chokeRelease ?? 10) / 1000);
+    } else if (value(p, "chokeMode", 0) === 1) {
+      const gate = this.hatChoke.open(this.context!, destination, time, duration);
+      if (!gate) return;
+      destination = gate;
+    }
+    const bus = this.brightnessDestination(time, p, destination);
     if (custom) {
       const noiseFilter = this.filter("highpass", value(p, "noiseHighpass", 7800) * 2 ** (p.tune / 24), 0.8, time);
       const noiseGain = this.gain(0, time);
@@ -846,14 +859,16 @@ export class SequencerEngine {
 
   private bassline(time: number, p: SynthParameters): void {
     const bus = this.busses.get("bassline")!;
-    const filterDuration = Math.max(0.06, value(p, "filterDecay", 260) / 1000 * p.decay);
+    const accentInput = value(p, "accentSource", 0) === 1 ? clamp(p.levelModulation, 0, 1) : 1;
+    const accent = value(p, "accent", 30) / 100 * accentInput;
+    const filterDuration = Math.max(0.06, value(p, "filterDecay", 260) / 1000 * p.decay) * (1 + accent * value(p, "accentDecay", 0) / 100);
     const ampDecay = value(p, "ampDecay", 0);
     const duration = ampDecay > 0 ? Math.max(0.01, ampDecay / 1000 * p.decay) : filterDuration;
     const cutoff = value(p, "cutoff", 700);
     const envelopeAmount = value(p, "envelopeAmount", 82) / 100;
-    const accent = value(p, "accent", 30) / 100;
     const filter = this.filter("lowpass", cutoff, value(p, "resonance", 12), time);
-    filter.frequency.setValueAtTime(this.safeFrequency(Math.min(16000, cutoff * (1 + envelopeAmount * 10))), time);
+    const accentOctaves = 2 * accent * value(p, "accentFilter", 0) / 100;
+    filter.frequency.setValueAtTime(this.safeFrequency(Math.min(16000, cutoff * (1 + envelopeAmount * 10) * 2 ** accentOctaves)), time);
     filter.frequency.exponentialRampToValueAtTime(this.safeFrequency(Math.max(40, cutoff)), time + filterDuration);
     const gain = this.gain(0, time);
     this.attackDecay(gain.gain, time, p.amplitude * (0.72 + accent * 0.28), 0.004, duration);
@@ -906,6 +921,7 @@ interface SynthParameters {
   tune: number;
   decay: number;
   amplitude: number;
+  levelModulation: number;
   frequency: number;
   custom: CustomVoiceSettings;
 }
