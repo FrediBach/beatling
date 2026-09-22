@@ -91,6 +91,8 @@ it.each([
   ["Bassline", "Amplitude length", "900"], ["Lead", "Filter decay", "200"], ["Lead", "Sub oscillator", "35"],
   ["Open hat", "Choke release", "25"], ["Bassline", "Accent brightness", "70"], ["Bassline", "Accent length", "40"],
   ["Bassline", "Glide", "125"], ["Lead", "Glide", "200"],
+  ["Rim", "Noise length", "90"], ["Closed hat", "Metal length", "100"],
+  ["Open hat", "Metal length", "900"], ["Cymbal", "Metal length", "2200"],
 ])("retains the new %s %s control when reopening its editor", (name, label, value) => {
   render(<Fixture />);
   const card = screen.getByRole("region", { name: `${name} voice` });
@@ -156,4 +158,25 @@ it.each(["Bassline", "Lead"])("retains %s mono playback when reopening, and rese
   fireEvent.click(screen.getByRole("button", { name: "Reset synthesis" }));
   expect(screen.getByRole("combobox", { name: `${name} Playback` })).toHaveValue("0");
   expect(screen.getByRole("slider", { name: `${name} Glide` })).toHaveValue("0");
+});
+
+it("edits, retains and resets the rim's independent noise envelope", () => {
+  render(<Fixture />);
+  const card = screen.getByRole("region", { name: "Rim voice" });
+  const next909 = within(card).queryByRole("button", { name: "Use 909 Rim" });
+  if (next909) fireEvent.click(next909);
+  fireEvent.click(within(card).getByRole("button", { name: "Use custom Rim" }));
+  const configure = within(card).getByRole("button", { name: /^Configure/ });
+  fireEvent.click(configure);
+  const mode = screen.getByRole("combobox", { name: "Rim Noise envelope" });
+  expect(mode).toHaveValue("0");
+  fireEvent.change(mode, { target: { value: "1" } });
+  fireEvent.change(screen.getByRole("slider", { name: "Rim Noise length" }), { target: { value: "90" } });
+  fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
+  fireEvent.click(configure);
+  expect(screen.getByRole("combobox", { name: "Rim Noise envelope" })).toHaveValue("1");
+  expect(screen.getByRole("slider", { name: "Rim Noise length" })).toHaveValue("90");
+  fireEvent.click(screen.getByRole("button", { name: "Reset synthesis" }));
+  expect(screen.getByRole("combobox", { name: "Rim Noise envelope" })).toHaveValue("0");
+  expect(screen.getByRole("slider", { name: "Rim Noise length" })).toHaveValue("20");
 });

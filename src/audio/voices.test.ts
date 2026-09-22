@@ -123,6 +123,88 @@ it.each(["ch", "oh", "cym"] as const)("filters both layers of %s and bypasses br
   expect(legacy.filters.some((filter) => filter.type === "lowpass")).toBe(false);
 });
 
+it("lets independent rim noise outlast a silent tone layer, with matching filter tuning", () => {
+  const f = fixture("rim", { noiseMode: 1, noiseDecay: 180, duration: 20, toneLevel: 0, noiseLevel: 40, filterFrequency: 2000, filterQ: 2 });
+  f.patch.voices.rim.decay = 0; // 0.25 multiplier
+  f.patch.voices.rim.tune = 12;
+  f.trigger();
+  const noiseGain = f.sources[0].connect.mock.calls[0][0] as ReturnType<typeof node>;
+  expect(noiseGain.gain.setValueAtTime).toHaveBeenLastCalledWith(0.4, 1);
+  expect(noiseGain.gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1.045);
+  expect(f.sources[0].stop.mock.calls[0][0]).toBeCloseTo(1.095);
+  expect(f.filters).toHaveLength(2);
+  for (const filter of f.filters) {
+    expect(filter.frequency.setValueAtTime).toHaveBeenCalledWith(4000, 1);
+    expect(filter.Q.setValueAtTime).toHaveBeenCalledWith(2, 1);
+  }
+  expect(noiseGain.connect).toHaveBeenCalledWith(f.filters[1]);
+  expect(f.filters[0].connect).toHaveBeenCalledWith(f.gains[0]);
+  expect(f.filters[1].connect.mock.calls[0][0]).toBe(f.gains[0].connect.mock.calls[0][0]);
+  expect(f.gains[0].gain.exponentialRampToValueAtTime).not.toHaveBeenCalled();
+});
+
+it("keeps independent rim noise silent at zero Noise level without muting its tone", () => {
+  const f = fixture("rim", { noiseMode: 1, noiseLevel: 0, toneLevel: 70 });
+  f.trigger();
+  const noiseGain = f.sources[0].connect.mock.calls[0][0] as ReturnType<typeof node>;
+  expect(noiseGain.gain.exponentialRampToValueAtTime).not.toHaveBeenCalled();
+  expect(noiseGain.gain.setValueAtTime).toHaveBeenLastCalledWith(0, 1);
+  expect(f.gains[0].gain.setValueAtTime).toHaveBeenLastCalledWith(0.7, 1);
+});
+
+it.each(["custom", "808", "909"] as const)("preserves the original linked rim graph for %s", (machine) => {
+  const f = fixture("rim", { noiseMode: machine === "custom" ? 0 : 1, noiseDecay: 180 });
+  f.patch.voices.rim.machine = machine;
+  f.trigger();
+  expect(f.filters).toHaveLength(1);
+  const noiseGain = f.sources[0].connect.mock.calls[0][0] as ReturnType<typeof node>;
+  expect(noiseGain.connect).toHaveBeenCalledWith(f.filters[0]);
+  expect(f.filters[0].connect).toHaveBeenCalledWith(f.gains[0]);
+  expect(noiseGain.gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1.02);
+  expect(f.sources[0].stop).toHaveBeenCalledWith(1.07);
+});
+
+it.each(["ch", "oh", "cym"] as const)("gives %s independent metal and noise lengths that both follow Decay", (id) => {
+  for (const metalDecay of [50, 0, 300]) {
+    for (const decay of [0, 46.875, 100]) {
+      const f = fixture(id, { duration: 200, metalDecay });
+      f.patch.voices[id].decay = decay;
+      const multiplier = 0.25 + decay / 100 * 1.6;
+      const metalDuration = (metalDecay || 200) / 1000 * multiplier;
+      f.trigger();
+      const metalGain = f.gains[id === "cym" ? 0 : 1];
+      const noiseGain = f.gains[id === "cym" ? 1 : 0];
+      expect(metalGain.gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1 + metalDuration);
+      expect(noiseGain.gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1 + 0.2 * multiplier);
+      for (const oscillator of f.oscillators) expect(oscillator.stop).toHaveBeenCalledWith(1 + metalDuration + 0.03);
+      expect(f.sources[0].stop).toHaveBeenCalledWith(1 + 0.2 * multiplier + 0.05);
+    }
+  }
+});
+
+it.each(["ch", "oh", "cym"] as const)("ignores custom metal length in the 808/909 %s circuits", (id) => {
+  for (const machine of ["808", "909"] as const) {
+    const f = fixture(id, { metalDecay: 10 });
+    f.patch.voices[id].machine = machine;
+    f.trigger();
+    const duration = id === "cym" ? machine === "909" ? 1.6 : 1.15 : id === "oh" ? 0.42 : 0.058;
+    const metalDuration = id !== "cym" && machine === "909" ? duration * 0.7 : duration;
+    for (const oscillator of f.oscillators) expect(oscillator.stop).toHaveBeenCalledWith(1 + metalDuration + 0.03);
+  }
+});
+
+it.each([[80, 1000], [1000, 80]])("keeps open-hat choking active through noise %i ms and metal %i ms", (duration, metalDecay) => {
+  const f = fixture("oh", { chokeMode: 1, chokeRelease: 20, duration, metalDecay });
+  f.trigger();
+  const gate = f.gains[0];
+  f.context.currentTime = 1.3;
+  f.trigger("oh", 1.3); // Reclaims expired gates using the actual audio clock.
+  expect(gate.disconnect).not.toHaveBeenCalled();
+  f.trigger("ch", 1.4);
+  expect(gate.gain.cancelScheduledValues).toHaveBeenCalledWith(1.4);
+  expect(gate.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0, 1.42);
+});
+
 it("adds kick harmonics only when requested", () => {
   const f = fixture("kick", { bodyTone: 50 });
   f.trigger();

@@ -734,7 +734,9 @@ export class SequencerEngine {
   private rim(time: number, p: SynthParameters): void {
     const bus = this.busses.get("rim")!;
     const custom = p.machine === "custom";
-    const filter = this.filter("bandpass", (custom ? value(p, "filterFrequency", 1750) : 1750) * 2 ** (p.tune / 12), custom ? value(p, "filterQ", 3.5) : 3.5, time);
+    const filterFrequency = (custom ? value(p, "filterFrequency", 1750) : 1750) * 2 ** (p.tune / 12);
+    const filterQ = custom ? value(p, "filterQ", 3.5) : 3.5;
+    const filter = this.filter("bandpass", filterFrequency, filterQ, time);
     const gain = this.gain(0, time);
     const duration = (custom ? value(p, "duration", 35) / 1000 : 0.035) * p.decay;
     this.decay(gain.gain, time, p.amplitude * (custom ? value(p, "toneLevel", 70) / 100 : 0.7), duration);
@@ -746,8 +748,14 @@ export class SequencerEngine {
       oscillator.stop(time + duration + 0.015);
     });
     const noiseGain = this.gain(0, time);
-    this.decay(noiseGain.gain, time, p.amplitude * (custom ? value(p, "noiseLevel", 25) / 100 : 0.25), Math.min(0.02, duration));
-    this.noiseSource(time, 0.02).connect(noiseGain).connect(filter);
+    const independentNoise = custom && value(p, "noiseMode", 0) === 1;
+    const noiseDuration = independentNoise ? value(p, "noiseDecay", 20) / 1000 * p.decay : Math.min(0.02, duration);
+    this.decay(noiseGain.gain, time, p.amplitude * (custom ? value(p, "noiseLevel", 25) / 100 : 0.25), noiseDuration);
+    // A separate filter keeps the crack out of the tone envelope without letting
+    // the pitched partials bypass it. Linked mode retains the original graph.
+    const noiseFilter = independentNoise ? this.filter("bandpass", filterFrequency, filterQ, time) : filter;
+    this.noiseSource(time, independentNoise ? noiseDuration : 0.02).connect(noiseGain).connect(noiseFilter);
+    if (independentNoise) noiseFilter.connect(bus);
     filter.connect(gain).connect(bus);
   }
 
@@ -770,11 +778,12 @@ export class SequencerEngine {
   private hat(time: number, p: SynthParameters, open: boolean): void {
     const custom = p.machine === "custom";
     const duration = (custom ? value(p, "duration", open ? 420 : 58) / 1000 : open ? 0.42 : 0.058) * p.decay;
+    const metalDuration = custom && value(p, "metalDecay", 0) > 0 ? value(p, "metalDecay", 0) / 1000 * p.decay : duration;
     let destination: AudioNode = this.busses.get(open ? "oh" : "ch")!;
     if (!open) {
       this.hatChoke.close(time, (this.getPatch().voices.oh.custom.chokeRelease ?? 10) / 1000);
     } else if (value(p, "chokeMode", 0) === 1) {
-      const gate = this.hatChoke.open(this.context!, destination, time, duration);
+      const gate = this.hatChoke.open(this.context!, destination, time, Math.max(duration, metalDuration));
       if (!gate) return;
       destination = gate;
     }
@@ -784,7 +793,7 @@ export class SequencerEngine {
       const noiseGain = this.gain(0, time);
       this.decay(noiseGain.gain, time, p.amplitude * value(p, "noiseLevel", 20) / 100, duration);
       this.noiseSource(time, duration).connect(noiseFilter).connect(noiseGain).connect(bus);
-      this.metallic(time, duration, p.tune, p.amplitude * value(p, "metalLevel", 50) / 100, bus, value(p, "highpass", 7400), value(p, "metalBase", 40));
+      this.metallic(time, metalDuration, p.tune, p.amplitude * value(p, "metalLevel", 50) / 100, bus, value(p, "highpass", 7400), value(p, "metalBase", 40));
     } else if (p.machine === "909") {
       const filter = this.filter("highpass", 7800 * 2 ** (p.tune / 24), 0.8, time);
       const gain = this.gain(0, time);
@@ -845,7 +854,8 @@ export class SequencerEngine {
     const bus = this.brightnessDestination(time, p, this.busses.get("cym")!);
     const custom = p.machine === "custom";
     const duration = (custom ? value(p, "duration", 1400) / 1000 : p.machine === "909" ? 1.6 : 1.15) * p.decay;
-    this.metallic(time, duration, p.tune - 2, p.amplitude * (custom ? value(p, "metalLevel", 40) / 100 : 0.4), bus, custom ? value(p, "highpass", 4200) : 4200, custom ? value(p, "metalBase", 40) : 40);
+    const metalDuration = custom && value(p, "metalDecay", 0) > 0 ? value(p, "metalDecay", 0) / 1000 * p.decay : duration;
+    this.metallic(time, metalDuration, p.tune - 2, p.amplitude * (custom ? value(p, "metalLevel", 40) / 100 : 0.4), bus, custom ? value(p, "highpass", 4200) : 4200, custom ? value(p, "metalBase", 40) : 40);
     const filter = this.filter("highpass", custom ? value(p, "noiseHighpass", 5200) : 5200, 0.7, time);
     const gain = this.gain(0, time);
     this.decay(gain.gain, time, p.amplitude * (custom ? value(p, "noiseLevel", 32) / 100 : p.machine === "909" ? 0.4 : 0.22), duration);
