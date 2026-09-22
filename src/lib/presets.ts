@@ -35,6 +35,7 @@ import { refineSpeedGarage } from "@/lib/preset-speed-garage";
 import { refineFutureGarage } from "@/lib/preset-future-garage";
 import { refineSlow808Soul } from "@/lib/preset-slow-808-soul";
 import { refineSynthPopMidTempo } from "@/lib/preset-synth-pop-mid-tempo";
+import { refineContemporaryRnb } from "@/lib/preset-contemporary-rnb";
 
 const PRESET_REFINERS: Partial<Record<string, (patch: Patch, variation: 0 | 1 | 2 | 3) => void>> = {
   "electro-backbeat": refineElectroBackbeat,
@@ -69,6 +70,7 @@ const PRESET_REFINERS: Partial<Record<string, (patch: Patch, variation: 0 | 1 | 
   "future-garage": refineFutureGarage,
   "slow-808-soul": refineSlow808Soul,
   "synth-pop-mid-tempo": refineSynthPopMidTempo,
+  "contemporary-rnb": refineContemporaryRnb,
 };
 
 interface PresetLane {
