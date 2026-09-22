@@ -4,6 +4,7 @@ import { clamp, effectiveBlock, euclidHit, volumeGain } from "@/lib/euclid";
 import { effectiveVoiceModulation } from "@/lib/modulation";
 import { quantizeVoiceCv } from "@/lib/quantizer";
 import { synthFilterSweep } from "@/lib/synth-filter";
+import { pulseWaveCoefficients } from "@/lib/pulse-wave";
 import { sampleLfo, type LfoFrame } from "@/lib/lfo";
 import { EFFECT_IDS, effectGain, waveguideDamping, waveguideFeedback, waveguideFrequency, delaySeconds, distortionSample, REVERB_SECONDS } from "@/lib/effects";
 import { rhythmAt, rhythmsFor } from "@/lib/rhythm-series";
@@ -87,6 +88,7 @@ export class SequencerEngine {
   private voiceHitAt = new Map<VoiceId, number>();
   private hatChoke = new HatChoke();
   private synthArticulation = { bassline: new SynthArticulation(), lead: new SynthArticulation() };
+  private pulseWaves = new Map<number, PeriodicWave>();
   private timer: number | null = null;
   private nextPulse = 0;
   private pulseIndex = 0;
@@ -186,6 +188,7 @@ export class SequencerEngine {
     void this.context?.close();
     this.context = null;
     this.reverbImpulses.clear();
+    this.pulseWaves.clear();
     this.appliedEffects = null;
     this.distortionShape = "";
     this.reverbSpace = "";
@@ -926,7 +929,7 @@ export class SequencerEngine {
     const note = this.beginSynthNote("bassline", bus, time, duration, p);
     if (!note) return;
     this.synthFilter(filter.frequency, note, peak, this.safeFrequency(Math.max(40, cutoff)), filterDuration, value(p, "filterTracking", 0), 16000);
-    const oscillator = this.synthOscillator(value(p, "waveform", 0) >= 0.5 ? "square" : "sawtooth", note);
+    const oscillator = this.synthOscillator(value(p, "waveform", 0) >= 0.5 ? "square" : "sawtooth", note, 1, value(p, "pulseWidth", 50));
     oscillator.connect(filter).connect(gain).connect(note.output);
     oscillator.start(time);
     oscillator.stop(time + duration + 0.04);
@@ -948,7 +951,7 @@ export class SequencerEngine {
     if (!note) return;
     this.synthFilter(filter.frequency, note, peak, this.safeFrequency(Math.max(80, cutoff)), filterDuration, value(p, "filterTracking", 0), 18000);
     const waveforms: OscillatorType[] = ["sawtooth", "square", "triangle"];
-    const main = this.synthOscillator(waveforms[Math.round(value(p, "waveform", 0))] ?? "sawtooth", note);
+    const main = this.synthOscillator(waveforms[Math.round(value(p, "waveform", 0))] ?? "sawtooth", note, 1, value(p, "pulseWidth", 50));
     main.connect(filter);
     main.start(time);
     main.stop(time + duration + 0.04);
@@ -962,7 +965,7 @@ export class SequencerEngine {
     const companionMix = value(p, "pulseMix", 28) / 100;
     if (companionMix > 0) {
       const companionGain = this.gain(companionMix, time);
-      const companion = this.synthOscillator("square", note, 2 ** (value(p, "detune", 7) / 1200));
+      const companion = this.synthOscillator("square", note, 2 ** (value(p, "detune", 7) / 1200), value(p, "pulseWidth", 50));
       companion.connect(companionGain).connect(filter);
       companion.start(time);
       companion.stop(time + duration + 0.04);
@@ -984,12 +987,28 @@ export class SequencerEngine {
     for (const point of points.slice(1)) parameter.exponentialRampToValueAtTime(point.frequency, point.time);
   }
 
-  private synthOscillator(type: OscillatorType, note: SynthNote, ratio = 1): OscillatorNode {
+  private synthOscillator(type: OscillatorType, note: SynthNote, ratio = 1, pulseWidth = 50): OscillatorNode {
     const oscillator = this.oscillator(type, note.from * ratio, note.start);
+    const width = Math.round(clamp(pulseWidth, 10, 90));
+    if (type === "square" && width !== 50) oscillator.setPeriodicWave(this.pulseWave(width));
     if (note.glideEnd > note.start) {
       oscillator.frequency.exponentialRampToValueAtTime(this.safeFrequency(note.target * ratio), note.glideEnd);
     }
     return oscillator;
+  }
+
+  private pulseWave(width: number): PeriodicWave {
+    let wave = this.pulseWaves.get(width);
+    if (wave) {
+      this.pulseWaves.delete(width); // Refresh recency without rebuilding the wave.
+    } else {
+      const { real, imag } = pulseWaveCoefficients(width);
+      wave = this.context!.createPeriodicWave(real, imag, { disableNormalization: false });
+      // Bound retained native tables while users explore widths during playback.
+      if (this.pulseWaves.size >= 8) this.pulseWaves.delete(this.pulseWaves.keys().next().value!);
+    }
+    this.pulseWaves.set(width, wave);
+    return wave;
   }
 }
 

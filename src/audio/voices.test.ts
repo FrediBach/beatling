@@ -13,7 +13,7 @@ function parameter() {
 function node() {
   return {
     type: "", loop: false, buffer: null, gain: parameter(), frequency: parameter(), Q: parameter(), playbackRate: parameter(),
-    connect: vi.fn((target: unknown) => target), disconnect: vi.fn(), start: vi.fn(), stop: vi.fn(),
+    connect: vi.fn((target: unknown) => target), disconnect: vi.fn(), start: vi.fn(), stop: vi.fn(), setPeriodicWave: vi.fn(),
   };
 }
 function fixture(id: VoiceId, custom: Record<string, number> = {}) {
@@ -26,7 +26,7 @@ function fixture(id: VoiceId, custom: Record<string, number> = {}) {
   const sources: ReturnType<typeof node>[] = [];
   const create = (nodes: ReturnType<typeof node>[]) => () => { const result = node(); nodes.push(result); return result; };
   const engine = new SequencerEngine(patch);
-  const context = { currentTime: 0, sampleRate: 32000, close: vi.fn(), createGain: create(gains), createBiquadFilter: create(filters), createOscillator: create(oscillators), createBufferSource: create(sources) };
+  const context = { currentTime: 0, sampleRate: 32000, close: vi.fn(), createGain: create(gains), createBiquadFilter: create(filters), createOscillator: create(oscillators), createBufferSource: create(sources), createPeriodicWave: vi.fn((real: Float32Array, imag: Float32Array, constraints: PeriodicWaveConstraints) => ({ real, imag, constraints })) };
   Object.assign(engine, {
     context,
     noise: { duration: 2 },
@@ -542,6 +542,79 @@ it.each(["bassline", "lead"] as const)("keeps %s polyphonic by default, even wit
   expect(f.oscillators[1].frequency.setValueAtTime.mock.calls[0][0]).toBeCloseTo(f.oscillators[0].frequency.setValueAtTime.mock.calls[0][0] * 2);
   expect(f.oscillators[1].frequency.exponentialRampToValueAtTime).not.toHaveBeenCalled();
   expect(f.gains[1].gain.cancelScheduledValues).not.toHaveBeenCalled();
+});
+
+it.each(["bassline", "lead"] as const)("shapes %s square pulses without disturbing glide or filter tracking", (id) => {
+  const f = fixture(id, { waveform: 1, pulseWidth: 25, playMode: 1, glide: 200, filterTracking: 100, octave: 3, root: 0, cutoff: 400, envelopeAmount: 0, filterDecay: 100, ampDecay: 1000, release: 1000, pulseMix: 0 });
+  f.trigger();
+  f.trigger(id, 1.1, { tune: 1 });
+  expect(f.context.createPeriodicWave).toHaveBeenCalledOnce();
+  const wave = f.context.createPeriodicWave.mock.results[0].value;
+  expect(wave.constraints).toEqual({ disableNormalization: false });
+  for (const oscillator of f.oscillators) expect(oscillator.setPeriodicWave).toHaveBeenCalledWith(wave);
+  const pitch = f.oscillators[0].frequency.setValueAtTime.mock.calls[0][0];
+  expect(f.oscillators[1].frequency.setValueAtTime).toHaveBeenCalledWith(pitch, 1.1);
+  expect(f.oscillators[1].frequency.exponentialRampToValueAtTime.mock.lastCall![0]).toBeCloseTo(pitch * 2);
+  expect(f.oscillators[1].frequency.exponentialRampToValueAtTime.mock.lastCall![1]).toBeCloseTo(1.3);
+  expect(f.filters[1].frequency.exponentialRampToValueAtTime.mock.lastCall![0]).toBeCloseTo(800);
+});
+
+it("shares the lead pulse shape between main and companion while leaving the sine sub intact", () => {
+  const f = fixture("lead", { waveform: 1, pulseWidth: 30, subLevel: 40, pulseMix: 50, detune: 12 });
+  f.trigger();
+  expect(f.context.createPeriodicWave).toHaveBeenCalledOnce();
+  const wave = f.context.createPeriodicWave.mock.results[0].value;
+  expect(f.oscillators[0].setPeriodicWave).toHaveBeenCalledWith(wave);
+  expect(f.oscillators[1].type).toBe("sine");
+  expect(f.oscillators[1].setPeriodicWave).not.toHaveBeenCalled();
+  expect(f.oscillators[2].setPeriodicWave).toHaveBeenCalledWith(wave);
+  const pitch = f.oscillators[0].frequency.setValueAtTime.mock.calls[0][0];
+  expect(f.oscillators[2].frequency.setValueAtTime.mock.calls[0][0]).toBeCloseTo(pitch * 2 ** (12 / 1200));
+});
+
+it.each(["bassline", "lead"] as const)("keeps the native %s square and avoids allocating wave tables at 50 percent", (id) => {
+  const f = fixture(id, { waveform: 1, pulseWidth: 50 });
+  f.trigger();
+  expect(f.context.createPeriodicWave).not.toHaveBeenCalled();
+  expect(f.oscillators.every((oscillator) => oscillator.type === "square" && oscillator.setPeriodicWave.mock.calls.length === 0)).toBe(true);
+});
+
+it("leaves saw and triangle mains unchanged while shaping only an audible square companion", () => {
+  const bass = fixture("bassline", { waveform: 0, pulseWidth: 10 });
+  bass.trigger();
+  expect(bass.context.createPeriodicWave).not.toHaveBeenCalled();
+  for (const waveform of [0, 2]) {
+    const f = fixture("lead", { waveform, pulseWidth: 10, pulseMix: 0 });
+    f.trigger();
+    expect(f.context.createPeriodicWave).not.toHaveBeenCalled();
+    f.patch.voices.lead.custom.pulseMix = 30;
+    f.trigger("lead", 1.1);
+    expect(f.oscillators[1].setPeriodicWave).not.toHaveBeenCalled();
+    expect(f.oscillators[2].setPeriodicWave).toHaveBeenCalledOnce();
+  }
+});
+
+it("bounds pulse-wave caching, reuses recent shapes across synths, and clears tables on teardown", () => {
+  const f = fixture("bassline", { waveform: 1, pulseWidth: 10 });
+  for (let width = 10; width <= 17; width++) {
+    f.patch.voices.bassline.custom.pulseWidth = width;
+    f.trigger();
+  }
+  Object.assign(f.patch.voices.lead.custom, { waveform: 1, pulseWidth: 10, pulseMix: 0 });
+  f.trigger("lead"); // Retain the oldest table by using it again.
+  expect(f.context.createPeriodicWave).toHaveBeenCalledTimes(8);
+  const oldWave = f.context.createPeriodicWave.mock.results[1].value;
+  for (const width of [18, 10, 11]) {
+    f.patch.voices.bassline.custom.pulseWidth = width;
+    f.trigger();
+  }
+  expect(f.context.createPeriodicWave).toHaveBeenCalledTimes(10); // 11 was evicted, 10 was retained.
+  expect(f.oscillators[1].setPeriodicWave).toHaveBeenCalledWith(oldWave); // Sounding notes keep their wave.
+  expect(f.oscillators[1].setPeriodicWave).toHaveBeenCalledOnce();
+  f.engine.destroy();
+  Object.assign(f.engine, { context: f.context });
+  f.trigger();
+  expect(f.context.createPeriodicWave).toHaveBeenCalledTimes(11);
 });
 
 it("glides the lead main, sub and companion together while preserving their tuning", () => {

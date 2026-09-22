@@ -81,6 +81,16 @@ Try Mono retrigger with Glide around 60–100 ms and an amplitude length longer 
 
 Stop and pattern reset now fade synth output and cancel scheduled synth notes in both playback modes, clearing glide memory. This fixes pending synth hits continuing after transport reset. Existing shared effect tails are left to decay. Note gates are reclaimed using the actual audio clock and bounded to 256 retained notes per synth; excessive routed bursts skip additional notes until capacity is available. JSON retains the controls; MIDI/Strudel exports do not reproduce this articulation.
 
+## Synth pulse width
+
+**Bassline / Lead → Configure → Tone → Pulse width** adjusts square-wave duty cycle from **10–90%**. At **50%** the original native square is used. Moving away from 50% changes the harmonic balance for thinner or more nasal sounds; widths on either side of 50% have complementary pulse shapes.
+
+On Bassline, select **Oscillator: Square** to hear it. On Lead, it affects the **Square main** and the **companion oscillator** together. The lead's saw/triangle main and sine sub retain their shapes, so Pulse width can also color the companion beneath a saw or triangle. Set Companion mix above zero to hear that layer.
+
+Try Bassline Square at 25–35%, or Lead Triangle with Companion mix around 40% and Pulse width around 20–30%. Width changes apply to new notes, preserving currently sounding notes. Glide, detune and Filter tracking continue to follow pitch normally. This is a per-note width setting, not continuous pulse-width modulation. The shapes have no DC offset and use peak normalization; perceived loudness can still vary with width.
+
+Both synths default to 50%, preserving existing patches. Generated wave tables are shared and cached with a fixed eight-table limit, and released from the cache on engine teardown.
+
 ## Synth filter tracking
 
 **Bassline / Lead → Configure → Tone → Filter tracking** adjusts the filter with the main note pitch:
@@ -99,7 +109,7 @@ Try Lead Filter tracking 50–100% with a low cutoff for a phrase spanning sever
 - Zero-level layers stay at zero; positive envelopes finish their exponential tail with a short ramp to exact silence.
 - Shaker attack/decay ordering is valid at the full supported range. All sources retain bounded stop times.
 - Voice filter cutoffs and oscillator creation respect the active sample rate's Nyquist limit, including 32 kHz contexts. Low synth pitches remain available below 20 Hz.
-- Patch and arrangement format **v16** stores the numeric custom settings, including hat choking, bassline accent articulation and synth playback/glide. Readers still migrate v1–v15 storage and JSON. Older patches receive neutral defaults: no added harmonics/overtones/sub, bypassed brightness, centered partial balance, original snare/clap lengths and linked synth envelopes. Choking is off; accent brightness/length are zero and the accent source is Every note. Both synths default to Polyphonic with zero Glide; all existing voice shaping, accent and choke values are retained. Rim noise defaults to Linked (20 ms Noise length when Independent is enabled); hat/cymbal Metal length defaults to zero to follow the original duration. Cymbal Bell level defaults to zero, with 800 Hz Bell pitch and 500 ms Bell length ready when enabled. Both synths default to zero Filter tracking. Snare pitch stays fixed (1× with a dormant 30 ms pitch decay), and Noise attack defaults to zero.
+- Patch and arrangement format **v17** stores the numeric custom settings, including hat choking, bassline accent articulation and synth playback/glide. Readers still migrate v1–v16 storage and JSON. Older patches receive neutral defaults: no added harmonics/overtones/sub, bypassed brightness, centered partial balance, original snare/clap lengths and linked synth envelopes. Choking is off; accent brightness/length are zero and the accent source is Every note. Both synths default to Polyphonic with zero Glide; all existing voice shaping, accent and choke values are retained. Rim noise defaults to Linked (20 ms Noise length when Independent is enabled); hat/cymbal Metal length defaults to zero to follow the original duration. Cymbal Bell level defaults to zero, with 800 Hz Bell pitch and 500 ms Bell length ready when enabled. Both synths default to zero Filter tracking. Snare pitch stays fixed (1× with a dormant 30 ms pitch decay), and Noise attack defaults to zero. Synth Pulse width defaults to the original 50% square.
 - 808/909 drum selections retain their existing circuits; choose Custom for the added shaping controls. Preset rhythms, balances, effect sends, routing and variation histories retain their existing meaning. The shared envelope/noise bug fixes apply to all models.
 
 ## Remaining synthesis opportunities
@@ -119,6 +129,8 @@ These require separate behavior decisions or auditioning rather than additional 
 
 `src/audio/synth-articulation.test.ts` checks note stealing, interrupted glides, simultaneous-hit arbitration, gaps, mode changes, audio-time cleanup, reset and bounded tracking. Voice integration tests exercise both synths, synchronized lead oscillators, independent ownership, muted triggers, routed/Bernoulli hits and transport teardown.
 
-`src/lib/voice-config.test.ts` covers v9/v10/v11/v12/v13/v14/v15 storage migration, neutral defaults, new-control round trips, numeric bounds and malformed values. `src/components/voice-bank.test.tsx` verifies accessible editing, reopening and resetting of every new control, including choking across model changes and synth playback/glide. The full quality gate also checks the existing preset and routing suite.
+`src/lib/voice-config.test.ts` covers v9/v10/v11/v12/v13/v14/v15/v16 storage migration, neutral defaults, new-control round trips, numeric bounds and malformed values. `src/components/voice-bank.test.tsx` verifies accessible editing, reopening and resetting of every new control, including choking across model changes and synth playback/glide. The full quality gate also checks the existing preset and routing suite.
 
 `src/lib/synth-filter.test.ts` checks full/partial pitch tracking, overlapping envelope/glide curves, frequency-limit plateaus and bounded automation. Voice integration tests cover quantized V/Oct, both synths, interrupted glides, original zero-tracking behavior and bassline accent coupling.
+
+`src/lib/pulse-wave.test.ts` reconstructs pulse plateaus at several widths and verifies zero DC, bounded coefficients and the native square series. Voice tests cover square-only routing, main/companion sharing, native 50% bypass, glide/tracking, cache bounds, eviction and teardown. These are coefficient and scheduling checks, not browser-rendered audio or listening comparisons.

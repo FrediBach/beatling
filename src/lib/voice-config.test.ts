@@ -9,12 +9,12 @@ const additions: Partial<Record<VoiceId, Record<string, number>>> = {
   rim: { balance: 50, noiseMode: 0, noiseDecay: 20 }, cow: { balance: 50 },
   ch: { lowpass: 20000, metalDecay: 0 }, oh: { lowpass: 20000, metalDecay: 0, chokeMode: 0, chokeRelease: 10 }, cym: { lowpass: 20000, metalDecay: 0, bellLevel: 0, bellFrequency: 800, bellDecay: 500 },
   lt: { overtoneLevel: 0 }, mt: { overtoneLevel: 0 }, ht: { overtoneLevel: 0 },
-  bassline: { filterTracking: 0, playMode: 0, glide: 0, ampDecay: 0, accentSource: 0, accentFilter: 0, accentDecay: 0 }, lead: { filterTracking: 0, playMode: 0, glide: 0, filterDecay: 0, subLevel: 0 },
+  bassline: { pulseWidth: 50, filterTracking: 0, playMode: 0, glide: 0, ampDecay: 0, accentSource: 0, accentFilter: 0, accentDecay: 0 }, lead: { pulseWidth: 50, filterTracking: 0, playMode: 0, glide: 0, filterDecay: 0, subLevel: 0 },
 };
 
 afterEach(() => localStorage.clear());
 
-it("migrates v9 patch and arrangement storage with neutral voice defaults and saves v16", () => {
+it("migrates v9 patch and arrangement storage with neutral voice defaults and saves v17", () => {
   const patch = createEmptyPatch();
   patch.voices.snare.custom.noiseDecay = 400;
   patch.voices.lead.custom.release = 900;
@@ -26,19 +26,19 @@ it("migrates v9 patch and arrangement storage with neutral voice defaults and sa
   localStorage.setItem("egs.patch.v9", JSON.stringify(legacy));
   localStorage.setItem("egs.arrangement.v9", JSON.stringify({ ...createArrangement(patch), format: "euclid-grid.arrangement.v9", variations: [{ id: "variation-1", name: "A", patch: legacy }] }));
   const migrated = loadStoredPatch()!;
-  expect(migrated.format).toBe("euclid-grid.v16");
+  expect(migrated.format).toBe("euclid-grid.v17");
   for (const [id, fields] of Object.entries(additions)) expect(migrated.voices[id as VoiceId].custom).toMatchObject(fields);
   expect(migrated.voices.snare.custom.noiseDecay).toBe(400);
   expect(migrated.voices.lead.custom.release).toBe(900);
   expect(migrated.voices.lead.modulations).toEqual(patch.voices.lead.modulations);
   const arrangement = loadStoredArrangement(createEmptyPatch());
-  expect(arrangement.format).toBe("euclid-grid.arrangement.v16");
+  expect(arrangement.format).toBe("euclid-grid.arrangement.v17");
   expect(arrangement.variations[0].patch).toEqual(migrated);
   expect(arrangement.songParts[0].variationId).toBe("variation-1");
   savePatch(migrated);
   saveArrangement(arrangement);
-  expect(JSON.parse(localStorage.getItem("egs.patch.v16")!)).toEqual(migrated);
-  expect(JSON.parse(localStorage.getItem("egs.arrangement.v16")!)).toEqual(arrangement);
+  expect(JSON.parse(localStorage.getItem("egs.patch.v17")!)).toEqual(migrated);
+  expect(JSON.parse(localStorage.getItem("egs.arrangement.v17")!)).toEqual(arrangement);
 });
 
 it("round-trips edited voice controls through JSON normalization", () => {
@@ -55,7 +55,7 @@ it("round-trips edited voice controls through JSON normalization", () => {
   Object.assign(patch.voices.bassline.custom, { accentSource: 1, accentFilter: 70, accentDecay: 40 });
   Object.assign(patch.voices.oh.custom, { chokeMode: 1, chokeRelease: 25 });
   Object.assign(patch.voices.lead.custom, { filterDecay: 200, subLevel: 35 });
-  for (const id of ["bassline", "lead"] as const) Object.assign(patch.voices[id].custom, { playMode: 1, glide: 125, filterTracking: 65 });
+  for (const id of ["bassline", "lead"] as const) Object.assign(patch.voices[id].custom, { playMode: 1, glide: 125, filterTracking: 65, pulseWidth: 25 });
   savePatch(patch);
   const restored = loadStoredPatch()!;
   for (const [id, fields] of Object.entries(additions)) {
@@ -96,6 +96,12 @@ it("bounds added controls and uses defaults for malformed values", () => {
     expect(normalizeCustomVoiceSettings("cym", { bellLevel: invalid, bellFrequency: invalid, bellDecay: invalid })).toMatchObject({ bellLevel: 0, bellFrequency: 800, bellDecay: 500 });
   }
   for (const id of ["bassline", "lead"] as const) {
+    expect(normalizeCustomVoiceSettings(id, { pulseWidth: -1 }).pulseWidth).toBe(10);
+    expect(normalizeCustomVoiceSettings(id, { pulseWidth: 999 }).pulseWidth).toBe(90);
+    expect(normalizeCustomVoiceSettings(id, { pulseWidth: "27.7" }).pulseWidth).toBe(28);
+    for (const pulseWidth of [null, false, "", {}, NaN, Infinity]) {
+      expect(normalizeCustomVoiceSettings(id, { pulseWidth }).pulseWidth).toBe(50);
+    }
     expect(normalizeCustomVoiceSettings(id, { filterTracking: -10 }).filterTracking).toBe(0);
     expect(normalizeCustomVoiceSettings(id, { filterTracking: 900 }).filterTracking).toBe(100);
     expect(normalizeCustomVoiceSettings(id, { filterTracking: "62.7" }).filterTracking).toBe(63);
@@ -138,7 +144,7 @@ it("migrates v11 synths to polyphonic playback while retaining accents and hat c
   localStorage.setItem("egs.patch.v11", JSON.stringify(legacy));
   localStorage.setItem("egs.arrangement.v11", JSON.stringify({ ...createArrangement(patch), format: "euclid-grid.arrangement.v11", variations: [{ id: "variation-1", name: "A", patch: legacy }] }));
   const migrated = loadStoredPatch()!;
-  expect(migrated.format).toBe("euclid-grid.v16");
+  expect(migrated.format).toBe("euclid-grid.v17");
   for (const id of ["bassline", "lead"] as const) expect(migrated.voices[id].custom).toMatchObject({ playMode: 0, glide: 0 });
   expect(migrated.voices.bassline.custom).toMatchObject({ accentSource: 1, accentFilter: 60, accentDecay: 30 });
   expect(migrated.voices.oh.custom).toMatchObject({ chokeMode: 1, chokeRelease: 20 });
@@ -157,7 +163,7 @@ it("migrates v12 percussion to linked envelopes and retains edited layers on sav
   localStorage.setItem("egs.patch.v12", JSON.stringify(legacy));
   localStorage.setItem("egs.arrangement.v12", JSON.stringify({ ...createArrangement(patch), format: "euclid-grid.arrangement.v12", variations: [{ id: "variation-1", name: "A", patch: legacy }] }));
   const migrated = loadStoredPatch()!;
-  expect(migrated.format).toBe("euclid-grid.v16");
+  expect(migrated.format).toBe("euclid-grid.v17");
   expect(migrated.voices.rim.custom).toMatchObject({ noiseMode: 0, noiseDecay: 20, toneLevel: 30, noiseLevel: 60, duration: 70 });
   for (const id of ["ch", "oh", "cym"] as const) expect(migrated.voices[id].custom.metalDecay).toBe(0);
   expect(migrated.voices.oh.custom).toMatchObject({ duration: 800, chokeMode: 1 });
@@ -182,7 +188,7 @@ it("migrates v13 cymbals with a disabled bell and retains bell edits in patch an
   localStorage.setItem("egs.patch.v13", JSON.stringify(legacy));
   localStorage.setItem("egs.arrangement.v13", JSON.stringify({ ...createArrangement(patch), format: "euclid-grid.arrangement.v13", variations: [{ id: "variation-1", name: "A", patch: legacy }] }));
   const migrated = loadStoredPatch()!;
-  expect(migrated.format).toBe("euclid-grid.v16");
+  expect(migrated.format).toBe("euclid-grid.v17");
   expect(migrated.voices.cym.custom).toMatchObject({ bellLevel: 0, bellFrequency: 800, bellDecay: 500, duration: 1800, metalDecay: 300, lowpass: 6500 });
   expect(migrated.voices.rim.custom).toMatchObject({ noiseMode: 1, noiseDecay: 90 });
   const arrangement = loadStoredArrangement(createEmptyPatch());
@@ -206,7 +212,7 @@ it("migrates v14 synths to fixed filters and retains tracking edits on save", ()
   localStorage.setItem("egs.patch.v14", JSON.stringify(legacy));
   localStorage.setItem("egs.arrangement.v14", JSON.stringify({ ...createArrangement(patch), format: "euclid-grid.arrangement.v14", variations: [{ id: "variation-1", name: "A", patch: legacy }] }));
   const migrated = loadStoredPatch()!;
-  expect(migrated.format).toBe("euclid-grid.v16");
+  expect(migrated.format).toBe("euclid-grid.v17");
   for (const id of ["bassline", "lead"] as const) expect(migrated.voices[id].custom).toMatchObject({ filterTracking: 0, playMode: 1, glide: 150, cutoff: 1000 });
   expect(migrated.voices.cym.custom).toMatchObject({ bellLevel: 35, bellFrequency: 1100, bellDecay: 900 });
   const arrangement = loadStoredArrangement(createEmptyPatch());
@@ -229,12 +235,37 @@ it("migrates v15 snares with neutral articulation and retains edits in patch and
   localStorage.setItem("egs.patch.v15", JSON.stringify(legacy));
   localStorage.setItem("egs.arrangement.v15", JSON.stringify({ ...createArrangement(patch), format: "euclid-grid.arrangement.v15", variations: [{ id: "variation-1", name: "A", patch: legacy }] }));
   const migrated = loadStoredPatch()!;
-  expect(migrated.format).toBe("euclid-grid.v16");
+  expect(migrated.format).toBe("euclid-grid.v17");
   expect(migrated.voices.snare.custom).toMatchObject({ pitchAmount: 1, pitchDecay: 30, noiseAttack: 0, toneFrequency: 240, toneSpread: 1.5, toneDecay: 200, noiseDecay: 400 });
   expect(migrated.voices.lead.custom.filterTracking).toBe(65);
   const arrangement = loadStoredArrangement(createEmptyPatch());
   expect(arrangement.variations[0].patch).toEqual(migrated);
   Object.assign(migrated.voices.snare.custom, { pitchAmount: 1.75, pitchDecay: 45, noiseAttack: 8 });
+  arrangement.variations[0].patch = migrated;
+  savePatch(migrated);
+  saveArrangement(arrangement);
+  expect(loadStoredPatch()).toEqual(migrated);
+  expect(loadStoredArrangement(createEmptyPatch())).toEqual(arrangement);
+});
+
+it("migrates v16 synths to native square widths and retains pulse edits on save", () => {
+  const patch = createEmptyPatch();
+  for (const id of ["bassline", "lead"] as const) {
+    delete patch.voices[id].custom.pulseWidth;
+    Object.assign(patch.voices[id].custom, { waveform: 1, filterTracking: 65, playMode: 1, glide: 150 });
+  }
+  Object.assign(patch.voices.snare.custom, { pitchAmount: 1.5, pitchDecay: 25, noiseAttack: 5 });
+  const legacy = { ...patch, format: "euclid-grid.v16" };
+  localStorage.setItem("egs.patch.v16", JSON.stringify(legacy));
+  localStorage.setItem("egs.arrangement.v16", JSON.stringify({ ...createArrangement(patch), format: "euclid-grid.arrangement.v16", variations: [{ id: "variation-1", name: "A", patch: legacy }] }));
+  const migrated = loadStoredPatch()!;
+  expect(migrated.format).toBe("euclid-grid.v17");
+  for (const id of ["bassline", "lead"] as const) expect(migrated.voices[id].custom).toMatchObject({ pulseWidth: 50, waveform: 1, filterTracking: 65, playMode: 1, glide: 150 });
+  expect(migrated.voices.snare.custom).toMatchObject({ pitchAmount: 1.5, pitchDecay: 25, noiseAttack: 5 });
+  const arrangement = loadStoredArrangement(createEmptyPatch());
+  expect(arrangement.variations[0].patch).toEqual(migrated);
+  migrated.voices.bassline.custom.pulseWidth = 25;
+  migrated.voices.lead.custom.pulseWidth = 70;
   arrangement.variations[0].patch = migrated;
   savePatch(migrated);
   saveArrangement(arrangement);
