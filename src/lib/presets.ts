@@ -7,12 +7,14 @@ import { refineElectroBackbeat } from "@/lib/preset-electro-backbeat";
 import { refineElectroFunkMaracas } from "@/lib/preset-electro-funk-maracas";
 import { refineStripped808Breakbeat } from "@/lib/preset-stripped-808-breakbeat";
 import { refineBassTempoStandard } from "@/lib/preset-bass-tempo-standard";
+import { refineDoubleTimeBass } from "@/lib/preset-double-time-bass";
 
 const PRESET_REFINERS: Partial<Record<string, (patch: Patch, variation: 0 | 1 | 2 | 3) => void>> = {
   "electro-backbeat": refineElectroBackbeat,
   "electro-funk-maracas": refineElectroFunkMaracas,
   "stripped-808-breakbeat": refineStripped808Breakbeat,
   "bass-tempo-standard": refineBassTempoStandard,
+  "double-time-bass": refineDoubleTimeBass,
 };
 
 interface PresetLane {
