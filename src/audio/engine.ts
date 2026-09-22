@@ -740,9 +740,18 @@ export class SequencerEngine {
     }
     const tailGain = this.gain(0, time);
     const tailStart = time + spread * Math.max(0, burstCount - 1);
-    const tailDuration = (custom ? value(p, "tailDecay", 220) / 1000 : 0.22) * p.decay;
-    this.decay(tailGain.gain, tailStart, p.amplitude * (custom ? value(p, "tailLevel", 50) / 100 : 0.5), tailDuration);
-    this.noiseSource(tailStart, tailDuration).connect(tailGain).connect(filter);
+    const attack = custom ? value(p, "tailAttack", 0) / 1000 : 0;
+    const requestedDuration = (custom ? value(p, "tailDecay", 220) / 1000 : 0.22) * p.decay;
+    const tailDuration = attack > 0 ? Math.max(attack + 0.005, requestedDuration) : requestedDuration;
+    const tailLevel = p.amplitude * (custom ? value(p, "tailLevel", 50) / 100 : 0.5);
+    if (attack > 0) this.attackDecay(tailGain.gain, tailStart, tailLevel, attack, tailDuration);
+    else this.decay(tailGain.gain, tailStart, tailLevel, tailDuration);
+    const tailFrequency = custom ? value(p, "tailFilter", 0) : 0;
+    const tailFilter = tailFrequency > 0 && tailLevel > 0
+      ? this.filter("bandpass", tailFrequency * 2 ** (p.tune / 24), value(p, "filterQ", 1.1), tailStart)
+      : filter;
+    if (tailFilter !== filter) tailFilter.connect(bus);
+    this.noiseSource(tailStart, tailDuration).connect(tailGain).connect(tailFilter);
   }
 
   private rim(time: number, p: SynthParameters): void {

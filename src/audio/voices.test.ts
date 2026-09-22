@@ -297,6 +297,93 @@ it("gives each clap burst its own configured length without stretching the tail"
   expect(f.gains[2].gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1.22);
 });
 
+it("gives the clap tail its own filter and fade-in without changing the bursts", () => {
+  const f = fixture("clap", { burstCount: 3, burstSpacing: 20, burstDecay: 15, filterFrequency: 2000, filterQ: 2, tailFilter: 800, tailAttack: 30, tailDecay: 300, tailLevel: 40 });
+  f.patch.voices.clap.tune = 12;
+  f.trigger("clap", 1, { tune: 1 }); // Combined +24 semitones doubles clap filter frequencies.
+  expect(f.filters).toHaveLength(2);
+  expect(f.sources).toHaveLength(4);
+  expect(f.filters[0].frequency.setValueAtTime).toHaveBeenCalledWith(4000, 1);
+  expect(f.filters[1].frequency.setValueAtTime).toHaveBeenCalledWith(1600, 1.04);
+  expect(f.filters[1].Q.setValueAtTime).toHaveBeenCalledWith(2, 1.04);
+  expect(f.filters[1].connect).toHaveBeenCalledWith(f.filters[0].connect.mock.calls[0][0]);
+  for (let i = 0; i < 3; i++) {
+    expect(f.gains[i].connect).toHaveBeenCalledWith(f.filters[0]);
+    expect(f.gains[i].gain.setValueAtTime).toHaveBeenLastCalledWith(0.55, 1 + i * 0.02);
+    expect(f.gains[i].gain.exponentialRampToValueAtTime.mock.calls[0][1]).toBeCloseTo(1.015 + i * 0.02);
+  }
+  const tail = f.gains[3];
+  expect(tail.connect).toHaveBeenCalledWith(f.filters[1]);
+  expect(tail.gain.setValueAtTime).toHaveBeenLastCalledWith(0, 1.04);
+  expect(tail.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.4, 1.07);
+  expect(tail.gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1.34);
+  expect(f.sources[3].start.mock.calls[0][0]).toBe(1.04);
+  expect(f.sources[3].stop.mock.calls[0][0]).toBeCloseTo(1.39);
+});
+
+it.each(["custom", "808", "909"] as const)("preserves the original %s clap with tail shaping disabled or unsupported", (machine) => {
+  const f = fixture("clap", { tailFilter: machine === "custom" ? 0 : 12000, tailAttack: machine === "custom" ? 0 : 80 });
+  f.patch.voices.clap.machine = machine;
+  f.trigger();
+  const start = machine === "custom" ? 1.022 : machine === "808" ? 1.026 : 1.018;
+  expect(f.filters).toHaveLength(1);
+  for (const gain of f.gains) expect(gain.connect).toHaveBeenCalledWith(f.filters[0]);
+  expect(f.gains[3].gain.setValueAtTime).toHaveBeenLastCalledWith(0.5, start);
+  expect(f.gains[3].gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, start + 0.22);
+  expect(f.gains[3].gain.linearRampToValueAtTime).toHaveBeenCalledOnce(); // Final silence only.
+});
+
+it("supports clap tail attack with a linked filter and a separate filter with zero attack", () => {
+  const linked = fixture("clap", { tailAttack: 20, tailFilter: 0 });
+  linked.trigger();
+  expect(linked.filters).toHaveLength(1);
+  expect(linked.gains[3].connect).toHaveBeenCalledWith(linked.filters[0]);
+  expect(linked.gains[3].gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.5, 1.042);
+  const immediate = fixture("clap", { tailAttack: 0, tailFilter: 600 });
+  immediate.trigger();
+  expect(immediate.filters).toHaveLength(2);
+  expect(immediate.gains[3].gain.setValueAtTime).toHaveBeenLastCalledWith(0.5, 1.022);
+  expect(immediate.gains[3].gain.linearRampToValueAtTime).toHaveBeenCalledOnce();
+});
+
+it("extends a short clap tail to finish its attack after the last burst", () => {
+  const f = fixture("clap", { burstCount: 6, burstSpacing: 30, tailAttack: 80, tailDecay: 40 });
+  f.patch.voices.clap.decay = 0;
+  f.trigger("clap", 1, { decay: -1 });
+  const tail = f.gains[6];
+  expect(tail.gain.setValueAtTime).toHaveBeenLastCalledWith(0, 1.15);
+  expect(tail.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.5, 1.23);
+  expect(tail.gain.exponentialRampToValueAtTime.mock.calls[0][1]).toBeCloseTo(1.235);
+  expect(tail.gain.linearRampToValueAtTime.mock.lastCall![0]).toBe(0);
+  expect(tail.gain.linearRampToValueAtTime.mock.lastCall![1]).toBeCloseTo(1.24);
+  expect(f.sources[6].stop.mock.calls[0][0]).toBeCloseTo(1.285);
+});
+
+it("keeps clap attack time fixed under Decay modulation and bounds the tail filter", () => {
+  const f = fixture("clap", { burstCount: 1, tailAttack: 40, tailDecay: 1000, tailFilter: 12000 });
+  f.patch.voices.clap.decay = 100;
+  f.patch.voices.clap.tune = 12;
+  f.trigger("clap", 1, { decay: 1, tune: 1 });
+  expect(f.filters[1].frequency.setValueAtTime).toHaveBeenCalledWith(15680, 1);
+  expect(f.gains[1].gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.5, 1.04);
+  expect(f.gains[1].gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 3.4);
+  expect(f.sources[1].stop.mock.calls[0][0]).toBeCloseTo(3.45);
+});
+
+it.each(["burstLevel", "tailLevel"])("keeps zero clap %s silent with tail shaping enabled", (silentLayer) => {
+  const f = fixture("clap", { [silentLayer]: 0, tailAttack: 30, tailFilter: 700 });
+  f.trigger();
+  const silent = silentLayer === "burstLevel" ? f.gains.slice(0, 3) : [f.gains[3]];
+  for (const gain of silent) {
+    expect(gain.gain.setValueAtTime.mock.lastCall![0]).toBe(0);
+    expect(gain.gain.linearRampToValueAtTime).not.toHaveBeenCalled();
+    expect(gain.gain.exponentialRampToValueAtTime).not.toHaveBeenCalled();
+  }
+  const audible = silentLayer === "burstLevel" ? f.gains[3] : f.gains[0];
+  expect(audible.gain.exponentialRampToValueAtTime).toHaveBeenCalled();
+  expect(f.filters).toHaveLength(silentLayer === "tailLevel" ? 1 : 2);
+});
+
 it.each(["rim", "cow"] as const)("isolates the low or high %s partial without changing the centered mix", (id) => {
   for (const balance of [0, 50, 100]) {
     const f = fixture(id, { balance });

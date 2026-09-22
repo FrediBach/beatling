@@ -85,6 +85,7 @@ it("offers quantized V/Oct and musical scale controls for synth voices", () => {
 it.each([
   ["Kick", "Body harmonics", "65"], ["Snare", "Body length", "350"],
   ["Clap", "Burst length", "40"], ["Rim", "Partial balance", "25"],
+  ["Clap", "Tail filter", "700"], ["Clap", "Tail attack", "20"],
   ["Cowbell", "Partial balance", "75"], ["Closed hat", "Brightness", "6000"],
   ["Open hat", "Brightness", "7000"], ["Cymbal", "Brightness", "8000"],
   ["Low tom", "Overtone", "40"], ["Mid tom", "Overtone", "50"], ["Hi tom", "Overtone", "60"],
