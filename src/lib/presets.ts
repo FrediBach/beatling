@@ -41,6 +41,7 @@ import { refineReggaeton } from "@/lib/preset-reggaeton";
 import { refineDancehall } from "@/lib/preset-dancehall";
 import { refineAfrobeatsAmapiano } from "@/lib/preset-afrobeats-amapiano";
 import { refineMachineBreakbeat } from "@/lib/preset-machine-breakbeat";
+import { refineBigBeat } from "@/lib/preset-big-beat";
 
 const PRESET_REFINERS: Partial<Record<string, (patch: Patch, variation: 0 | 1 | 2 | 3) => void>> = {
   "electro-backbeat": refineElectroBackbeat,
@@ -81,6 +82,7 @@ const PRESET_REFINERS: Partial<Record<string, (patch: Patch, variation: 0 | 1 | 
   "dancehall": refineDancehall,
   "afrobeats-amapiano": refineAfrobeatsAmapiano,
   "machine-breakbeat": refineMachineBreakbeat,
+  "big-beat": refineBigBeat,
 };
 
 interface PresetLane {

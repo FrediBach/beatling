@@ -175,7 +175,7 @@ describe("patches", () => {
   });
 
   it("keeps four-hit endings for presets with generated fill variations", () => {
-    for (const id of ["big-beat", "jungle-half-time"]) {
+    for (const id of ["jungle-half-time"]) {
       const patch = createPresetArrangement(id).variations[3].patch;
       const endingHits = Array.from({ length: 4 }, (_, offset) => patch.blocks.some((block) => ["snare", "rim", "clap"].includes(block.voice) && euclidHit(patch.rate * 4 - 4 + offset, block.steps, block.pulses, block.rot)));
       expect(endingHits, id).toEqual([true, true, true, true]);
