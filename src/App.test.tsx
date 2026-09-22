@@ -193,7 +193,7 @@ describe("application shell", () => {
     expect(screen.getByLabelText("Kick Pitch sweep")).toBeInTheDocument();
     expect(screen.queryByLabelText("Kick Tone spread")).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Kick Body frequency"), { target: { value: "64" } });
-    expect(screen.getByLabelText("Kick Body frequency value")).toHaveValue(64);
+    expect(screen.getByLabelText("Kick Body frequency value")).toHaveValue("64");
 
     fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
     fireEvent.click(screen.getByRole("button", { name: "Use 808 Kick" }));

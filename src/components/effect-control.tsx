@@ -3,6 +3,7 @@ import { useId, useRef, useState, type CSSProperties } from "react";
 interface EffectControlProps {
   label: string;
   accessibleLabel?: string;
+  describedBy?: string;
   value: number;
   min?: number;
   max?: number;
@@ -14,7 +15,7 @@ interface EffectControlProps {
 }
 
 /** Native keyboard control, vertical knob dragging, and a separately named value editor. */
-export function EffectControl({ label, accessibleLabel = label, value, min = 0, max = 100, step = 1, suffix = "%", defaultValue = 0, knob = false, onChange }: EffectControlProps) {
+export function EffectControl({ label, accessibleLabel = label, describedBy, value, min = 0, max = 100, step = 1, suffix = "%", defaultValue = 0, knob = false, onChange }: EffectControlProps) {
   const id = useId();
   const [draft, setDraft] = useState<string | null>(null);
   const drag = useRef<{ y: number; value: number } | null>(null);
@@ -32,7 +33,7 @@ export function EffectControl({ label, accessibleLabel = label, value, min = 0, 
     <label htmlFor={id}>{label}</label>
     <div className={knob ? "effect-dial" : "effect-track"}>
       {knob && <div className="effect-dial-face" aria-hidden="true"><i /></div>}
-      <input id={id} className="range" type="range" aria-label={accessibleLabel} aria-valuetext={`${value}${suffix}`} min={min} max={max} step={step} value={value}
+      <input id={id} className="range" type="range" aria-label={accessibleLabel} aria-describedby={describedBy} aria-valuetext={`${value}${suffix}`} min={min} max={max} step={step} value={value}
         title={knob ? "Drag up or down · Shift for fine adjustment · Double-click to reset" : "Double-click to reset"}
         onChange={(event) => onChange(Number(event.target.value))}
         onDoubleClick={() => { if (value !== defaultValue) onChange(defaultValue); }}
@@ -54,7 +55,7 @@ export function EffectControl({ label, accessibleLabel = label, value, min = 0, 
       />
     </div>
     <div className="effect-value">
-      <input type="text" inputMode="decimal" aria-label={`${accessibleLabel} value`} value={draft ?? String(value)}
+      <input type="text" inputMode="decimal" aria-label={`${accessibleLabel} value`} aria-describedby={describedBy} value={draft ?? String(value)}
         onFocus={(event) => { setDraft(String(value)); event.currentTarget.select(); }}
         onChange={(event) => setDraft(event.target.value)}
         onBlur={(event) => commit(event.currentTarget.value)}

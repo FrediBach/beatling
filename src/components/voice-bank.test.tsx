@@ -116,7 +116,7 @@ it.each([
   const slider = screen.getByRole("slider", { name: `${name} ${label}` });
   const original = slider.getAttribute("value");
   fireEvent.change(slider, { target: { value } });
-  expect(screen.getByRole("spinbutton", { name: `${name} ${label} value` })).toHaveValue(Number(value));
+  expect(screen.getByRole("textbox", { name: `${name} ${label} value` })).toHaveValue(value);
   fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
   fireEvent.click(within(card).getByRole("button", { name: /^Configure/ }));
   expect(screen.getByRole("slider", { name: `${name} ${label}` })).toHaveValue(value);
@@ -129,15 +129,15 @@ it("edits and retains open-hat choking across 909, Custom and 808 models", () =>
   const card = screen.getByRole("region", { name: "Open hat voice" });
   for (const next of ["custom", "808", "909"]) {
     fireEvent.click(within(card).getByRole("button", { name: /^Configure/ }));
-    const mode = screen.getByRole("combobox", { name: "Open hat Choke by" });
-    expect(mode).toHaveValue(next === "custom" ? "0" : "1");
-    fireEvent.change(mode, { target: { value: "1" } });
+    const mode = screen.getByRole("button", { name: "Open hat Choke by: Closed hat" });
+    expect(mode).toHaveAttribute("aria-pressed", next === "custom" ? "false" : "true");
+    fireEvent.click(mode);
     fireEvent.change(screen.getByRole("slider", { name: "Open hat Choke release" }), { target: { value: "35" } });
     fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
     fireEvent.click(within(card).getByRole("button", { name: `Use ${next} Open hat` }));
   }
   fireEvent.click(within(card).getByRole("button", { name: /^Configure/ }));
-  expect(screen.getByRole("combobox", { name: "Open hat Choke by" })).toHaveValue("1");
+  expect(screen.getByRole("button", { name: "Open hat Choke by: Closed hat" })).toHaveAttribute("aria-pressed", "true");
   expect(screen.getByRole("slider", { name: "Open hat Choke release" })).toHaveValue("35");
   expect(screen.queryByRole("slider", { name: "Open hat Metal level" })).not.toBeInTheDocument();
 });
@@ -145,13 +145,13 @@ it("edits and retains open-hat choking across 909, Custom and 808 models", () =>
 it("offers Level modulation as a bassline accent source and resets it with synthesis", () => {
   render(<Fixture />);
   fireEvent.click(screen.getByRole("button", { name: "Configure Bassline synthesizer" }));
-  const source = screen.getByRole("combobox", { name: "Bassline Accent source" });
-  expect(source).toHaveValue("0");
-  fireEvent.change(source, { target: { value: "1" } });
-  expect(source).toHaveValue("1");
+  const source = screen.getByRole("button", { name: "Bassline Accent source: Level modulation" });
+  expect(source).toHaveAttribute("aria-pressed", "false");
+  fireEvent.click(source);
+  expect(source).toHaveAttribute("aria-pressed", "true");
   fireEvent.change(screen.getByRole("slider", { name: "Bassline Accent brightness" }), { target: { value: "75" } });
   fireEvent.click(screen.getByRole("button", { name: "Reset synthesis" }));
-  expect(source).toHaveValue("0");
+  expect(source).toHaveAttribute("aria-pressed", "false");
   expect(screen.getByRole("slider", { name: "Bassline Accent brightness" })).toHaveValue("0");
 });
 
@@ -159,16 +159,16 @@ it.each(["Bassline", "Lead"])("retains %s mono playback when reopening, and rese
   render(<Fixture />);
   const configure = screen.getByRole("button", { name: `Configure ${name} synthesizer` });
   fireEvent.click(configure);
-  const mode = screen.getByRole("combobox", { name: `${name} Playback` });
-  expect(mode).toHaveValue("0");
-  fireEvent.change(mode, { target: { value: "1" } });
+  const mode = screen.getByRole("button", { name: `${name} Playback: Mono retrigger` });
+  expect(mode).toHaveAttribute("aria-pressed", "false");
+  fireEvent.click(mode);
   fireEvent.change(screen.getByRole("slider", { name: `${name} Glide` }), { target: { value: "100" } });
   fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
   fireEvent.click(configure);
-  expect(screen.getByRole("combobox", { name: `${name} Playback` })).toHaveValue("1");
+  expect(screen.getByRole("button", { name: `${name} Playback: Mono retrigger` })).toHaveAttribute("aria-pressed", "true");
   expect(screen.getByRole("slider", { name: `${name} Glide` })).toHaveValue("100");
   fireEvent.click(screen.getByRole("button", { name: "Reset synthesis" }));
-  expect(screen.getByRole("combobox", { name: `${name} Playback` })).toHaveValue("0");
+  expect(screen.getByRole("button", { name: `${name} Playback: Mono retrigger` })).toHaveAttribute("aria-pressed", "false");
   expect(screen.getByRole("slider", { name: `${name} Glide` })).toHaveValue("0");
 });
 
@@ -180,15 +180,15 @@ it("edits, retains and resets the rim's independent noise envelope", () => {
   fireEvent.click(within(card).getByRole("button", { name: "Use custom Rim" }));
   const configure = within(card).getByRole("button", { name: /^Configure/ });
   fireEvent.click(configure);
-  const mode = screen.getByRole("combobox", { name: "Rim Noise envelope" });
-  expect(mode).toHaveValue("0");
-  fireEvent.change(mode, { target: { value: "1" } });
+  const mode = screen.getByRole("button", { name: "Rim Noise envelope: Independent" });
+  expect(mode).toHaveAttribute("aria-pressed", "false");
+  fireEvent.click(mode);
   fireEvent.change(screen.getByRole("slider", { name: "Rim Noise length" }), { target: { value: "90" } });
   fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
   fireEvent.click(configure);
-  expect(screen.getByRole("combobox", { name: "Rim Noise envelope" })).toHaveValue("1");
+  expect(screen.getByRole("button", { name: "Rim Noise envelope: Independent" })).toHaveAttribute("aria-pressed", "true");
   expect(screen.getByRole("slider", { name: "Rim Noise length" })).toHaveValue("90");
   fireEvent.click(screen.getByRole("button", { name: "Reset synthesis" }));
-  expect(screen.getByRole("combobox", { name: "Rim Noise envelope" })).toHaveValue("0");
+  expect(screen.getByRole("button", { name: "Rim Noise envelope: Independent" })).toHaveAttribute("aria-pressed", "false");
   expect(screen.getByRole("slider", { name: "Rim Noise length" })).toHaveValue("20");
 });

@@ -216,7 +216,6 @@ button { transition: background-color 120ms, color 120ms, border-color 120ms; }
 .voice-tone-controls .range { margin-top: 8px; }
 .voice-tone-note { margin-top: 8px; color: var(--muted); font-size: 10px; }
 
-.voice-editor-dialog { inset: 50% auto auto 50%; bottom: auto; width: min(760px,calc(100vw - 32px)); max-height: min(760px,calc(100dvh - 32px)); transform: translate(-50%,-50%); border: 1px solid var(--ink); border-radius: 5px; background: var(--sheet); padding: 24px; gap: 20px; }
 .voice-row .voice-routing { height: 23px; min-height: 23px; padding: 0 6px; border-radius: 0 0 3px 3px; font-size: 8px; }
 .voice-routing .model-button { font-size: 8px; line-height: 1; }
 .voice-routing .routing-ports { gap: 2px; padding: 0; }
@@ -227,10 +226,6 @@ button { transition: background-color 120ms, color 120ms, border-color 120ms; }
 .voice-routing-header { padding-right: 28px; }
 .voice-routing-header h2 { margin: 5px 0 4px; font-size: 22px; font-weight: 600; }
 .voice-routing-header p { color: var(--muted); font-size: 11px; line-height: 1.5; }
-.voice-editor-select { grid-column: 1 / -1; width: 100%; height: 28px; padding: 0 8px; background: var(--paper); font-size: 10px; }
-.voice-editor-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding-right: 24px; }.voice-editor-header h2 { margin: 5px 0 4px; font-size: 22px; font-weight: 600; letter-spacing: -.5px; }.voice-editor-header p { max-width: 540px; color: var(--muted); font-size: 11px; line-height: 1.5; }.voice-editor-header > button { flex: 0 0 auto; }
-.voice-editor-sections { display: grid; gap: 18px; overflow-y: auto; padding-right: 5px; }.voice-editor-section { min-width: 0; border-top: 1px solid var(--rule); padding-top: 12px; }.voice-editor-section legend { padding-right: 10px; color: var(--signal); font: 700 9px var(--font-mono); letter-spacing: .09em; text-transform: uppercase; }.voice-editor-controls { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px 24px; }.voice-editor-control > span { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; font-size: 11px; font-weight: 600; }.voice-editor-control > span small { overflow: hidden; color: var(--muted); font-size: 8px; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }.voice-editor-control > div { display: grid; grid-template-columns: minmax(80px,1fr) 88px; align-items: center; gap: 10px; margin-top: 5px; }.voice-editor-value { height: 25px; display: flex; align-items: center; border: 1px solid var(--rule); border-radius: 2px; background: var(--paper); }.voice-editor-value input { width: 100%; min-width: 0; border: 0; background: transparent; padding: 3px 2px 3px 7px; outline: none; font: 10px var(--font-mono); }.voice-editor-value i { padding-right: 6px; color: var(--muted); font: normal 8px var(--font-mono); }
-@media (max-width:620px) { .voice-editor-dialog { width: 100%; max-height: 88dvh; inset: auto 0 0; transform: none; border-width: 1px 0 0; border-radius: 0; padding: 18px; }.voice-editor-header { display: block; }.voice-editor-header > button { margin-top: 10px; }.voice-editor-controls { grid-template-columns: 1fr; }.voice-editor-control > span small { display: none; } }
 /* Effects rack: a focused processor and its independent voice sends. */
 .effects-dialog { inset: 50% auto auto 50%; width: min(1040px,calc(100vw - 40px)); max-height: calc(100dvh - 40px); transform: translate(-50%,-50%); border: 1px solid var(--ink); border-radius: 5px; background: var(--sheet); padding: 26px; gap: 22px; overflow-y: auto; }
 .effects-header { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-right: 26px; }
