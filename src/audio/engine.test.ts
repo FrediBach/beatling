@@ -1,9 +1,37 @@
 import { afterEach, expect, it, vi } from "vitest";
 import { SequencerEngine } from "./engine";
 import { createEmptyPatch } from "@/lib/patch";
+import { createPresetArrangement } from "@/lib/presets";
 import { waveguideDamping, waveguideFeedback, waveguideFrequency } from "@/lib/effects";
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+
+it.each([0, 1, 2, 3])("preserves Acid with Tom Fill's routed drum gaps and loop restart in variation %i", (variation) => {
+  const patch = createPresetArrangement("acid-tom-fill").variations[variation].patch;
+  const engine = new SequencerEngine(patch);
+  // Exercise the real clock/routing/series scheduler, replacing only synthesis.
+  const scheduler = engine as unknown as {
+    tick: (time: number, pulse: number) => void;
+    playVoice: (id: string, time: number, effective: unknown) => void;
+  };
+  const playVoice = vi.spyOn(scheduler, "playVoice").mockImplementation(() => undefined);
+  const interval = 60 / patch.bpm / patch.rate;
+  try {
+    for (let step = 0; step <= 64; step++) scheduler.tick(0.08 + step * interval, step);
+    const hits = (voice: string) => playVoice.mock.calls.filter(([id]) => id === voice).map(([, time]) => Math.round((time - 0.08) / interval));
+    const twiceAndDownbeat = (cycle: number[]) => [...cycle, ...cycle.map((step) => step + 32), ...(cycle.includes(0) ? [64] : [])];
+    expect(hits("kick")).toEqual(twiceAndDownbeat(variation === 2 ? [0, 8, 16, 24] : [0, 4, 8, 12, 16, 20, 24]));
+    expect(hits("clap")).toEqual(twiceAndDownbeat([4, 12, 20]));
+    expect(hits("ch")).toEqual(twiceAndDownbeat(Array.from({ length: variation === 2 ? 12 : 24 }, (_, step) => step * (variation === 2 ? 2 : 1))));
+    expect(hits("ht")).toEqual(twiceAndDownbeat(variation === 2 ? [24] : [24, 26]));
+    expect(hits("mt")).toEqual(twiceAndDownbeat(variation === 3 ? [28, 29] : [28]));
+    expect(hits("lt")).toEqual(twiceAndDownbeat([30, 31]));
+    for (const voice of ["bassline", "lead"]) {
+      expect(hits(voice).length).toBeGreaterThan(0);
+      expect(hits(voice).some((step) => step % 32 >= 24)).toBe(false);
+    }
+  } finally { engine.destroy(); }
+});
 
 it("maps Karplus–Strong controls onto a stable String/Tube feedback waveguide", async () => {
   vi.useFakeTimers();

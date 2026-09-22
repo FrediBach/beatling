@@ -10,6 +10,7 @@ import type { Patch, VoiceId } from "@/lib/types";
 
 // Expand the authored series into global clock positions (rate × 4 per bar). These presets
 // use the global clock at division 1, without chance or routed mute inputs.
+// Acid with Tom Fill's routed drums are checked through the engine instead.
 function hitsFor(patch: Patch, voice: VoiceId, bars: number): number[] {
   const hits = new Set<number>();
   for (const block of patch.blocks) {
@@ -1137,7 +1138,68 @@ describe("Acid Basic", () => {
   });
 });
 
-describe.each(["electro-backbeat", "electro-funk-maracas", "stripped-808-breakbeat", "bass-tempo-standard", "double-time-bass", "half-time-bass-groove", "boom-bap", "sparse-808-ballad", "modern-808-hip-hop", "trap-standard", "triplet-trap", "drill-variant", "basic-house", "open-hat-house", "deep-house-shuffle", "jackin-house", "acid-basic"])("%s persistence", (id) => {
+describe("Acid with Tom Fill", () => {
+  it("gives the two-bar tom answer space after a square 303 phrase and short 101 calls", () => {
+    const patch = createPresetPatch("acid-tom-fill", 61);
+    expect(patch).toMatchObject({ bpm: 122, rate: 4, swing: 0, vol: 61 });
+    expect(hitsFor(patch, "bassline", 2)).toEqual([1, 4, 7, 9, 12, 15, 17, 20, 23]);
+    expect(hitsFor(patch, "lead", 2)).toEqual([6, 18]);
+    for (const id of ["kick", "clap", "ch", "ht", "mt", "lt"] as const) {
+      expect(patch.voices[id].machine).toBe("909");
+    }
+    expect(patch.effects.distortion).toMatchObject({ enabled: true, mode: "soft" });
+    expect(patch.effects.reverb).toMatchObject({ enabled: true, space: "room", lowCut: 600 });
+    expect(patch.effects.delay).toMatchObject({ enabled: true, sync: true, division: "1/8" });
+    expect(patch.effects.sends.bassline.distortion).toBeGreaterThan(0);
+    expect(patch.effects.sends.lead.delay).toBeGreaterThan(0);
+    for (const id of ["ht", "mt", "lt"] as const) {
+      expect(patch.effects.sends[id].reverb).toBeGreaterThan(0);
+      expect(patch.effects.sends[id].delay).toBe(0);
+    }
+    expect(patch.effects.sends.bassline.reverb).toBe(0);
+    expect(patch.effects.sends.bassline.delay).toBe(0);
+    expect(patch.effects.sends.kick).toEqual({ distortion: 0, delay: 0, reverb: 0, compressor: 0, karplus: 0 });
+  });
+
+  it("outlines G minor, answers on the fifth and softens the last note of each tom double", () => {
+    const patch = createPresetPatch("acid-tom-fill");
+    const modulationAt = (voice: VoiceId, step: number) => effectiveVoiceModulation(patch.voices[voice], (source) => {
+      const block = patch.blocks[source];
+      return euclideanLfoValue(block.shape, step, block, 0.5);
+    });
+    const notesFor = (voice: "bassline" | "lead") => hitsFor(patch, voice, 2).map((step) => quantizeVoiceCv(patch.voices[voice].custom, modulationAt(voice, step).vOct).name);
+    expect(notesFor("bassline")).toEqual(["G2", "B♭2", "C3", "D3", "E♭3", "G3", "G2", "B♭2", "C3"]);
+    expect(notesFor("lead")).toEqual(["G3", "D4"]);
+    expect(modulationAt("bassline", 1).level).toBeGreaterThan(modulationAt("bassline", 7).level);
+    expect(modulationAt("bassline", 1).decay).toBeGreaterThan(modulationAt("bassline", 7).decay);
+    expect(modulationAt("ch", 1).level).toBeLessThan(modulationAt("ch", 0).level);
+    for (const [voice, first] of [["mt", 28], ["lt", 30]] as const) {
+      expect(modulationAt(voice, first + 1).level).toBeLessThan(modulationAt(voice, first).level);
+      expect(modulationAt(voice, first + 1).decay).toBeLessThan(modulationAt(voice, first).decay);
+    }
+  });
+
+  it("opens the lift, pares back the break and finishes the synth call before the closing roll", () => {
+    const [groove, lift, breakdown, fill] = createPresetArrangement("acid-tom-fill").variations.map(({ patch }) => patch);
+    expect(hitsFor(lift, "bassline", 2)).toEqual(Array.from({ length: 12 }, (_, index) => 1 + index * 2));
+    expect(hitsFor(lift, "lead", 2)).toEqual([6, 14, 18]);
+    expect(lift.voices.bassline.custom.cutoff).toBeGreaterThan(groove.voices.bassline.custom.cutoff);
+    expect(lift.voices.bassline.custom.filterDecay).toBeLessThan(groove.voices.bassline.custom.filterDecay);
+    expect(hitsFor(breakdown, "bassline", 2)).toEqual([1, 9, 17]);
+    expect(hitsFor(breakdown, "lead", 2)).toEqual([6]);
+    expect(breakdown.voices.bassline.custom.cutoff).toBeLessThan(groove.voices.bassline.custom.cutoff);
+    expect(hitsFor(fill, "bassline", 2)).toEqual([1, 4, 7, 9, 12, 15, 17]);
+    expect(hitsFor(fill, "lead", 2)).toEqual([14]);
+    expect(hitsFor(fill, "mt", 4)).toEqual([28, 29, 60, 61]);
+    for (const patch of [groove, lift, breakdown, fill]) {
+      for (const voice of ["bassline", "lead"] as const) {
+        expect(hitsFor(patch, voice, 4).some((step) => step % 32 >= 24)).toBe(false);
+      }
+    }
+  });
+});
+
+describe.each(["electro-backbeat", "electro-funk-maracas", "stripped-808-breakbeat", "bass-tempo-standard", "double-time-bass", "half-time-bass-groove", "boom-bap", "sparse-808-ballad", "modern-808-hip-hop", "trap-standard", "triplet-trap", "drill-variant", "basic-house", "open-hat-house", "deep-house-shuffle", "jackin-house", "acid-basic", "acid-tom-fill"])("%s persistence", (id) => {
   it("round-trips every variation and keeps series, routes and sends independently editable", () => {
     const arrangement = createPresetArrangement(id);
     for (const { patch } of arrangement.variations) {
@@ -1154,6 +1216,7 @@ describe.each(["electro-backbeat", "electro-funk-maracas", "stripped-808-breakbe
       expect(restored.voices.ch.modulations).toEqual(patch.voices.ch.modulations);
       expect(restored.voices.oh.modulations).toEqual(patch.voices.oh.modulations);
       expect(restored.voices.lt.modulations).toEqual(patch.voices.lt.modulations);
+      expect(restored.voices.mt.modulations).toEqual(patch.voices.mt.modulations);
       for (const voice of Object.values(patch.voices)) {
         for (const route of voice.modulations) {
           expect(patch.blocks[Number(route.source)]).toMatchObject({ kind: "modulator", mute: false });
