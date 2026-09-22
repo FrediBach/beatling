@@ -37,6 +37,7 @@ import { refineSlow808Soul } from "@/lib/preset-slow-808-soul";
 import { refineSynthPopMidTempo } from "@/lib/preset-synth-pop-mid-tempo";
 import { refineContemporaryRnb } from "@/lib/preset-contemporary-rnb";
 import { refineDembow } from "@/lib/preset-dembow";
+import { refineReggaeton } from "@/lib/preset-reggaeton";
 
 const PRESET_REFINERS: Partial<Record<string, (patch: Patch, variation: 0 | 1 | 2 | 3) => void>> = {
   "electro-backbeat": refineElectroBackbeat,
@@ -73,6 +74,7 @@ const PRESET_REFINERS: Partial<Record<string, (patch: Patch, variation: 0 | 1 | 
   "synth-pop-mid-tempo": refineSynthPopMidTempo,
   "contemporary-rnb": refineContemporaryRnb,
   "dembow": refineDembow,
+  "reggaeton": refineReggaeton,
 };
 
 interface PresetLane {
