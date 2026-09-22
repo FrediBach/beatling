@@ -1013,7 +1013,8 @@ export class SequencerEngine {
     const companionMix = value(p, "pulseMix", 28) / 100;
     if (companionMix > 0) {
       const companionGain = this.gain(companionMix, time);
-      const companion = this.synthOscillator("square", note, 2 ** (value(p, "detune", 7) / 1200), value(p, "pulseWidth", 50));
+      const ratio = 2 ** (value(p, "companionInterval", 0) / 12 + value(p, "detune", 7) / 1200);
+      const companion = this.synthOscillator("square", note, ratio, value(p, "pulseWidth", 50));
       companion.connect(companionGain).connect(filter);
       companion.start(time);
       companion.stop(time + duration + 0.04);

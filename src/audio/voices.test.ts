@@ -1136,7 +1136,7 @@ it("leaves saw and triangle mains unchanged while shaping only an audible square
   bass.trigger();
   expect(bass.context.createPeriodicWave).not.toHaveBeenCalled();
   for (const waveform of [0, 2]) {
-    const f = fixture("lead", { waveform, pulseWidth: 10, pulseMix: 0 });
+    const f = fixture("lead", { waveform, pulseWidth: 10, pulseMix: 0, companionInterval: 24 });
     f.trigger();
     expect(f.context.createPeriodicWave).not.toHaveBeenCalled();
     f.patch.voices.lead.custom.pulseMix = 30;
@@ -1169,8 +1169,29 @@ it("bounds pulse-wave caching, reuses recent shapes across synths, and clears ta
   expect(f.context.createPeriodicWave).toHaveBeenCalledTimes(11);
 });
 
-it("glides the lead main, sub and companion together while preserving their tuning", () => {
-  const f = fixture("lead", { playMode: 1, glide: 200, subLevel: 30, pulseMix: 25, detune: 12, release: 1000 });
+it.each([-24, -7, 7, 24])("transposes the lead companion by %s semitones after main-note quantization", (companionInterval) => {
+  const f = fixture("lead", { companionInterval, detune: -15, waveform: 1, pulseWidth: 30, subLevel: 40, pulseMix: 50, octave: 3, root: 0, scale: 1, filterTracking: 100, cutoff: 400, envelopeAmount: 0, release: 1000 });
+  f.patch.voices.lead.modulations = [{ source: "0", destination: "vOct", amount: 1 }];
+  vi.spyOn(f.engine as unknown as { sourceLfo: () => number }, "sourceLfo").mockReturnValue(0.5);
+  f.trigger("lead", 1, { tune: 0.5 });
+  expect(f.oscillators).toHaveLength(3);
+  expect(f.filters).toHaveLength(1);
+  expect(f.gains).toHaveLength(4);
+  const [main, sub, companion] = f.oscillators;
+  const frequency = main.frequency.setValueAtTime.mock.calls[0][0];
+  expect(sub.frequency.setValueAtTime.mock.calls[0][0]).toBeCloseTo(frequency / 2);
+  expect(companion.frequency.setValueAtTime.mock.calls[0][0]).toBeCloseTo(frequency * 2 ** (companionInterval / 12 - 15 / 1200));
+  expect(f.context.createPeriodicWave).toHaveBeenCalledOnce();
+  expect(companion.setPeriodicWave.mock.calls[0][0]).toBe(main.setPeriodicWave.mock.calls[0][0]);
+  expect(f.filters[0].frequency.setValueAtTime.mock.lastCall![0]).toBeCloseTo(400 * frequency / (440 * 2 ** ((48 - 69) / 12)));
+  const companionGain = companion.connect.mock.calls[0][0] as ReturnType<typeof node>;
+  expect(companionGain.gain.setValueAtTime).toHaveBeenCalledWith(0.5, 1);
+  expect(companionGain.connect).toHaveBeenCalledWith(f.filters[0]);
+  for (const oscillator of f.oscillators) expect(oscillator.stop).toHaveBeenCalledWith(2.04);
+});
+
+it.each([-12, 0, 7])("glides lead layers together with companion interval %s, including interrupted slides", (companionInterval) => {
+  const f = fixture("lead", { companionInterval, playMode: 1, glide: 200, subLevel: 30, pulseMix: 25, detune: 12, release: 1000 });
   f.trigger();
   f.trigger("lead", 1.1, { tune: 1 });
   const main = f.oscillators[3];
@@ -1180,13 +1201,29 @@ it("glides the lead main, sub and companion together while preserving their tuni
   const target = main.frequency.exponentialRampToValueAtTime.mock.calls[0][0];
   expect(sub.frequency.setValueAtTime.mock.calls[0][0]).toBeCloseTo(start / 2);
   expect(sub.frequency.exponentialRampToValueAtTime.mock.calls[0][0]).toBeCloseTo(target / 2);
-  expect(companion.frequency.setValueAtTime.mock.calls[0][0]).toBeCloseTo(start * 2 ** (12 / 1200));
-  expect(companion.frequency.exponentialRampToValueAtTime.mock.calls[0][0]).toBeCloseTo(target * 2 ** (12 / 1200));
+  const ratio = 2 ** (companionInterval / 12 + 12 / 1200);
+  expect(companion.frequency.setValueAtTime.mock.calls[0][0]).toBeCloseTo(start * ratio);
+  expect(companion.frequency.exponentialRampToValueAtTime.mock.calls[0][0]).toBeCloseTo(target * ratio);
   for (const oscillator of [main, sub, companion]) expect(oscillator.frequency.exponentialRampToValueAtTime.mock.calls[0][1]).toBeCloseTo(1.3);
+  f.trigger("lead", 1.2, { tune: -1 });
+  const interrupted = f.oscillators[8];
+  expect(interrupted.frequency.setValueAtTime.mock.calls[0][0]).toBeCloseTo(Math.sqrt(start * target) * ratio);
+  expect(interrupted.frequency.exponentialRampToValueAtTime.mock.calls[0][0]).toBeCloseTo(start / 2 * ratio);
+  expect(interrupted.frequency.exponentialRampToValueAtTime.mock.calls[0][1]).toBeCloseTo(1.4);
+});
+
+it("bounds an upward lead companion interval at low sample rates throughout glide", () => {
+  const f = fixture("lead", { companionInterval: 24, detune: 30, playMode: 1, glide: 200, octave: 6, root: 11, pulseMix: 50, release: 1000 });
+  f.context.sampleRate = 22050;
+  f.patch.voices.lead.tune = 12;
+  f.trigger();
+  f.trigger("lead", 1.1, { tune: 1 });
+  expect(f.oscillators[3].frequency.setValueAtTime).toHaveBeenCalledWith(10804.5, 1.1);
+  expect(f.oscillators[3].frequency.exponentialRampToValueAtTime.mock.calls[0][0]).toBe(10804.5);
 });
 
 it("keeps high-register polyphonic sub tuning independent of the main oscillator's Nyquist limit", () => {
-  const f = fixture("lead", { octave: 6, root: 11, scale: 0, subLevel: 50, pulseMix: 0 });
+  const f = fixture("lead", { octave: 6, root: 11, scale: 0, subLevel: 50, pulseMix: 50, companionInterval: -12, detune: 0 });
   f.patch.voices.lead.tune = 12;
   f.patch.voices.lead.modulations = [{ source: "0", destination: "vOct", amount: 1 }];
   // The source's pitch voltage is injected through the existing LFO boundary.
@@ -1194,6 +1231,7 @@ it("keeps high-register polyphonic sub tuning independent of the main oscillator
   f.trigger("lead", 1, { tune: 1 });
   expect(f.oscillators[0].frequency.setValueAtTime.mock.calls[0][0]).toBe(15680);
   expect(f.oscillators[1].frequency.setValueAtTime.mock.calls[0][0]).toBeCloseTo(7902.13, 1);
+  expect(f.oscillators[2].frequency.setValueAtTime.mock.calls[0][0]).toBeCloseTo(7902.13, 1);
 });
 
 it("keeps bassline and lead ownership independent and ignores muted or silent triggers", () => {
