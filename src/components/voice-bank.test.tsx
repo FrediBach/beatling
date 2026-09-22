@@ -98,6 +98,7 @@ it.each([
   ["Rim", "Noise length", "90"], ["Closed hat", "Metal length", "100"],
   ["Open hat", "Metal length", "900"], ["Cymbal", "Metal length", "2200"],
   ["Cymbal", "Bell level", "35"], ["Cymbal", "Bell pitch", "1100"], ["Cymbal", "Bell length", "900"],
+  ["Cymbal", "Stick level", "40"], ["Cymbal", "Stick filter", "6000"], ["Cymbal", "Stick length", "25"],
   ["Bassline", "Filter tracking", "100"], ["Lead", "Filter tracking", "50"],
   ["Snare", "Pitch sweep", "1.75"], ["Snare", "Pitch decay", "45"], ["Snare", "Noise attack", "8"],
   ["Bassline", "Pulse width", "25"], ["Lead", "Pulse width", "70"],

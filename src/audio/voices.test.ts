@@ -80,6 +80,77 @@ it("keeps cymbal noise alive for its full envelope even beyond the noise buffer"
   expect(f.sources[0].stop).toHaveBeenCalledWith(5.05);
 });
 
+it("adds a cymbal stick tick through brightness without changing the wash, metal or bell lengths", () => {
+  const f = fixture("cym", { stickLevel: 40, stickFilter: 3000, stickDecay: 20, duration: 1200, metalDecay: 800, bellLevel: 30, bellDecay: 400, lowpass: 6500 });
+  f.patch.voices.cym.tune = 12;
+  f.patch.voices.cym.level = 50;
+  f.patch.voices.cym.decay = 0;
+  f.trigger("cym", 1, { tune: 1 }); // +24 semitones; quarter-length wash, metal and bell.
+  expect(f.sources).toHaveLength(2);
+  expect(f.oscillators).toHaveLength(9);
+  const filter = f.sources[1].connect.mock.calls[0][0] as ReturnType<typeof node>;
+  const gain = filter.connect.mock.calls[0][0] as ReturnType<typeof node>;
+  expect(filter.type).toBe("bandpass");
+  expect(filter.frequency.setValueAtTime).toHaveBeenCalledWith(6000, 1);
+  expect(gain.connect).toHaveBeenCalledWith(f.filters.find(({ type }) => type === "lowpass"));
+  expect(gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.2, 1.001);
+  expect(gain.gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1.02);
+  expect(gain.gain.linearRampToValueAtTime.mock.lastCall![0]).toBe(0);
+  expect(gain.gain.linearRampToValueAtTime.mock.lastCall![1]).toBeCloseTo(1.025);
+  expect(f.sources[1].stop).toHaveBeenCalledWith(1.07);
+  expect(f.sources[0].stop.mock.calls[0][0]).toBeCloseTo(1.35);
+  for (const oscillator of f.oscillators.filter(({ type }) => type === "square")) expect(oscillator.stop).toHaveBeenCalledWith(1.23);
+  expect(f.oscillators.find(({ type }) => type === "sine")!.stop.mock.calls[0][0]).toBeCloseTo(1.13);
+});
+
+it("lets cymbal stick noise sound alone through the original voice bus", () => {
+  const f = fixture("cym", { stickLevel: 50, noiseLevel: 0, metalLevel: 0, bellLevel: 0 });
+  f.trigger();
+  const stick = f.gains[2];
+  for (const layer of f.gains.slice(0, 2)) expect(layer.gain.exponentialRampToValueAtTime).not.toHaveBeenCalled();
+  expect(stick.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.5, 1.001);
+  expect(stick.connect).toHaveBeenCalledWith(f.gains[0].connect.mock.calls[0][0]);
+  expect(f.filters.some(({ type }) => type === "lowpass")).toBe(false);
+});
+
+it.each(["custom", "808", "909"] as const)("retains the original %s cymbal when stick noise is off or unsupported", (machine) => {
+  const f = fixture("cym", { stickLevel: machine === "custom" ? 0 : 100, stickFilter: 12000, stickDecay: 120 });
+  f.patch.voices.cym.machine = machine;
+  f.trigger();
+  expect(f.sources).toHaveLength(1);
+  expect(f.gains).toHaveLength(2);
+  expect(f.filters).toHaveLength(3);
+  expect(f.oscillators).toHaveLength(6);
+});
+
+it.each([-1, 1])("keeps the cymbal stick short under Decay modulation %s and respects the filter ceiling", (decay) => {
+  const f = fixture("cym", { stickLevel: 100, stickFilter: 12000, stickDecay: 10 });
+  f.patch.voices.cym.tune = 12;
+  f.patch.voices.cym.decay = decay < 0 ? 0 : 100;
+  f.trigger("cym", 1, { tune: 1, decay });
+  const filter = f.sources[1].connect.mock.calls[0][0] as ReturnType<typeof node>;
+  expect(filter.frequency.setValueAtTime).toHaveBeenCalledWith(15680, 1);
+  expect(f.gains[2].gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1.01);
+  expect(f.sources[1].stop).toHaveBeenCalledWith(1.06);
+});
+
+it("adds cymbal stick noise without consuming extra probability randomness, including at zero buffer offset", () => {
+  const f = fixture("cym", { stickLevel: 100 });
+  const random = vi.spyOn(Math, "random").mockReturnValue(0.25);
+  try {
+    f.trigger("cym", 2);
+    f.trigger("cym", 2.1);
+    expect(random).toHaveBeenCalledTimes(2); // The original wash offset only.
+    expect(f.sources[0].start).toHaveBeenCalledWith(2, 0.5);
+    expect(f.sources[1].start).toHaveBeenCalledWith(2, 0);
+    expect(f.sources[3].start.mock.calls[0][0]).toBe(2.1);
+    expect(f.sources[3].start.mock.calls[0][1]).toBeCloseTo(0.1);
+    expect(f.sources[1].loop).toBe(true);
+  } finally {
+    random.mockRestore();
+  }
+});
+
 it("adds an independently pitched cymbal bell with faster-damping upper partials", () => {
   const f = fixture("cym", { bellLevel: 50, bellFrequency: 600, bellDecay: 800, duration: 100, metalDecay: 200, lowpass: 6000 });
   f.patch.voices.cym.tune = 12;

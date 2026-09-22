@@ -593,13 +593,13 @@ export class SequencerEngine {
     parameter.linearRampToValueAtTime(0, time + Math.max(0.01, duration) + 0.005);
   }
 
-  private noiseSource(time: number, duration: number): AudioBufferSourceNode {
+  private noiseSource(time: number, duration: number, offset?: number): AudioBufferSourceNode {
     const source = this.context!.createBufferSource();
     source.buffer = this.noise;
     source.playbackRate.value = 1;
     // A random offset must not shorten long hats/cymbals to the buffer remainder.
     source.loop = true;
-    source.start(time, Math.random() * this.noise!.duration);
+    source.start(time, offset ?? Math.random() * this.noise!.duration);
     source.stop(time + duration + 0.05);
     return source;
   }
@@ -894,6 +894,16 @@ export class SequencerEngine {
     this.decay(gain.gain, time, p.amplitude * (custom ? value(p, "noiseLevel", 32) / 100 : p.machine === "909" ? 0.4 : 0.22), duration);
     this.noiseSource(time, duration).connect(filter).connect(gain).connect(bus);
     if (custom && value(p, "bellLevel", 0) > 0) this.cymbalBell(time, p, bus);
+    if (custom && value(p, "stickLevel", 0) > 0) this.cymbalStick(time, p, bus);
+  }
+
+  private cymbalStick(time: number, p: SynthParameters, destination: AudioNode): void {
+    const duration = value(p, "stickDecay", 15) / 1000;
+    const filter = this.filter("bandpass", value(p, "stickFilter", 4500) * 2 ** (p.tune / 24), 0.7, time);
+    const gain = this.gain(0, time);
+    this.attackDecay(gain.gain, time, p.amplitude * value(p, "stickLevel", 0) / 100, 0.001, duration);
+    // Use the shared noise timeline without consuming extra rhythm randomness.
+    this.noiseSource(time, duration, time % this.noise!.duration).connect(filter).connect(gain).connect(destination);
   }
 
   private cymbalBell(time: number, p: SynthParameters, destination: AudioNode): void {

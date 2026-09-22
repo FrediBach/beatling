@@ -188,6 +188,11 @@ export const VOICE_PARAMETER_SECTIONS: Record<VoiceId, VoiceParameterSection[]> 
       parameter("noiseLevel", "Noise level", 0, 100, 1, "Level of the broadband noise wash.", "%"),
       parameter("noiseHighpass", "Noise high-pass", 1000, 12000, 50, "High-pass cutoff for the noise wash.", "Hz"),
     ),
+    transient(
+      parameter("stickLevel", "Stick level", 0, 100, 1, "Level of a short filtered-noise tick, separate from the wash and bell. 0 disables it; Brightness also shapes this layer.", "%"),
+      parameter("stickFilter", "Stick filter", 800, 12000, 50, "Band-pass center of the stick tick. Lower values give a duller tap; higher values give a brighter tick. Follows Tune.", "Hz"),
+      parameter("stickDecay", "Stick length", 10, 120, 1, "Length of the stick transient, independent of the main Decay control and other layer lengths.", "ms"),
+    ),
     {
       title: "Bell",
       parameters: [
@@ -300,7 +305,7 @@ export const DEFAULT_CUSTOM_VOICE_SETTINGS: Record<VoiceId, CustomVoiceSettings>
   mt: { overtoneRatio: 1.5, overtoneDecay: 0, overtoneLevel: 0, bodyFrequency: 138, pitchAmount: 1.7, pitchDecay: 70, bodyLevel: 90, noiseLevel: 18, noiseFilter: 552, duration: 450 },
   ht: { overtoneRatio: 1.5, overtoneDecay: 0, overtoneLevel: 0, bodyFrequency: 196, pitchAmount: 1.7, pitchDecay: 70, bodyLevel: 90, noiseLevel: 18, noiseFilter: 784, duration: 450 },
   cow: { highDamping: 0, balance: 50, lowFrequency: 540, highFrequency: 800, filterFrequency: 2640, filterQ: 1.4, toneLevel: 55, duration: 360 },
-  cym: { bellLevel: 0, bellFrequency: 800, bellDecay: 500, metalDecay: 0, lowpass: 20000, metalBase: 40, metalLevel: 40, highpass: 4200, noiseLevel: 32, noiseHighpass: 5200, duration: 1400 },
+  cym: { stickLevel: 0, stickFilter: 4500, stickDecay: 15, bellLevel: 0, bellFrequency: 800, bellDecay: 500, metalDecay: 0, lowpass: 20000, metalBase: 40, metalLevel: 40, highpass: 4200, noiseLevel: 32, noiseHighpass: 5200, duration: 1400 },
   shk: { grainDepth: 0, grainRate: 60, noiseLevel: 50, filterFrequency: 6200, filterQ: 1.6, attack: 6, duration: 75 },
   bassline: { pulseWidth: 50, filterTracking: 0, playMode: 0, glide: 0, accentSource: 0, accentFilter: 0, accentDecay: 0, ampDecay: 0, root: 0, scale: 2, octave: 2, waveform: 0, cutoff: 700, resonance: 12, envelopeAmount: 82, filterDecay: 260, accent: 30 },
   lead: { pulseWidth: 50, filterTracking: 0, playMode: 0, glide: 0, filterDecay: 0, subLevel: 0, root: 0, scale: 1, octave: 4, waveform: 0, pulseMix: 28, detune: 7, cutoff: 3200, resonance: 3.5, envelopeAmount: 38, attack: 8, release: 520 },

@@ -18,12 +18,24 @@ Drum synthesis controls appear under **Custom → Configure**. Open-hat articula
 | Mid tom | Body and shell need separate balance, pitch interval and damping. | Independent **Overtone**, **Overtone ratio** and **Overtone length** for the mid register. Fundamental pitch and sweep remain intact. |
 | High tom | Extra attack noise adds broadband energy rather than an independently shaped pitched mode. | **Overtone**, **Overtone ratio** and **Overtone length** shape a separate pitched attack or ring. |
 | Cowbell | Its two square oscillators initially had equal levels and always shared the same decay, keeping their balance fixed through the tail. | **Partial balance** sets their starting mix. **High damping** lets the High oscillator fade faster so the tail can favor the Low oscillator. Zero damping preserves equal decay. |
-| Cymbal | Metal ring and noise wash share a decay and the source lacks a distinct pitched strike. | **Metal length** separates ring from wash. Optional **Bell level/pitch/length** adds an independently shaped strike. **Brightness** softens all layers; noise lasts for the full requested tail. |
+| Cymbal | Metal and wash initially shared a decay, with no separate pitched bell or short stick transient. | **Metal length** separates ring from wash. **Bell level/pitch/length** adds a pitched strike; **Stick level/filter/length** adds a short noise tick. **Brightness** shapes all layers; wash lasts for the full requested tail. |
 | Shaker | One smooth filtered-noise envelope limits the sense of separate grain impacts. Short envelope ordering and silent-noise handling also needed correction. | **Grain depth** (0–100%) and **Grain rate** (20–120 Hz) add optional pulses with varying peaks. Zero depth retains the original swish. The envelope ends at least 5 ms after the attack and honors zero level. |
 | Bassline | Filter decay also determines amplitude decay, preventing a sustained bass under a short filter sweep. | **Amplitude length**, 0–2400 ms. Zero follows Filter decay; positive values decouple the envelopes. Both still scale with the main Decay control. |
 | Lead | Filter sweep follows release, and the companion oscillator only thickens the same register. | **Filter decay**, 0–2400 ms, decouples the sweep (zero follows Release). **Sub oscillator** adds a sine one octave down through the same filter and amplitude envelope. |
 
 Suggested values above are starting points for auditioning, not newly imposed preset settings.
+
+## Cymbal stick transient
+
+**Cymbal → Custom → Configure → Transient** adds a separate filtered-noise tick:
+
+- **Stick level:** 0–100%; zero disables the layer.
+- **Stick filter:** 800–12000 Hz band-pass center. Lower settings give a duller tap; higher settings give a brighter tick. Tune moves this filter at half the rate of the pitched bell.
+- **Stick length:** 10–120 ms, independent of main Decay, wash length, metal length and bell length.
+
+Try **Stick level around 20–35%**, **Stick filter around 4500–6500 Hz**, and **Stick length around 12–25 ms** as starting points for a defined attack over a long wash. Lower Metal level and Noise level to expose the tick; setting both and Bell level to zero isolates it. The layer has a 1 ms attack, passes through Brightness and feeds the existing effect sends. A low Brightness setting can soften or hide the tick.
+
+The shared noise buffer supplies the transient at an offset determined by audio time, without extra random draws that could change probability decisions. No new noise buffer is generated per hit. Old patches keep Stick level at zero, with a dormant 4500 Hz filter and 15 ms length. The 808/909 models ignore the new controls. This is a designed attack layer, not a physical stick-impact model.
 
 ## Cowbell high damping
 
@@ -148,11 +160,11 @@ Try Lead Filter tracking 50–100% with a low cutoff for a phrase spanning sever
 
 ## Shared corrections and compatibility
 
-- Noise loops the existing buffer from a randomized offset and stops explicitly after the requested duration. No new noise buffer is generated per hit.
+- Main noise layers loop the existing buffer from a randomized offset and stop explicitly after the requested duration. The optional cymbal stick uses an audio-time offset without extra random draws. No new noise buffer is generated per hit.
 - Zero-level layers stay at zero; positive envelopes finish their exponential tail with a short ramp to exact silence.
 - Shaker attack/decay ordering is valid at the full supported range. All sources retain bounded stop times.
 - Voice filter cutoffs and oscillator creation respect the active sample rate's Nyquist limit, including 32 kHz contexts. Low synth pitches remain available below 20 Hz.
-- Patch and arrangement format **v21** stores the numeric custom settings, including hat choking, bassline accent articulation and synth playback/glide. Readers still migrate v1–v20 storage and JSON. Older patches receive neutral defaults: no added harmonics/overtones/sub, bypassed brightness, centered partial balance, original snare/clap lengths and linked synth envelopes. Choking is off; accent brightness/length are zero and the accent source is Every note. Both synths default to Polyphonic with zero Glide; all existing voice shaping, accent and choke values are retained. Rim noise defaults to Linked (20 ms Noise length when Independent is enabled); hat/cymbal Metal length defaults to zero to follow the original duration. Cymbal Bell level defaults to zero, with 800 Hz Bell pitch and 500 ms Bell length ready when enabled. Both synths default to zero Filter tracking. Snare pitch stays fixed (1× with a dormant 30 ms pitch decay), and Noise attack defaults to zero. Synth Pulse width defaults to the original 50% square. Shaker Grain depth defaults to zero with a dormant 60 Hz Grain rate. Tom Overtone ratio defaults to 1.5×, with zero Overtone length preserving the original 45% body-duration link. Clap Tail filter and Tail attack default to zero for the original linked filter and immediate tail. Cowbell High damping defaults to zero for the original equal partial decay.
+- Patch and arrangement format **v22** stores the numeric custom settings, including hat choking, bassline accent articulation and synth playback/glide. Readers still migrate v1–v21 storage and JSON. Older patches receive neutral defaults: no added harmonics/overtones/sub, bypassed brightness, centered partial balance, original snare/clap lengths and linked synth envelopes. Choking is off; accent brightness/length are zero and the accent source is Every note. Both synths default to Polyphonic with zero Glide; all existing voice shaping, accent and choke values are retained. Rim noise defaults to Linked (20 ms Noise length when Independent is enabled); hat/cymbal Metal length defaults to zero to follow the original duration. Cymbal Bell level defaults to zero, with 800 Hz Bell pitch and 500 ms Bell length ready when enabled. Both synths default to zero Filter tracking. Snare pitch stays fixed (1× with a dormant 30 ms pitch decay), and Noise attack defaults to zero. Synth Pulse width defaults to the original 50% square. Shaker Grain depth defaults to zero with a dormant 60 Hz Grain rate. Tom Overtone ratio defaults to 1.5×, with zero Overtone length preserving the original 45% body-duration link. Clap Tail filter and Tail attack default to zero for the original linked filter and immediate tail. Cowbell High damping defaults to zero for the original equal partial decay. Cymbal Stick level defaults to zero, with a dormant 4500 Hz Stick filter and 15 ms Stick length.
 - 808/909 drum selections retain their existing circuits; choose Custom for the added shaping controls. Preset rhythms, balances, effect sends, routing and variation histories retain their existing meaning. The shared envelope/noise bug fixes apply to all models.
 
 ## Remaining synthesis opportunities
@@ -161,7 +173,7 @@ These require separate behavior decisions or auditioning rather than additional 
 
 1. **Legato and gate-driven sustain.** Mono retrigger and glide now share persistent note ownership and pitch state, but still create a new synthesis graph per hit. Phase-continuous legato and gate-driven sustain require reusable oscillator/filter graphs, explicit gate overlap semantics and a separate envelope design.
 2. **Nonlinear bassline filter.** Accent now optionally shapes the filter envelope, but the filter itself remains a native Web Audio low-pass. A calibrated nonlinear stage needs reference listening and level-matched comparisons.
-3. **Metallic texture.** Hats and cymbal share a six-square-wave source. Metal and noise now have independent lengths. The cymbal also has an optional additive bell with faster-damping upper partials. A dedicated stick transient or richer wash excitation could further distinguish it from the hats; the current bell is a designed timbre, not a physical model.
+3. **Metallic texture.** Hats and cymbal share a six-square-wave source. Metal and noise now have independent lengths. The cymbal also has an optional additive bell with faster-damping upper partials and a separate stick-noise transient. Richer wash excitation could further distinguish it from the hats; the bell and stick remain designed timbres, not physical models.
 4. **Model differentiation.** Rim, cowbell and shaker have no separate 808/909 synthesis branches; tom models mainly differ in duration. The UI labels should not be taken as separate accurate emulations. More distinct models need reference listening and level-matched comparisons.
 
 ## Verification
@@ -172,7 +184,7 @@ These require separate behavior decisions or auditioning rather than additional 
 
 `src/audio/synth-articulation.test.ts` checks note stealing, interrupted glides, simultaneous-hit arbitration, gaps, mode changes, audio-time cleanup, reset and bounded tracking. Voice integration tests exercise both synths, synchronized lead oscillators, independent ownership, muted triggers, routed/Bernoulli hits and transport teardown.
 
-`src/lib/voice-config.test.ts` covers v9/v10/v11/v12/v13/v14/v15/v16/v17/v18/v19/v20 storage migration, neutral defaults, new-control round trips, numeric bounds and malformed values. `src/components/voice-bank.test.tsx` verifies accessible editing, reopening and resetting of every new control, including choking across model changes and synth playback/glide. The full quality gate also checks the existing preset and routing suite.
+`src/lib/voice-config.test.ts` covers v9/v10/v11/v12/v13/v14/v15/v16/v17/v18/v19/v20/v21 storage migration, neutral defaults, new-control round trips, numeric bounds and malformed values. `src/components/voice-bank.test.tsx` verifies accessible editing, reopening and resetting of every new control, including choking across model changes and synth playback/glide. The full quality gate also checks the existing preset and routing suite.
 
 `src/lib/synth-filter.test.ts` checks full/partial pitch tracking, overlapping envelope/glide curves, frequency-limit plateaus and bounded automation. Voice integration tests cover quantized V/Oct, both synths, interrupted glides, original zero-tracking behavior and bassline accent coupling.
 
@@ -185,3 +197,5 @@ Tom voice tests cover all three registers, independent and linked shell lengths,
 Clap voice tests cover independent tail tone/routing, Tune and sample-rate limits, fade-in from the final burst, attack-safe short tails, fixed attack under Decay modulation, both controls independently, silent layers and legacy model compatibility. Migration and UI tests verify neutral defaults, saving, reopening and resetting. Validation covers scheduled audio graphs; the new timbres still need auditioning.
 
 Cowbell voice tests cover high-only damping before the shared filter/envelope, gradual strength near zero, unchanged node counts and source lifetime, Decay scaling, unchanged tuning, silent partials and Tone level, very short tails and legacy model compatibility. Migration and UI tests cover the neutral default, round trips, editing and resetting. These validate scheduled graphs; listening comparisons remain separate.
+
+Cymbal stick tests cover independent transient length under Decay modulation, Tune/filter limits, level scaling, routing through Brightness and the voice bus, isolated stick playback, unchanged wash/metal/bell lengths, legacy-model bypass and random-stream preservation including zero buffer offset. Migration and UI tests verify all three controls, neutral defaults and saved edits. These are graph and scheduling checks; the new timbre still needs auditioning.
