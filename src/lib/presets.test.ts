@@ -364,7 +364,65 @@ describe("Half-Time Bass Groove", () => {
   });
 });
 
-describe.each(["electro-backbeat", "electro-funk-maracas", "stripped-808-breakbeat", "bass-tempo-standard", "double-time-bass", "half-time-bass-groove"])("%s persistence", (id) => {
+describe("Boom Bap", () => {
+  it("preserves the swung drum groove and adds a restrained fourth-bar pickup", () => {
+    const patch = createPresetPatch("boom-bap", 63);
+    expect(patch).toMatchObject({ bpm: 90, rate: 4, swing: 16, vol: 63 });
+    expect(hitsFor(patch, "kick", 1)).toEqual([0, 6, 10]);
+    expect(hitsFor(patch, "snare", 1)).toEqual([4, 12]);
+    expect(hitsFor(patch, "ch", 1)).toEqual([0, 2, 3, 4, 6, 8, 10, 11, 12, 14]);
+    expect(hitsFor(patch, "snare", 4)).toEqual([4, 12, 20, 28, 36, 44, 51, 52, 59, 60]);
+    expect(hitsFor(patch, "oh", 4)).toEqual([14, 30, 46]);
+    expect(hitsFor(patch, "bassline", 4)).toEqual([1, 7, 12, 17, 23, 28, 33, 39, 44, 49, 57]);
+    expect(hitsFor(patch, "lead", 4)).toEqual([3, 11, 35, 43]);
+    expect(patch.effects.delay).toMatchObject({ enabled: true, sync: false, time: 95 });
+    expect(patch.effects.sends.lead.delay).toBeGreaterThan(0);
+    expect(patch.effects.compressor.enabled).toBe(true);
+    expect(patch.effects.sends.snare.compressor).toBeGreaterThan(0);
+    for (const voice of ["kick", "bassline", "ch"] as const) {
+      expect(patch.effects.sends[voice].reverb).toBe(0);
+      expect(patch.effects.sends[voice].delay).toBe(0);
+    }
+  });
+
+  it("plays D Dorian and keeps hat and snare pickups softer than the main hits", () => {
+    const patch = createPresetPatch("boom-bap");
+    const modulationAt = (voice: VoiceId, step: number) => effectiveVoiceModulation(patch.voices[voice], (source) => {
+      const block = patch.blocks[source];
+      return euclideanLfoValue(block.shape, step, block, 0.5);
+    });
+    const notes = hitsFor(patch, "bassline", 1).map((step) => quantizeVoiceCv(patch.voices.bassline.custom, modulationAt("bassline", step).vOct).midi);
+    // D, G and B: the natural sixth distinguishes Dorian from natural minor.
+    expect(notes).toEqual([38, 43, 47]);
+    expect(patch.voices.lead.custom).toMatchObject({ root: 2, scale: 3, waveform: 2 });
+    for (const voice of ["ch", "snare"] as const) {
+      expect(modulationAt(voice, 3).level).toBeLessThan(modulationAt(voice, 4).level);
+      expect(modulationAt(voice, 11).level).toBeLessThan(modulationAt(voice, 12).level);
+    }
+  });
+
+  it("adds a ghost-snare lift, strips back the break and leaves a short rim ending", () => {
+    const [groove, lift, breakdown, fill] = createPresetArrangement("boom-bap").variations.map(({ patch }) => patch);
+    expect(hitsFor(lift, "kick", 4)).toEqual(hitsFor(groove, "kick", 4));
+    expect(hitsFor(lift, "snare", 1)).toEqual([3, 4, 11, 12]);
+    expect(hitsFor(lift, "bassline", 4).length).toBeGreaterThan(hitsFor(groove, "bassline", 4).length);
+    expect(hitsFor(breakdown, "kick", 2)).toEqual([0, 10, 16, 26]);
+    expect(hitsFor(breakdown, "snare", 2)).toEqual([4, 12, 20, 28]);
+    expect(hitsFor(breakdown, "ch", 1)).toEqual([0, 2, 4, 6, 8, 10, 12, 14]);
+    expect(hitsFor(breakdown, "oh", 2)).toEqual([]);
+    expect(hitsFor(breakdown, "bassline", 2)).toEqual([1, 9, 25]);
+    expect(hitsFor(fill, "snare", 2)).toEqual([4, 12, 20, 27, 28]);
+    expect(hitsFor(fill, "rim", 2)).toEqual([30]);
+    expect(hitsFor(fill, "ch", 2)).toEqual([0, 2, 3, 4, 6, 8, 10, 11, 12, 14, 16, 18, 20, 22, 24, 26]);
+    expect(hitsFor(fill, "bassline", 2)).toEqual([1, 7, 12, 17]);
+    expect(hitsFor(fill, "lead", 2)).toEqual([3, 11]);
+    expect(hitsFor(fill, "oh", 2)).toEqual([14]);
+    expect(hitsFor(fill, "rim", 4)).toEqual([30, 62]);
+    expect(hitsFor(fill, "ch", 3)).toContain(35);
+  });
+});
+
+describe.each(["electro-backbeat", "electro-funk-maracas", "stripped-808-breakbeat", "bass-tempo-standard", "double-time-bass", "half-time-bass-groove", "boom-bap"])("%s persistence", (id) => {
   it("round-trips every variation and keeps series, routes and sends independently editable", () => {
     const arrangement = createPresetArrangement(id);
     for (const { patch } of arrangement.variations) {
