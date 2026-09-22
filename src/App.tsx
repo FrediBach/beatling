@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useEffectEvent, useId, useMemo, useRef, useState, type SetStateAction } from "react";
-import { Dices, Cable, Eraser, GripVertical, ListMusic, Lock, LockOpen, Minus, Play, Plus, RotateCcw, Square, Trash2, Volume2, VolumeX } from "lucide-react";
+import { Cable, GripVertical, ListMusic, Minus, Play, Plus, RotateCcw, Square, Trash2, Volume2, VolumeX } from "lucide-react";
 import { SequencerEngine } from "@/audio/engine";
 import { InstrumentHeader } from "@/components/instrument-header";
 import { ExportDialog } from "@/components/export-dialog";
@@ -11,6 +11,7 @@ import { CABLE_SIGNALS } from "@/lib/cables";
 import { connectionsFor } from "@/lib/routing";
 import { SequencerCard } from "@/components/sequencer-card";
 import { SessionPresetControls } from "@/components/session-preset-controls";
+import { PatternToolbar } from "@/components/pattern-toolbar";
 import { VoiceBank } from "@/components/voice-bank";
 import { RATE_OPTIONS, VOICE_DEFS } from "@/lib/constants";
 import { effectiveBlock, volumeGain } from "@/lib/euclid";
@@ -337,7 +338,7 @@ export default function App() {
     } else {
       songBarsRef.current = 0;
       await engine.start();
-      setPlaying(engine.running);
+      setPlaying(engine.running && !engine.auditioning);
     }
   }, [engine]);
 
@@ -581,7 +582,11 @@ export default function App() {
                 {activeVariation > 0 && <button type="button" className="delete-variation" aria-label={`Delete variation ${variations[activeVariation].name}`} onClick={deleteVariation} title="Delete selected variation"><Trash2 size={11} /></button>}
               </>}
             </div>
-            <div className="grid-actions"><button onClick={() => applyPatch(shufflePatch(patch, Math.random, randomizationLocks))} title="Shuffle unlocked settings, preserving routing" disabled={allSettingsLocked}><Dices size={13} />Shuffle</button><button className="lock-all-button" aria-pressed={allSettingsLocked} onClick={() => setRandomizationLocks(createRandomizationLocks(!allSettingsLocked))} title={allSettingsLocked ? "Unlock every pattern setting" : "Lock every pattern setting"}>{allSettingsLocked ? <Lock size={12} /> : <LockOpen size={12} />}{allSettingsLocked ? "Unlock all" : "Lock all"}</button><button onClick={() => applyPatch(createEmptyPatch(patch.vol))}><Eraser size={13} />Clear</button></div>
+            <PatternToolbar patch={patch} variationId={variations[activeVariation].id} locks={randomizationLocks} engine={engine} onPause={() => setPlaying(false)} onApply={(next, source, variationId) => {
+              if (historyRef.current.present !== source || variationsRef.current[activeVariationRef.current].id !== variationId) return false;
+              applyPatch(next);
+              return true;
+            }} allLocked={allSettingsLocked} onShuffle={() => applyPatch(shufflePatch(patch, Math.random, randomizationLocks))} onToggleLocks={() => setRandomizationLocks(createRandomizationLocks(!allSettingsLocked))} onClear={() => applyPatch(createEmptyPatch(patch.vol))} />
           </div>
           {view === "grid" ? <><div className="cable-controls">
             <button type="button" className="cable-toggle" role="switch" aria-checked={showCables} onClick={() => setShowCables((current) => !current)}><Cable size={13} />Patch cables<span className="toggle-track" aria-hidden="true"><i /></span></button>

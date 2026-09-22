@@ -1,6 +1,6 @@
 # Musical randomizer implementation plan
 
-Status: proposal; application implementation has not started.
+Status: implemented in the guided Musical randomizer. The first release uses 32 bounded candidates, six recent ideas, deterministic synth pitch recipes, and the existing engine for audition. New-groove mode conservatively preserves an entire slot/voice when any of its parameters is locked. Reshape works on direct division-one lanes at rate 4, preserves existing rhythm series and sounds, and reports unsupported or missing parts. Arrangement generation and independent part rerolls remain future work as scoped below.
 
 ## Product direction
 

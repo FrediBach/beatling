@@ -98,10 +98,13 @@ export class SequencerEngine {
   private displayClockPulse = -1;
   private _running = false;
   private barCallback: (() => void) | null = null;
-  private getPatch: () => Patch;
+  private sourcePatch: () => Patch;
+  private auditionPatch: Patch | null = null;
+  private startRequest = 0;
+  private getPatch = () => this.auditionPatch ?? this.sourcePatch();
 
   constructor(source: Patch | (() => Patch)) {
-    this.getPatch = typeof source === "function" ? source : () => source;
+    this.sourcePatch = typeof source === "function" ? source : () => source;
     this.resetRuntime();
     VOICE_DEFS.forEach(({ id }) => this.voiceHitAt.set(id, -1));
   }
@@ -111,9 +114,11 @@ export class SequencerEngine {
   }
 
   async start(): Promise<void> {
+    const request = ++this.startRequest;
     this.initAudio();
     if (!this.context) return;
     if (this.context.state === "suspended") await this.context.resume();
+    if (request !== this.startRequest || !this.context) return;
     this.resetRuntime();
     this.pulseIndex = 0;
     this.pulsesIntoBar = 0;
@@ -125,6 +130,7 @@ export class SequencerEngine {
   }
 
   stop(): void {
+    this.startRequest += 1;
     this._running = false;
     this.outputAnalysers.forEach((analyser) => this.disconnectOutputAnalyser(analyser));
     if (this.timer !== null) window.clearInterval(this.timer);
@@ -143,7 +149,7 @@ export class SequencerEngine {
 
   setVolume(value: number): void {
     if (this.master && this.context) {
-      this.master.gain.setTargetAtTime(volumeGain(value), this.context.currentTime, 0.02);
+      this.master.gain.setTargetAtTime(volumeGain(this.auditionPatch?.vol ?? value), this.context.currentTime, 0.02);
     }
   }
 
@@ -172,8 +178,28 @@ export class SequencerEngine {
   }
 
   setPatch(patch: Patch): void {
-    this.getPatch = () => patch;
+    this.endAudition();
+    this.sourcePatch = () => patch;
     this.applyEffects();
+  }
+
+  get auditioning(): boolean { return this.auditionPatch !== null; }
+
+  beginAudition(patch: Patch): void {
+    this.stop();
+    this.auditionPatch = patch;
+    this.resetRuntime();
+    this.applyEffects();
+    this.setVolume(patch.vol);
+  }
+
+  endAudition(): void {
+    if (!this.auditionPatch) return;
+    this.stop();
+    this.auditionPatch = null;
+    this.resetRuntime();
+    this.applyEffects();
+    this.setVolume(this.sourcePatch().vol);
   }
 
   setBarCallback(callback: (() => void) | null): void {
@@ -186,6 +212,7 @@ export class SequencerEngine {
 
   destroy(): void {
     this.stop();
+    this.auditionPatch = null;
     void this.context?.close();
     this.context = null;
     this.reverbImpulses.clear();
@@ -461,7 +488,7 @@ export class SequencerEngine {
     const patchBeforeBoundary = this.getPatch();
     if (this.pulsesIntoBar >= patchBeforeBoundary.rate * 4) {
       this.pulsesIntoBar = 0;
-      this.barCallback?.();
+      if (!this.auditionPatch) this.barCallback?.();
     }
     this.clockQueue.push({ time, pulse: pulseIndex });
     const patch = this.getPatch();
