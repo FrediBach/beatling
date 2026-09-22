@@ -1,4 +1,4 @@
-import { BLOCK_COUNT, type LfoShape, type ModDestination, type Patch } from "@/lib/types";
+import { BLOCK_COUNT, type LfoShape, type ModDestination, type Patch, type SequencerBlock } from "@/lib/types";
 import { blockName, padBlock, voiceTag } from "@/lib/constants";
 import { rhythmsFor } from "@/lib/rhythm-series";
 
@@ -23,6 +23,11 @@ const sourceNumber = (value: string) => {
 
 const luaString = (value: string) => `"${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`;
 
+// Bernoulli probability chooses a browser voice; it never drops a trigger.
+const rhythmModulations = (block: SequencerBlock) => block.modulations.filter((route) =>
+  route.source !== "" && DESTINATION_NUMBER[route.destination] > 0
+  && !(block.kind === "bernoulli" && route.destination === "prob"));
+
 export function buildLua(patch: Patch): string {
   const usedTriggers = new Set<number>();
   const usedLfos = new Set<number>();
@@ -30,8 +35,8 @@ export function buildLua(patch: Patch): string {
     block.clk.forEach((source) => source !== "G" && usedTriggers.add(Number(source)));
     if (!["", "G", "BAR"].includes(block.rst)) usedTriggers.add(Number(block.rst));
     if (block.mut !== "") usedTriggers.add(Number(block.mut));
-    block.modulations.forEach((route) => {
-      if (route.source !== "" && route.amount !== 0) usedLfos.add(Number(route.source));
+    rhythmModulations(block).forEach((route) => {
+      if (route.amount !== 0) usedLfos.add(Number(route.source));
     });
   });
 
@@ -59,29 +64,32 @@ export function buildLua(patch: Patch): string {
     const voiceTargets = block.modulations.filter((route) => ["tune", "decay", "level"].includes(route.destination));
     const browserNotes = [
       voiceTargets.length ? `voice mod (${voiceTargets.map((route) => route.destination).join(", ")})` : "",
-      block.kind === "bernoulli" ? `Bernoulli voices ${block.branchVoices.join("/")}` : "",
+      block.kind === "bernoulli" ? `Bernoulli voices ${block.branchVoices.join("/")} (branch chance and its modulation)` : "",
     ].filter(Boolean);
     const browserOnly = browserNotes.length ? `  -- browser ${browserNotes.join("; ")} not exported` : "";
-    const mods = block.modulations
-      .filter((route) => route.source !== "" && DESTINATION_NUMBER[route.destination] > 0)
-      .map((route) => `{ src=${Number(route.source) + 1}, dst=${DESTINATION_NUMBER[route.destination]}, amt=${route.amount.toFixed(2)} }`)
+    const mods = rhythmModulations(block)
+      .map((route) => `{ src=${Number(route.source) + 1}, dst=${DESTINATION_NUMBER[route.destination]}, amt=${route.amount} }`)
       .join(", ");
     const series = rhythmsFor(block)
       .map((rhythm) => `{ steps=${rhythm.steps}, pulses=${rhythm.pulses}, rot=${rhythm.rot}, repeats=${rhythm.repeats} }`)
       .join(", ");
-    return `\t\t{ steps=${block.steps}, pulses=${block.pulses}, rot=${block.rot}, series={${series}}, div=${block.div}, prob=${block.prob}, gate=${block.gate}, clk={${block.clk.map(sourceNumber).join(", ")}}, rst=${sourceNumber(block.rst)}, mut=${block.mut === "" ? 0 : Number(block.mut) + 1}, mn=${block.mute}, shape=${SHAPE_NUMBER[block.shape]}, euclidean=${!voiceBlock}, mods={${mods}}, out=${outputIndexes[index]}, lout=${lfoIndexes[index]}, tag=${luaString(voiceBlock ? voiceTag(block.voice) : "--")} },${browserOnly}`;
+    return `\t\t{ steps=${block.steps}, pulses=${block.pulses}, rot=${block.rot}, series={${series}}, div=${block.div}, prob=${block.kind === "bernoulli" ? 100 : block.prob}, gate=${block.gate}, clk={${block.clk.map(sourceNumber).join(", ")}}, rst=${sourceNumber(block.rst)}, mut=${block.mut === "" ? 0 : Number(block.mut) + 1}, mn=${block.mute}, shape=${SHAPE_NUMBER[block.shape]}, euclidean=${!voiceBlock}, mods={${mods}}, out=${outputIndexes[index]}, lout=${lfoIndexes[index]}, tag=${luaString(voiceBlock ? voiceTag(block.voice) : "--")} },${browserOnly}`;
   });
   const voiceRoutingNotes = Object.entries(patch.voices).flatMap(([id, voice]) => voice.modulations
     .filter((route) => route.source !== "")
     .map((route) => `-- browser voice routing: ${id} ${route.destination} <- block ${Number(route.source) + 1} (${Math.round(route.amount * 100)}%) not exported`));
   const outputRows = outputs.map((output) => `\t\t{ type=${luaString(output.type)}, name=${luaString(output.name)} },`);
+  const omittedLfos = [...usedLfos].filter((index) => lfoIndexes[index] === 0).sort((a, b) => a - b);
 
   return `-- Beatling data for the Euclid Grid example in Luading
-return {
+-- Contract: docs/lua-export.md; active patch rhythm/control data only.
+-- Browser synthesis, voice settings/routing, effects and song arrangement are not exported.
+${omittedLfos.length ? `-- Output limit (28): no linear output for blocks ${omittedLfos.map((index) => index + 1).join(", ")}; internal modulation still applies.\n` : ""}return {
 \tversion = 1,
 \tbpm = ${patch.bpm},
 \trate = ${patch.rate},
 \tbar = ${patch.rate * 4},
+\tswing = ${patch.swing},
 \toutputs = {
 ${outputRows.join("\n")}
 \t},

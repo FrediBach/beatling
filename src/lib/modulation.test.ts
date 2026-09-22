@@ -120,7 +120,7 @@ describe("multiple modulation targets", () => {
       { source: 13, target: 0, output: "LFO", input: "voice tune" },
     ]);
     const lua = buildLua(patch);
-    expect(lua).toContain("mods={{ src=13, dst=3, amt=-0.65 }, { src=13, dst=2, amt=0.50 }}");
+    expect(lua).toContain("mods={{ src=13, dst=3, amt=-0.65 }, { src=13, dst=2, amt=0.5 }}");
     expect(lua).toContain("browser voice mod (tune) not exported");
   });
 
