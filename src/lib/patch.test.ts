@@ -175,7 +175,7 @@ describe("patches", () => {
   });
 
   it("uses genre-aware four-hit endings for presets with generated fill variations", () => {
-    const house = createPresetArrangement("rave-stomp").variations[3].patch;
+    const house = createPresetArrangement("hardgroove").variations[3].patch;
     const garage = createPresetArrangement("two-step").variations[3].patch;
     const endingHits = (patch: typeof house, voices: string[]) => Array.from({ length: 4 }, (_, offset) => patch.blocks.some((block) => voices.includes(block.voice) && euclidHit(patch.rate * 4 - 4 + offset, block.steps, block.pulses, block.rot)));
     expect(endingHits(house, ["ht", "mt", "lt", "snare"])).toEqual([true, true, true, true]);
