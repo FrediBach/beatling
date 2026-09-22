@@ -2592,7 +2592,85 @@ describe("Dancehall", () => {
   });
 });
 
-describe.each(["electro-backbeat", "electro-funk-maracas", "stripped-808-breakbeat", "bass-tempo-standard", "double-time-bass", "half-time-bass-groove", "boom-bap", "sparse-808-ballad", "modern-808-hip-hop", "trap-standard", "triplet-trap", "drill-variant", "basic-house", "open-hat-house", "deep-house-shuffle", "jackin-house", "acid-basic", "acid-tom-fill", "hypnotic-acid", "detroit-syncopated-clap", "rolling-techno", "tom-driven-techno", "minimal-dub-techno", "rave-stomp", "hardgroove", "offbeat-kick-techno", "gabber-adjacent", "two-step", "speed-garage", "future-garage", "slow-808-soul", "synth-pop-mid-tempo", "contemporary-rnb", "dembow", "reggaeton", "dancehall"])("%s persistence", (id) => {
+describe("Afrobeats / Amapiano-Adjacent", () => {
+  it("preserves the interlocking drum parts and places quieter synth phrases around the low tom", () => {
+    const patch = createPresetPatch("afrobeats-amapiano", 60);
+    expect(patch).toMatchObject({ bpm: 112, rate: 4, swing: 12, vol: 60 });
+    expect(hitsFor(patch, "kick", 2)).toEqual([0, 3, 6, 8, 14, 16, 19, 22, 24, 30]);
+    expect(hitsFor(patch, "rim", 2)).toEqual([4, 12, 20, 28]);
+    expect(hitsFor(patch, "lt", 4)).toEqual([2, 5, 10, 13, 18, 21, 26, 29, 34, 37, 42, 45, 50, 58, 61]);
+    expect(hitsFor(patch, "shk", 1)).toEqual([0, 1, 3, 4, 5, 7, 8, 9, 11, 12, 13, 15]);
+    expect(hitsFor(patch, "shk", 4).filter((step) => step >= 48)).toEqual([48, 50, 52, 54, 56, 58, 60, 62]);
+    expect(hitsFor(patch, "ch", 2)).toEqual([2, 6, 10, 14, 18, 22, 26, 30]);
+    expect(hitsFor(patch, "bassline", 2)).toEqual([1, 9, 23, 31]);
+    expect(hitsFor(patch, "lead", 2)).toEqual([5, 25]);
+    for (const id of ["kick", "rim", "lt", "shk", "ch"] as const) expect(patch.voices[id].machine).toBe("808");
+    expect(patch.voices.bassline.level).toBeLessThan(patch.voices.lt.level);
+    expect(patch.effects.distortion).toMatchObject({ enabled: true, mode: "soft" });
+    expect(patch.effects.sends.lt.distortion).toBeGreaterThan(0);
+    expect(patch.effects.sends.lt.reverb).toBe(0);
+    expect(patch.effects.sends.lt.delay).toBe(0);
+    expect(patch.effects.reverb).toMatchObject({ enabled: true, space: "room", lowCut: 800 });
+    expect(patch.effects.delay).toMatchObject({ enabled: true, sync: true, division: "1/8D", lowCut: 1100 });
+    expect(patch.effects.sends.lead.delay).toBeGreaterThan(0);
+    for (const id of ["kick", "bassline", "shk", "ch"] as const) {
+      expect(patch.effects.sends[id]).toEqual({ distortion: 0, delay: 0, reverb: 0, compressor: 0, karplus: 0 });
+    }
+  });
+
+  it("alternates root/octave tom bodies and plays F-sharp-minor synth notes with lighter high replies", () => {
+    const [patch, , , fill] = createPresetArrangement("afrobeats-amapiano").variations.map(({ patch }) => patch);
+    const modulationAt = (patch: Patch, voice: VoiceId, step: number) => effectiveVoiceModulation(patch.voices[voice], (source) => {
+      const block = patch.blocks[source];
+      return euclideanLfoValue(block.shape, step, block, 0.5);
+    });
+    const notesFor = (voice: "bassline" | "lead") => hitsFor(patch, voice, 2).map((step) => quantizeVoiceCv(patch.voices[voice].custom, modulationAt(patch, voice, step).vOct).name);
+    expect(notesFor("bassline")).toEqual(["F♯2", "C♯3", "F♯2", "C♯3"]);
+    expect(notesFor("lead")).toEqual(["A3", "C♯4"]);
+    const tomFrequency = (patch: Patch, step: number) => 92 * 2 ** ((patch.voices.lt.tune + modulationAt(patch, "lt", step).tune * 12) / 12);
+    expect(hitsFor(patch, "lt", 1).map((step) => tomFrequency(patch, step))).toEqual([46, 92, 46, 92]);
+    expect([28, 29, 30, 31].map((step) => tomFrequency(fill, step))).toEqual([46, 46, 92, 92]);
+    expect(modulationAt(patch, "lt", 5).level).toBeLessThan(modulationAt(patch, "lt", 2).level);
+    expect(modulationAt(patch, "lt", 5).decay).toBeLessThan(modulationAt(patch, "lt", 2).decay);
+    expect(modulationAt(fill, "lt", 31).level).toBeLessThan(modulationAt(fill, "lt", 28).level);
+    expect(modulationAt(fill, "lt", 31).decay).toBeLessThan(modulationAt(fill, "lt", 28).decay);
+    expect(modulationAt(patch, "shk", 1).level).toBeLessThan(modulationAt(patch, "shk", 0).level);
+    for (const { patch: variation } of createPresetArrangement("afrobeats-amapiano").variations) {
+      const lowDrums = new Set([...hitsFor(variation, "kick", 4), ...hitsFor(variation, "lt", 4)]);
+      expect(hitsFor(variation, "bassline", 4).some((step) => lowDrums.has(step))).toBe(false);
+    }
+  });
+
+  it("opens the melody, exposes the pitched toms in the break and clears the final beat for an octave rise", () => {
+    const [groove, lift, breakdown, fill] = createPresetArrangement("afrobeats-amapiano").variations.map(({ patch }) => patch);
+    for (const voice of ["kick", "rim", "ch", "bassline"] as const) expect(hitsFor(lift, voice, 4)).toEqual(hitsFor(groove, voice, 4));
+    expect(hitsFor(lift, "lead", 2)).toEqual([5, 13, 17, 25]);
+    expect(hitsFor(lift, "lt", 4)).toEqual([2, 5, 10, 13, 18, 21, 26, 29, 34, 37, 42, 45, 50, 53, 58, 61]);
+    expect(hitsFor(lift, "shk", 4)).toHaveLength(48);
+    expect(lift.voices.lead.custom.cutoff).toBeGreaterThan(groove.voices.lead.custom.cutoff);
+    expect(hitsFor(breakdown, "kick", 2)).toEqual([0, 8, 16, 24]);
+    expect(hitsFor(breakdown, "rim", 2)).toEqual([4, 12, 20, 28]);
+    expect(hitsFor(breakdown, "lt", 2)).toEqual([2, 5, 10, 13, 18, 21, 26, 29]);
+    expect(hitsFor(breakdown, "shk", 2)).toEqual(Array.from({ length: 8 }, (_, step) => step * 4));
+    expect(hitsFor(breakdown, "ch", 2)).toEqual([]);
+    expect(hitsFor(breakdown, "bassline", 2)).toEqual([1, 23]);
+    expect(hitsFor(breakdown, "lead", 2)).toEqual([25]);
+    expect(breakdown.voices.lead.custom.release).toBeGreaterThan(groove.voices.lead.custom.release);
+    expect(hitsFor(fill, "kick", 2)).toEqual([0, 3, 6, 8, 14, 16, 19, 22, 24]);
+    expect(hitsFor(fill, "rim", 2)).toEqual([4, 12, 20, 28]);
+    expect(hitsFor(fill, "lt", 2)).toEqual([2, 5, 10, 13, 18, 21, 28, 29, 30, 31]);
+    expect(hitsFor(fill, "bassline", 2)).toEqual([1, 9, 17]);
+    expect(hitsFor(fill, "lead", 2)).toEqual([5]);
+    expect(hitsFor(fill, "ch", 2)).toEqual([2, 6, 10, 14, 18, 22, 26]);
+    expect(hitsFor(fill, "shk", 2)).toEqual([0, 1, 3, 4, 5, 7, 8, 9, 11, 12, 13, 15, 16, 17, 19, 20, 21, 23, 24, 25, 27]);
+    for (const voice of ["kick", "rim", "lt", "shk", "ch", "bassline", "lead"] as const) {
+      const cycle = hitsFor(fill, voice, 2);
+      expect(hitsFor(fill, voice, 4)).toEqual([...cycle, ...cycle.map((step) => step + 32)]);
+    }
+  });
+});
+
+describe.each(["electro-backbeat", "electro-funk-maracas", "stripped-808-breakbeat", "bass-tempo-standard", "double-time-bass", "half-time-bass-groove", "boom-bap", "sparse-808-ballad", "modern-808-hip-hop", "trap-standard", "triplet-trap", "drill-variant", "basic-house", "open-hat-house", "deep-house-shuffle", "jackin-house", "acid-basic", "acid-tom-fill", "hypnotic-acid", "detroit-syncopated-clap", "rolling-techno", "tom-driven-techno", "minimal-dub-techno", "rave-stomp", "hardgroove", "offbeat-kick-techno", "gabber-adjacent", "two-step", "speed-garage", "future-garage", "slow-808-soul", "synth-pop-mid-tempo", "contemporary-rnb", "dembow", "reggaeton", "dancehall", "afrobeats-amapiano"])("%s persistence", (id) => {
   it("round-trips every variation and keeps series, routes and sends independently editable", () => {
     const arrangement = createPresetArrangement(id);
     for (const { patch } of arrangement.variations) {
@@ -2610,7 +2688,13 @@ describe.each(["electro-backbeat", "electro-funk-maracas", "stripped-808-breakbe
       expect(restored.voices.cow.modulations).toEqual(patch.voices.cow.modulations);
       expect(restored.voices.ch.modulations).toEqual(patch.voices.ch.modulations);
       expect(restored.voices.oh.modulations).toEqual(patch.voices.oh.modulations);
-      expect(restored.voices.lt.modulations).toEqual(patch.voices.lt.modulations);
+      // 808/909 toms ignore the custom-model defaults, which normalization
+      // snaps to editor increments. Preserve their active mix/tuning/routes.
+      expect(restored.voices.lt).toMatchObject({
+        machine: patch.voices.lt.machine, level: patch.voices.lt.level,
+        tune: patch.voices.lt.tune, decay: patch.voices.lt.decay,
+        mute: patch.voices.lt.mute, modulations: patch.voices.lt.modulations,
+      });
       expect(restored.voices.mt.modulations).toEqual(patch.voices.mt.modulations);
       expect(restored.voices.ht.modulations).toEqual(patch.voices.ht.modulations);
       expect(restored.voices.cym.modulations).toEqual(patch.voices.cym.modulations);
