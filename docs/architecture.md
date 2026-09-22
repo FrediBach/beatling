@@ -41,7 +41,7 @@ Pure domain modules in `src/lib` support both the UI and audio engine.
 | `src/lib/variations.ts` | Arrangement defaults, migrations, persistence, change detection | Preserve compatibility with versioned stored formats |
 | `src/lib/routing.ts`, `cables.ts`, `orbit.ts` | Derived routing and visualization data | No React state or side effects |
 | `src/lib/presets.ts`, `voice-config.ts`, `constants.ts` | Curated data and domain configuration | Keep source data separate from rendering |
-| `src/lib/preset-electro-backbeat.ts` | Authored Electro Backbeat synth parts, rhythm series, mix and four song variations | Refine freshly owned patches; keep fixed pitch-routing slots consistent across variations |
+| `src/lib/preset-electro-backbeat.ts`, `preset-electro-funk-maracas.ts` | Individually authored synth parts, rhythm series, mixes and four song variations, selected through the preset refiner registry | Refine freshly owned patches; keep fixed modulation-routing slots consistent across variations |
 | `src/lib/file-system-presets.ts` | JSON preset parsing plus directory/file reads and writes | Normalize every external file before exposing it to session state |
 | `src/audio/engine.ts` | Clock, routing evaluation, voice synthesis, runtime snapshots | Timing cannot depend on React renders; all loops stay bounded |
 | `src/components/` | Accessible controls and visualizations | Receive data and typed callbacks; no in-place domain mutation |

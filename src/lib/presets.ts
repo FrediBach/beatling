@@ -4,6 +4,12 @@ import { BLOCK_COUNT, type Arrangement, type Machine, type Patch, type Sequencer
 import { createEffects } from "@/lib/effects";
 import { VOICE_DEFS } from "@/lib/constants";
 import { refineElectroBackbeat } from "@/lib/preset-electro-backbeat";
+import { refineElectroFunkMaracas } from "@/lib/preset-electro-funk-maracas";
+
+const PRESET_REFINERS: Partial<Record<string, (patch: Patch, variation: 0 | 1 | 2 | 3) => void>> = {
+  "electro-backbeat": refineElectroBackbeat,
+  "electro-funk-maracas": refineElectroFunkMaracas,
+};
 
 interface PresetLane {
   voice: VoiceId;
@@ -244,7 +250,7 @@ export function createPresetPatch(id: string, volume = 72): Patch {
     voices,
     effects: createEffects(),
   };
-  if (id === "electro-backbeat") refineElectroBackbeat(patch, 0);
+  PRESET_REFINERS[id]?.(patch, 0);
   return patch;
 }
 
@@ -349,10 +355,11 @@ export function createPresetArrangement(id: string, volume = 72): Arrangement {
   const preset = DRUM_PRESETS.find((candidate) => candidate.id === id);
   if (!preset) throw new Error(`Unknown preset: ${id}`);
   const base = createPresetPatch(id, volume);
-  const patches = id === "electro-backbeat"
+  const refine = PRESET_REFINERS[id];
+  const patches = refine
     ? [base, ...([1, 2, 3] as const).map((variation) => {
       const patch = clonePatch(base);
-      refineElectroBackbeat(patch, variation);
+      refine(patch, variation);
       return patch;
     })]
     : [base, createLiftVariation(base), createBreakVariation(base), createFillVariation(base, preset)];
