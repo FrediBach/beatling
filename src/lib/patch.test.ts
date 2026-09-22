@@ -175,10 +175,10 @@ describe("patches", () => {
   });
 
   it("uses genre-aware four-hit endings for presets with generated fill variations", () => {
-    const house = createPresetArrangement("gabber-adjacent").variations[3].patch;
+    const dancehall = createPresetArrangement("dembow").variations[3].patch;
     const garage = createPresetArrangement("two-step").variations[3].patch;
-    const endingHits = (patch: typeof house, voices: string[]) => Array.from({ length: 4 }, (_, offset) => patch.blocks.some((block) => voices.includes(block.voice) && euclidHit(patch.rate * 4 - 4 + offset, block.steps, block.pulses, block.rot)));
-    expect(endingHits(house, ["ht", "mt", "lt", "snare"])).toEqual([true, true, true, true]);
+    const endingHits = (patch: typeof dancehall, voices: string[]) => Array.from({ length: 4 }, (_, offset) => patch.blocks.some((block) => voices.includes(block.voice) && euclidHit(patch.rate * 4 - 4 + offset, block.steps, block.pulses, block.rot)));
+    expect(endingHits(dancehall, ["lt", "mt", "rim", "snare"])).toEqual([true, true, true, true]);
     expect(endingHits(garage, ["snare", "rim", "clap"])).toEqual([true, true, true, true]);
   });
 
