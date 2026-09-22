@@ -77,6 +77,7 @@ export const VOICE_PARAMETER_SECTIONS: Record<VoiceId, VoiceParameterSection[]> 
     tone(
       parameter("toneFrequency", "Tone frequency", 80, 400, 1, "Fundamental pitch of the lower shell mode.", "Hz"),
       parameter("toneSpread", "Tone spread", 1.1, 2.4, 0.01, "Ratio between the two shell oscillators.", "×"),
+      parameter("upperLevel", "Upper level", 0, 100, 1, "Upper shell tone relative to Tone level. 67 keeps the original balance; 0 leaves only the lower shell tone.", "%"),
       parameter("pitchAmount", "Pitch sweep", 1, 4, 0.05, "Starting pitch of both shell modes as a multiple of their resting pitch; 1 keeps pitch fixed.", "×"),
       parameter("pitchDecay", "Pitch decay", 5, 150, 1, "Time to reach the resting shell pitch, independent of the main Decay control.", "ms"),
       parameter("toneLevel", "Tone level", 0, 100, 1, "Level of the pitched shell oscillators.", "%"),
@@ -89,6 +90,7 @@ export const VOICE_PARAMETER_SECTIONS: Record<VoiceId, VoiceParameterSection[]> 
     ),
     envelope(
       parameter("toneDecay", "Body length", 30, 600, 5, "Shell decay, independent of the snare wires; scaled by Decay.", "ms"),
+      parameter("upperDecay", "Upper length", 0, 600, 5, "Independent upper shell decay, scaled by Decay. 0 follows Body length; positive values can shorten or extend the upper ring.", "ms"),
       parameter("noiseDecay", "Noise length", 40, 900, 5, "Base noise decay before the main Decay control is applied.", "ms"),
     ),
   ],
@@ -310,7 +312,7 @@ VOICE_PARAMETER_SECTIONS.ht = tomSections("High tom");
 
 export const DEFAULT_CUSTOM_VOICE_SETTINGS: Record<VoiceId, CustomVoiceSettings> = {
   kick: { bodyLevel: 100, bodyAttack: 0, bodyTone: 0, bodyFrequency: 50, pitchAmount: 5.5, pitchDecay: 55, clickLevel: 32, clickFrequency: 1800, clickDecay: 16, bodyDecay: 620 },
-  snare: { pitchAmount: 1, pitchDecay: 30, noiseAttack: 0, toneDecay: 130, toneFrequency: 185, toneSpread: 1.62, toneLevel: 42, noiseLevel: 80, noiseFilter: 1800, noiseQ: 0.9, noiseDecay: 260 },
+  snare: { upperLevel: 67, upperDecay: 0, pitchAmount: 1, pitchDecay: 30, noiseAttack: 0, toneDecay: 130, toneFrequency: 185, toneSpread: 1.62, toneLevel: 42, noiseLevel: 80, noiseFilter: 1800, noiseQ: 0.9, noiseDecay: 260 },
   clap: { tailFilter: 0, tailAttack: 0, burstDecay: 18, burstCount: 3, burstSpacing: 11, burstLevel: 55, filterFrequency: 1080, filterQ: 1.1, tailLevel: 50, tailDecay: 220 },
   rim: { noiseFilter: 0, noiseQ: 0, noiseMode: 0, noiseDecay: 20, balance: 50, lowFrequency: 1670, highFrequency: 2350, filterFrequency: 1750, filterQ: 3.5, toneLevel: 70, noiseLevel: 25, duration: 35 },
   ch: { metalFocus: 9000, metalQ: 0.9, metalDecay: 0, lowpass: 20000, metalLevel: 50, metalBase: 40, highpass: 7400, noiseLevel: 18, noiseHighpass: 7800, duration: 58 },

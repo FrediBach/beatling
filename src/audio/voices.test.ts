@@ -313,6 +313,56 @@ it("sweeps both snare shell modes together without changing their spread or ampl
   expect(f.gains[0].gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1.025);
 });
 
+it.each([0, 20, 400])("sets snare upper length to %s ms without changing lower tone, sweep or noise", (upperDecay) => {
+  const f = fixture("snare", { upperLevel: 40, upperDecay, toneLevel: 60, toneDecay: 100, toneFrequency: 200, toneSpread: 1.5, pitchAmount: 2, pitchDecay: 30, noiseAttack: 8, noiseDecay: 300, noiseLevel: 50 });
+  f.patch.voices.snare.level = 50;
+  f.patch.voices.snare.decay = 0;
+  f.patch.voices.snare.tune = 7;
+  f.trigger("snare", 1, { tune: 5 / 12, level: 0.5 }); // Effective level 0.65, Tune +12, Decay 0.25.
+  expect(f.oscillators).toHaveLength(2);
+  expect(f.filters).toHaveLength(1);
+  expect(f.sources).toHaveLength(1);
+  expect(f.gains).toHaveLength(3);
+  const [noise, lower, upper] = f.gains;
+  const duration = (upperDecay || 100) / 1000 * 0.25;
+  expect(lower.gain.setValueAtTime).toHaveBeenLastCalledWith(0.39, 1);
+  expect(upper.gain.setValueAtTime.mock.lastCall![0]).toBeCloseTo(0.156);
+  expect(lower.gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1.025);
+  expect(upper.gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1 + Math.max(0.01, duration));
+  expect(upper.gain.linearRampToValueAtTime.mock.lastCall![1]).toBeCloseTo(1 + Math.max(0.01, duration) + 0.005);
+  expect(f.oscillators[0].stop.mock.calls[0][0]).toBeCloseTo(1.055);
+  expect(f.oscillators[1].stop.mock.calls[0][0]).toBeCloseTo(1 + duration + 0.03);
+  expect(f.oscillators[1].frequency.setValueAtTime).toHaveBeenLastCalledWith(1200, 1);
+  expect(f.oscillators[1].frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(600, 1.03);
+  expect(noise.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.325, 1.008);
+  expect(noise.gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1.075);
+  expect(f.sources[0].stop.mock.calls[0][0]).toBeCloseTo(1.125);
+  expect(upper.connect.mock.calls[0][0]).toBe(lower.connect.mock.calls[0][0]);
+  expect(upper.connect.mock.calls[0][0]).toBe(noise.connect.mock.calls[0][0]);
+});
+
+it("silences the upper snare tone independently while retaining its lower tone and noise", () => {
+  const f = fixture("snare", { upperLevel: 0, upperDecay: 600 });
+  f.trigger();
+  expect(f.gains[2].gain.setValueAtTime).toHaveBeenLastCalledWith(0, 1);
+  expect(f.gains[2].gain.exponentialRampToValueAtTime).not.toHaveBeenCalled();
+  expect(f.gains[2].gain.linearRampToValueAtTime).not.toHaveBeenCalled();
+  expect(f.gains[1].gain.setValueAtTime).toHaveBeenLastCalledWith(0.42, 1);
+  expect(f.gains[0].gain.setValueAtTime).toHaveBeenLastCalledWith(0.8, 1);
+});
+
+it("completes the shortest upper snare envelope before stopping its oscillator", () => {
+  const f = fixture("snare", { upperLevel: 100, upperDecay: 5, toneLevel: 70 });
+  f.patch.voices.snare.decay = 0;
+  f.trigger("snare", 1, { decay: -1 });
+  expect(f.gains[2].gain.setValueAtTime).toHaveBeenLastCalledWith(0.7, 1);
+  expect(f.gains[2].gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1.01);
+  const silentAt = f.gains[2].gain.linearRampToValueAtTime.mock.lastCall![1];
+  expect(silentAt).toBeCloseTo(1.015);
+  expect(f.oscillators[1].stop.mock.calls[0][0]).toBeGreaterThan(silentAt);
+  expect(f.oscillators[1].stop.mock.calls[0][0]).toBeCloseTo(1.03075);
+});
+
 it("gives snare noise its own attack while the shell begins immediately", () => {
   const f = fixture("snare", { noiseAttack: 20, noiseDecay: 300, toneDecay: 100, noiseLevel: 60, toneLevel: 40 });
   f.patch.voices.snare.level = 50;
@@ -338,18 +388,22 @@ it("finishes long snare attacks at minimum Decay without extending the shell", (
 });
 
 it.each(["custom", "808", "909"] as const)("retains the original %s snare with shaping disabled or unsupported", (machine) => {
-  const f = fixture("snare", { pitchAmount: machine === "custom" ? 1 : 4, pitchDecay: 150, noiseAttack: machine === "custom" ? 0 : 40 });
+  const f = fixture("snare", { upperLevel: machine === "custom" ? 67 : 0, upperDecay: machine === "custom" ? 0 : 600, pitchAmount: machine === "custom" ? 1 : 4, pitchDecay: 150, noiseAttack: machine === "custom" ? 0 : 40 });
   f.patch.voices.snare.machine = machine;
   f.trigger();
   for (const oscillator of f.oscillators) expect(oscillator.frequency.exponentialRampToValueAtTime).not.toHaveBeenCalled();
   expect(f.gains[0].gain.setValueAtTime).toHaveBeenLastCalledWith(0.8, 1);
   expect(f.gains[0].gain.linearRampToValueAtTime.mock.calls).toHaveLength(1); // Final silence, no attack.
   expect(f.gains[0].gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1 + (machine === "custom" ? 0.26 : machine === "909" ? 0.28 : 0.2));
+  expect(f.gains[1].gain.setValueAtTime).toHaveBeenLastCalledWith(0.42, 1);
+  expect(f.gains[2].gain.setValueAtTime).toHaveBeenLastCalledWith(0.42 * 0.67, 1);
+  for (const gain of f.gains.slice(1)) expect(gain.gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1.13);
+  for (const oscillator of f.oscillators) expect(oscillator.stop.mock.calls[0][0]).toBeCloseTo(1.16);
 });
 
 it("keeps a snare layer silent at zero level with pitch sweep and noise attack enabled", () => {
   for (const mutedLayer of ["toneLevel", "noiseLevel"]) {
-    const f = fixture("snare", { pitchAmount: 4, noiseAttack: 40, [mutedLayer]: 0 });
+    const f = fixture("snare", { upperLevel: 100, upperDecay: 600, pitchAmount: 4, noiseAttack: 40, [mutedLayer]: 0 });
     f.trigger();
     const silentGains = mutedLayer === "toneLevel" ? f.gains.slice(1) : [f.gains[0]];
     for (const gain of silentGains) {

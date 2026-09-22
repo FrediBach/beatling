@@ -720,8 +720,10 @@ export class SequencerEngine {
       }
       const gain = this.gain(0, time);
       const toneLevel = custom ? value(p, "toneLevel", 42) / 100 : 0.42;
-      const toneDuration = (custom ? value(p, "toneDecay", 130) / 1000 : 0.13) * p.decay;
-      this.decay(gain.gain, time, p.amplitude * toneLevel * (index ? 0.67 : 1), toneDuration);
+      const upperDecay = custom && index === 1 ? value(p, "upperDecay", 0) : 0;
+      const toneDuration = (upperDecay > 0 ? upperDecay / 1000 : custom ? value(p, "toneDecay", 130) / 1000 : 0.13) * p.decay;
+      const partialLevel = index === 1 ? custom ? value(p, "upperLevel", 67) / 100 : 0.67 : 1;
+      this.decay(gain.gain, time, p.amplitude * toneLevel * partialLevel, toneDuration);
       oscillator.connect(gain).connect(bus);
       oscillator.start(time);
       oscillator.stop(time + toneDuration + 0.03);
