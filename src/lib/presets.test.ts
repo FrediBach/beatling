@@ -483,7 +483,75 @@ describe("Sparse 808 Ballad", () => {
   });
 });
 
-describe.each(["electro-backbeat", "electro-funk-maracas", "stripped-808-breakbeat", "bass-tempo-standard", "double-time-bass", "half-time-bass-groove", "boom-bap", "sparse-808-ballad"])("%s persistence", (id) => {
+describe("Modern 808 Hip Hop", () => {
+  it("preserves the swung drum pattern beneath a two-bar minor phrase", () => {
+    const patch = createPresetPatch("modern-808-hip-hop", 64);
+    expect(patch).toMatchObject({ bpm: 84, rate: 4, swing: 12, vol: 64 });
+    expect(hitsFor(patch, "kick", 1)).toEqual([0, 6, 10]);
+    expect(hitsFor(patch, "snare", 1)).toEqual([4, 12]);
+    expect(hitsFor(patch, "rim", 1)).toEqual([2, 10]);
+    expect(hitsFor(patch, "ch", 1)).toEqual([0, 2, 4, 5, 6, 8, 10, 12, 13, 14]);
+    expect(hitsFor(patch, "oh", 4)).toEqual([8, 40]);
+    expect(hitsFor(patch, "bassline", 4)).toEqual([1, 9, 19, 27, 33, 41, 51, 59]);
+    expect(hitsFor(patch, "lead", 4)).toEqual([7, 19, 39, 51]);
+    expect(patch.effects.distortion.enabled).toBe(true);
+    expect(patch.effects.sends.bassline.distortion).toBeGreaterThan(0);
+    expect(patch.effects.reverb).toMatchObject({ enabled: true, space: "studio" });
+    expect(patch.effects.delay).toMatchObject({ enabled: true, sync: true, division: "1/8D" });
+    expect(patch.effects.sends.lead.delay).toBeGreaterThan(0);
+    for (const voice of ["kick", "bassline"] as const) {
+      expect(patch.effects.sends[voice].reverb).toBe(0);
+      expect(patch.effects.sends[voice].delay).toBe(0);
+    }
+  });
+
+  it("voices F-sharp minor with softer hat pickups and space between bass and kick attacks", () => {
+    const patch = createPresetPatch("modern-808-hip-hop");
+    const modulationAt = (voice: VoiceId, step: number) => effectiveVoiceModulation(patch.voices[voice], (source) => {
+      const block = patch.blocks[source];
+      return euclideanLfoValue(block.shape, step, block, 0.5);
+    });
+    const notesFor = (voice: "bassline" | "lead") => hitsFor(patch, voice, 2).map((step) => quantizeVoiceCv(patch.voices[voice].custom, modulationAt(voice, step).vOct).name);
+    expect(notesFor("bassline")).toEqual(["F♯2", "C♯3", "E3", "A2"]);
+    expect(notesFor("lead")).toEqual(["B4", "A♭4"]);
+    expect(modulationAt("ch", 5).level).toBeLessThan(modulationAt("ch", 4).level);
+    expect(modulationAt("ch", 13).level).toBeLessThan(modulationAt("ch", 12).level);
+    for (const { patch: variation } of createPresetArrangement("modern-808-hip-hop").variations) {
+      const kicks = new Set(hitsFor(variation, "kick", 4));
+      expect(hitsFor(variation, "bassline", 4).some((step) => kicks.has(step))).toBe(false);
+    }
+  });
+
+  it("lifts the melody, breaks to rim-led drums and saves the hat roll for the final beat", () => {
+    const [groove, lift, breakdown, fill] = createPresetArrangement("modern-808-hip-hop").variations.map(({ patch }) => patch);
+    expect(hitsFor(lift, "kick", 4)).toEqual(hitsFor(groove, "kick", 4));
+    expect(hitsFor(lift, "snare", 4)).toEqual(hitsFor(groove, "snare", 4));
+    expect(hitsFor(lift, "ch", 4)).toEqual(hitsFor(groove, "ch", 4));
+    expect(hitsFor(lift, "bassline", 2)).toEqual([1, 5, 9, 13, 19, 23, 27, 31]);
+    expect(hitsFor(lift, "lead", 2)).toEqual([7, 15, 19, 27]);
+    expect(hitsFor(breakdown, "kick", 2)).toEqual([0, 10, 16, 26]);
+    expect(hitsFor(breakdown, "snare", 2)).toEqual([]);
+    expect(hitsFor(breakdown, "rim", 2)).toEqual([4, 12, 20, 28]);
+    expect(hitsFor(breakdown, "ch", 2)).toEqual([2, 6, 10, 14, 18, 22, 26, 30]);
+    expect(hitsFor(breakdown, "oh", 2)).toEqual([]);
+    expect(hitsFor(breakdown, "bassline", 2)).toEqual([1, 19]);
+    expect(hitsFor(fill, "bassline", 2)).toEqual([1, 9, 19]);
+    expect(hitsFor(fill, "lead", 2)).toEqual([7]);
+    expect(hitsFor(fill, "rim", 2)).toEqual([2, 10, 30]);
+    expect(hitsFor(fill, "snare", 2)).toEqual([4, 12, 20, 28]);
+    expect(hitsFor(fill, "ch", 2).filter((step) => step >= 16)).toEqual([16, 18, 20, 22, 24, 26, 28, 29, 30, 31]);
+    // Check individual layers as well as their union: the roll must not
+    // double-trigger hats already played by the main eighth-note pattern.
+    const hatLayers = fill.blocks.filter((block) => block.voice === "ch").map((block) =>
+      rhythmsFor(block).flatMap((rhythm) => Array.from({ length: rhythm.steps * rhythm.repeats }, (_, step) => euclidHit(step % rhythm.steps, rhythm.steps, rhythm.pulses, rhythm.rot))));
+    for (let step = 0; step < 64; step++) {
+      expect(hatLayers.filter((cycle) => cycle[step % cycle.length])).toHaveLength(hitsFor(fill, "ch", 4).includes(step) ? 1 : 0);
+    }
+    expect(hitsFor(fill, "ch", 3)).toContain(37);
+  });
+});
+
+describe.each(["electro-backbeat", "electro-funk-maracas", "stripped-808-breakbeat", "bass-tempo-standard", "double-time-bass", "half-time-bass-groove", "boom-bap", "sparse-808-ballad", "modern-808-hip-hop"])("%s persistence", (id) => {
   it("round-trips every variation and keeps series, routes and sends independently editable", () => {
     const arrangement = createPresetArrangement(id);
     for (const { patch } of arrangement.variations) {
