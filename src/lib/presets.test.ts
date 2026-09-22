@@ -1424,7 +1424,87 @@ describe("Rolling Techno", () => {
   });
 });
 
-describe.each(["electro-backbeat", "electro-funk-maracas", "stripped-808-breakbeat", "bass-tempo-standard", "double-time-bass", "half-time-bass-groove", "boom-bap", "sparse-808-ballad", "modern-808-hip-hop", "trap-standard", "triplet-trap", "drill-variant", "basic-house", "open-hat-house", "deep-house-shuffle", "jackin-house", "acid-basic", "acid-tom-fill", "hypnotic-acid", "detroit-syncopated-clap", "rolling-techno"])("%s persistence", (id) => {
+describe("Tom-Driven Techno", () => {
+  it("keeps the interlocking 909 tom groove ahead of a low bass pulse and sparse 101 reply", () => {
+    const patch = createPresetPatch("tom-driven-techno", 63);
+    expect(patch).toMatchObject({ bpm: 132, rate: 4, swing: 0, vol: 63 });
+    expect(hitsFor(patch, "kick", 1)).toEqual([0, 4, 8, 12]);
+    expect(hitsFor(patch, "clap", 2)).toEqual([8, 24]);
+    expect(hitsFor(patch, "lt", 2)).toEqual([2, 10, 18, 26]);
+    expect(hitsFor(patch, "mt", 2)).toEqual([6, 14, 22, 30]);
+    expect(hitsFor(patch, "ht", 2)).toEqual([3, 11, 19, 27]);
+    expect(hitsFor(patch, "ch", 1)).toEqual([0, 2, 4, 6, 8, 10, 12, 14]);
+    expect(hitsFor(patch, "bassline", 4)).toEqual([1, 5, 9, 13, 17, 21, 25, 29, 33, 37, 41, 45, 49, 57]);
+    expect(hitsFor(patch, "lead", 4)).toEqual([7, 31, 39, 63]);
+    expect(hitsFor(patch, "shk", 4)).toEqual([]);
+    for (const id of ["kick", "clap", "lt", "mt", "ht", "ch"] as const) expect(patch.voices[id].machine).toBe("909");
+    expect(patch.effects.reverb).toMatchObject({ enabled: true, space: "room", lowCut: 650 });
+    expect(patch.effects.delay).toMatchObject({ enabled: true, sync: true, division: "1/8D", lowCut: 1100 });
+    expect(patch.effects.compressor.enabled).toBe(true);
+    for (const id of ["lt", "mt", "ht"] as const) {
+      expect(patch.effects.sends[id].compressor).toBeGreaterThan(0);
+      expect(patch.effects.sends[id].reverb).toBeGreaterThan(0);
+      expect(patch.effects.sends[id].delay).toBe(0);
+    }
+    expect(patch.effects.sends.lead.delay).toBeGreaterThan(0);
+    for (const id of ["kick", "bassline", "ch", "shk"] as const) {
+      expect(patch.effects.sends[id]).toEqual({ distortion: 0, delay: 0, reverb: 0, compressor: 0, karplus: 0 });
+    }
+  });
+
+  it("supports F-sharp minor while shaping the tom pairs and the final low-tom release", () => {
+    const [patch, , , fill] = createPresetArrangement("tom-driven-techno").variations.map(({ patch }) => patch);
+    const modulationAt = (patch: Patch, voice: VoiceId, step: number) => effectiveVoiceModulation(patch.voices[voice], (source) => {
+      const block = patch.blocks[source];
+      return euclideanLfoValue(block.shape, step, block, 0.5);
+    });
+    const notesFor = (voice: "bassline" | "lead") => hitsFor(patch, voice, 2).map((step) => quantizeVoiceCv(patch.voices[voice].custom, modulationAt(patch, voice, step).vOct).name);
+    expect(notesFor("bassline")).toEqual(["F♯1", "F♯1", "F♯1", "F♯1", "C♯2", "C♯2", "C♯2", "C♯2"]);
+    expect(notesFor("lead")).toEqual(["A3", "F♯3"]);
+    for (const [voice, step] of [["lt", 2], ["mt", 6], ["ht", 3]] as const) {
+      expect(modulationAt(patch, voice, step).level).toBeGreaterThan(modulationAt(patch, voice, step + 8).level);
+      expect(modulationAt(patch, voice, step).decay).toBeGreaterThan(modulationAt(patch, voice, step + 8).decay);
+    }
+    expect(modulationAt(fill, "lt", 31).level).toBeLessThan(modulationAt(fill, "lt", 30).level);
+    expect(modulationAt(fill, "lt", 31).decay).toBeLessThan(modulationAt(fill, "lt", 30).decay);
+    expect(modulationAt(patch, "ch", 2).level).toBeLessThan(modulationAt(patch, "ch", 0).level);
+    for (const { patch: variation } of createPresetArrangement("tom-driven-techno").variations) {
+      const drums = new Set(["kick", "lt", "mt", "ht"].flatMap((voice) => hitsFor(variation, voice as VoiceId, 4)));
+      expect(hitsFor(variation, "bassline", 4).some((step) => drums.has(step))).toBe(false);
+    }
+  });
+
+  it("adds a high-tom lift, opens a low/mid-tom break and ends with a descending roll", () => {
+    const [groove, lift, breakdown, fill] = createPresetArrangement("tom-driven-techno").variations.map(({ patch }) => patch);
+    for (const voice of ["kick", "clap", "lt", "mt", "ch"] as const) {
+      expect(hitsFor(lift, voice, 4)).toEqual(hitsFor(groove, voice, 4));
+    }
+    expect(hitsFor(lift, "ht", 4).filter((step) => step >= 48)).toEqual([51, 55, 59, 63]);
+    expect(hitsFor(lift, "shk", 2)).toEqual(Array.from({ length: 16 }, (_, step) => 1 + step * 2));
+    expect(hitsFor(lift, "bassline", 4)).toEqual(Array.from({ length: 16 }, (_, step) => 1 + step * 4));
+    expect(hitsFor(lift, "lead", 2)).toEqual([7, 15, 23, 31]);
+    expect(hitsFor(breakdown, "kick", 2)).toEqual([0, 8, 16, 24]);
+    expect(hitsFor(breakdown, "clap", 2)).toEqual([]);
+    expect(hitsFor(breakdown, "ht", 2)).toEqual([]);
+    expect(hitsFor(breakdown, "lt", 2)).toEqual(hitsFor(groove, "lt", 2));
+    expect(hitsFor(breakdown, "mt", 2)).toEqual(hitsFor(groove, "mt", 2));
+    expect(hitsFor(breakdown, "bassline", 2)).toEqual([1, 9, 17, 25]);
+    expect(hitsFor(breakdown, "lead", 2)).toEqual([31]);
+    expect(hitsFor(fill, "kick", 2)).toEqual([0, 4, 8, 12, 16, 20, 24]);
+    expect(hitsFor(fill, "ch", 2)).toEqual(Array.from({ length: 14 }, (_, step) => step * 2));
+    expect(hitsFor(fill, "ht", 2)).toEqual([3, 11, 19, 28]);
+    expect(hitsFor(fill, "mt", 2)).toEqual([6, 14, 22, 29]);
+    expect(hitsFor(fill, "lt", 2)).toEqual([2, 10, 18, 30, 31]);
+    expect(hitsFor(fill, "bassline", 2)).toEqual([1, 5, 9, 13, 17, 21]);
+    expect(hitsFor(fill, "lead", 2)).toEqual([7]);
+    for (const voice of ["kick", "ch", "ht", "mt", "lt", "bassline", "lead"] as const) {
+      const cycle = hitsFor(fill, voice, 2);
+      expect(hitsFor(fill, voice, 4)).toEqual([...cycle, ...cycle.map((step) => step + 32)]);
+    }
+  });
+});
+
+describe.each(["electro-backbeat", "electro-funk-maracas", "stripped-808-breakbeat", "bass-tempo-standard", "double-time-bass", "half-time-bass-groove", "boom-bap", "sparse-808-ballad", "modern-808-hip-hop", "trap-standard", "triplet-trap", "drill-variant", "basic-house", "open-hat-house", "deep-house-shuffle", "jackin-house", "acid-basic", "acid-tom-fill", "hypnotic-acid", "detroit-syncopated-clap", "rolling-techno", "tom-driven-techno"])("%s persistence", (id) => {
   it("round-trips every variation and keeps series, routes and sends independently editable", () => {
     const arrangement = createPresetArrangement(id);
     for (const { patch } of arrangement.variations) {
@@ -1442,6 +1522,7 @@ describe.each(["electro-backbeat", "electro-funk-maracas", "stripped-808-breakbe
       expect(restored.voices.oh.modulations).toEqual(patch.voices.oh.modulations);
       expect(restored.voices.lt.modulations).toEqual(patch.voices.lt.modulations);
       expect(restored.voices.mt.modulations).toEqual(patch.voices.mt.modulations);
+      expect(restored.voices.ht.modulations).toEqual(patch.voices.ht.modulations);
       expect(restored.voices.cym.modulations).toEqual(patch.voices.cym.modulations);
       for (const voice of Object.values(patch.voices)) {
         for (const route of voice.modulations) {
