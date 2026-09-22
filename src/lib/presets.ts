@@ -15,6 +15,7 @@ import { refineModern808HipHop } from "@/lib/preset-modern-808-hip-hop";
 import { refineTrapStandard } from "@/lib/preset-trap-standard";
 import { refineTripletTrap } from "@/lib/preset-triplet-trap";
 import { refineDrillVariant } from "@/lib/preset-drill-variant";
+import { refineBasicHouse } from "@/lib/preset-basic-house";
 
 const PRESET_REFINERS: Partial<Record<string, (patch: Patch, variation: 0 | 1 | 2 | 3) => void>> = {
   "electro-backbeat": refineElectroBackbeat,
@@ -29,6 +30,7 @@ const PRESET_REFINERS: Partial<Record<string, (patch: Patch, variation: 0 | 1 | 
   "trap-standard": refineTrapStandard,
   "triplet-trap": refineTripletTrap,
   "drill-variant": refineDrillVariant,
+  "basic-house": refineBasicHouse,
 };
 
 interface PresetLane {
