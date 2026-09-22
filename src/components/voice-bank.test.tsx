@@ -97,7 +97,7 @@ it.each([
   ["Bassline", "Amplitude length", "900"], ["Lead", "Filter decay", "200"], ["Lead", "Sub oscillator", "35"],
   ["Open hat", "Choke release", "25"], ["Bassline", "Accent brightness", "70"], ["Bassline", "Accent length", "40"],
   ["Bassline", "Glide", "125"], ["Lead", "Glide", "200"],
-  ["Rim", "Noise length", "90"], ["Closed hat", "Metal length", "100"],
+  ["Rim", "Noise length", "90"], ["Rim", "Noise filter", "4500"], ["Rim", "Noise resonance", "0.8"], ["Closed hat", "Metal length", "100"],
   ["Open hat", "Metal length", "900"], ["Cymbal", "Metal length", "2200"],
   ["Cymbal", "Bell level", "35"], ["Cymbal", "Bell pitch", "1100"], ["Cymbal", "Bell length", "900"],
   ["Cymbal", "Stick level", "40"], ["Cymbal", "Stick filter", "6000"], ["Cymbal", "Stick length", "25"],

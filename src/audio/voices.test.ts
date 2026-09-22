@@ -643,8 +643,60 @@ it("lets independent rim noise outlast a silent tone layer, with matching filter
   expect(f.gains[0].gain.exponentialRampToValueAtTime).not.toHaveBeenCalled();
 });
 
+it.each([
+  [4500, 0.8, 9000, 0.8],
+  [0, 0.8, 4000, 0.8],
+  [4500, 0, 9000, 2],
+])("shapes rim noise with filter %s and resonance %s independently of the body", (noiseFilter, noiseQ, frequency, q) => {
+  const f = fixture("rim", { noiseMode: 1, noiseFilter, noiseQ, noiseDecay: 180, duration: 20, noiseLevel: 40, filterFrequency: 2000, filterQ: 2 });
+  f.patch.voices.rim.tune = 7;
+  f.patch.voices.rim.decay = 0;
+  f.patch.voices.rim.level = 50;
+  f.trigger("rim", 1, { tune: 5 / 12 }); // One octave of combined Tune, quarter-length envelopes.
+  expect(f.filters).toHaveLength(2);
+  expect(f.gains).toHaveLength(4);
+  expect(f.oscillators).toHaveLength(2);
+  expect(f.sources).toHaveLength(1);
+  const [body, noise] = f.filters;
+  expect(body.frequency.setValueAtTime).toHaveBeenCalledWith(4000, 1);
+  expect(body.Q.setValueAtTime).toHaveBeenCalledWith(2, 1);
+  expect(noise.type).toBe("bandpass");
+  expect(noise.frequency.setValueAtTime).toHaveBeenCalledWith(frequency, 1);
+  expect(noise.Q.setValueAtTime).toHaveBeenCalledWith(q, 1);
+  expect(f.gains[3].gain.setValueAtTime).toHaveBeenLastCalledWith(0.2, 1);
+  expect(f.gains[3].gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1.045);
+  expect(f.gains[3].connect).toHaveBeenCalledWith(noise);
+  expect(noise.connect.mock.calls[0][0]).toBe(f.gains[0].connect.mock.calls[0][0]);
+  expect(f.sources[0].stop.mock.calls[0][0]).toBeCloseTo(1.095);
+  expect(f.oscillators[0].frequency.setValueAtTime).toHaveBeenCalledWith(3340, 1);
+  expect(f.oscillators[1].frequency.setValueAtTime).toHaveBeenCalledWith(4700, 1);
+  for (const oscillator of f.oscillators) {
+    const partial = oscillator.connect.mock.calls[0][0] as ReturnType<typeof node>;
+    expect(partial.connect).toHaveBeenCalledWith(body);
+    expect(oscillator.stop.mock.calls[0][0]).toBeCloseTo(1.02);
+  }
+});
+
+it("bounds the independent rim noise filter below Nyquist under high Tune", () => {
+  const f = fixture("rim", { noiseMode: 1, noiseFilter: 12000, noiseQ: 12 });
+  f.context.sampleRate = 22050;
+  f.patch.voices.rim.tune = 12;
+  f.trigger("rim", 1, { tune: 1 });
+  expect(f.filters[1].frequency.setValueAtTime).toHaveBeenCalledWith(10804.5, 1);
+  expect(f.filters[1].Q.setValueAtTime).toHaveBeenCalledWith(12, 1);
+  expect(f.filters[0].frequency.setValueAtTime).toHaveBeenCalledWith(7000, 1);
+});
+
+it("keeps filtered rim noise audible with a silent body", () => {
+  const f = fixture("rim", { noiseMode: 1, noiseFilter: 4500, noiseQ: 0.8, toneLevel: 0, noiseLevel: 40 });
+  f.trigger();
+  expect(f.gains[0].gain.exponentialRampToValueAtTime).not.toHaveBeenCalled();
+  expect(f.gains[3].gain.setValueAtTime).toHaveBeenLastCalledWith(0.4, 1);
+  expect(f.filters[1].connect.mock.calls[0][0]).toBe(f.gains[0].connect.mock.calls[0][0]);
+});
+
 it("keeps independent rim noise silent at zero Noise level without muting its tone", () => {
-  const f = fixture("rim", { noiseMode: 1, noiseLevel: 0, toneLevel: 70 });
+  const f = fixture("rim", { noiseMode: 1, noiseLevel: 0, toneLevel: 70, noiseFilter: 4500, noiseQ: 0.8 });
   f.trigger();
   const noiseGain = f.sources[0].connect.mock.calls[0][0] as ReturnType<typeof node>;
   expect(noiseGain.gain.exponentialRampToValueAtTime).not.toHaveBeenCalled();
@@ -653,10 +705,12 @@ it("keeps independent rim noise silent at zero Noise level without muting its to
 });
 
 it.each(["custom", "808", "909"] as const)("preserves the original linked rim graph for %s", (machine) => {
-  const f = fixture("rim", { noiseMode: machine === "custom" ? 0 : 1, noiseDecay: 180 });
+  const f = fixture("rim", { noiseMode: machine === "custom" ? 0 : 1, noiseDecay: 180, noiseFilter: 4500, noiseQ: 0.8 });
   f.patch.voices.rim.machine = machine;
   f.trigger();
   expect(f.filters).toHaveLength(1);
+  expect(f.filters[0].frequency.setValueAtTime).toHaveBeenCalledWith(1750, 1);
+  expect(f.filters[0].Q.setValueAtTime).toHaveBeenCalledWith(3.5, 1);
   const noiseGain = f.sources[0].connect.mock.calls[0][0] as ReturnType<typeof node>;
   expect(noiseGain.connect).toHaveBeenCalledWith(f.filters[0]);
   expect(f.filters[0].connect).toHaveBeenCalledWith(f.gains[0]);

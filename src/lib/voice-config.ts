@@ -124,8 +124,10 @@ export const VOICE_PARAMETER_SECTIONS: Record<VoiceId, VoiceParameterSection[]> 
       parameter("duration", "Length", 10, 200, 1, "Base body length before the main Decay control is applied.", "ms"),
     ),
     noise(
-      optionParameter("noiseMode", "Noise envelope", ["Linked", "Independent"], "Linked keeps the original crack inside the tone envelope. Independent lets noise sound even at zero Tone level; it uses the same Body filter settings."),
+      optionParameter("noiseMode", "Noise envelope", ["Linked", "Independent"], "Linked keeps the original crack inside the tone envelope. Independent gives noise its own length and filter, even at zero Tone level."),
       parameter("noiseDecay", "Noise length", 5, 200, 1, "Crack length in Independent mode, scaled by Decay. Linked ignores this control.", "ms"),
+      parameter("noiseFilter", "Noise filter", 0, 12000, 50, "Band-pass center in Independent mode, following Tune. 0 follows Body filter; Linked ignores this control.", "Hz"),
+      parameter("noiseQ", "Noise resonance", 0, 12, 0.1, "Band-pass resonance in Independent mode. 0 follows Filter resonance; Linked ignores this control.", "Q"),
     ),
   ],
   ch: [
@@ -309,7 +311,7 @@ export const DEFAULT_CUSTOM_VOICE_SETTINGS: Record<VoiceId, CustomVoiceSettings>
   kick: { bodyLevel: 100, bodyAttack: 0, bodyTone: 0, bodyFrequency: 50, pitchAmount: 5.5, pitchDecay: 55, clickLevel: 32, clickFrequency: 1800, clickDecay: 16, bodyDecay: 620 },
   snare: { pitchAmount: 1, pitchDecay: 30, noiseAttack: 0, toneDecay: 130, toneFrequency: 185, toneSpread: 1.62, toneLevel: 42, noiseLevel: 80, noiseFilter: 1800, noiseQ: 0.9, noiseDecay: 260 },
   clap: { tailFilter: 0, tailAttack: 0, burstDecay: 18, burstCount: 3, burstSpacing: 11, burstLevel: 55, filterFrequency: 1080, filterQ: 1.1, tailLevel: 50, tailDecay: 220 },
-  rim: { noiseMode: 0, noiseDecay: 20, balance: 50, lowFrequency: 1670, highFrequency: 2350, filterFrequency: 1750, filterQ: 3.5, toneLevel: 70, noiseLevel: 25, duration: 35 },
+  rim: { noiseFilter: 0, noiseQ: 0, noiseMode: 0, noiseDecay: 20, balance: 50, lowFrequency: 1670, highFrequency: 2350, filterFrequency: 1750, filterQ: 3.5, toneLevel: 70, noiseLevel: 25, duration: 35 },
   ch: { metalFocus: 9000, metalQ: 0.9, metalDecay: 0, lowpass: 20000, metalLevel: 50, metalBase: 40, highpass: 7400, noiseLevel: 18, noiseHighpass: 7800, duration: 58 },
   oh: { metalFocus: 9000, metalQ: 0.9, metalDecay: 0, chokeMode: 0, chokeRelease: 10, lowpass: 20000, metalLevel: 48, metalBase: 40, highpass: 7000, noiseLevel: 30, noiseHighpass: 7600, duration: 420 },
   lt: { overtoneRatio: 1.5, overtoneDecay: 0, overtoneLevel: 0, bodyFrequency: 92, pitchAmount: 1.7, pitchDecay: 70, bodyLevel: 90, noiseLevel: 18, noiseFilter: 368, duration: 450 },

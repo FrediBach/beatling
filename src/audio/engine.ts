@@ -780,7 +780,9 @@ export class SequencerEngine {
     this.decay(noiseGain.gain, time, p.amplitude * (custom ? value(p, "noiseLevel", 25) / 100 : 0.25), noiseDuration);
     // A separate filter keeps the crack out of the tone envelope without letting
     // the pitched partials bypass it. Linked mode retains the original graph.
-    const noiseFilter = independentNoise ? this.filter("bandpass", filterFrequency, filterQ, time) : filter;
+    const noiseFrequency = independentNoise && value(p, "noiseFilter", 0) > 0 ? value(p, "noiseFilter", 0) * 2 ** (p.tune / 12) : filterFrequency;
+    const noiseQ = independentNoise && value(p, "noiseQ", 0) > 0 ? value(p, "noiseQ", 0) : filterQ;
+    const noiseFilter = independentNoise ? this.filter("bandpass", noiseFrequency, noiseQ, time) : filter;
     this.noiseSource(time, independentNoise ? noiseDuration : 0.02).connect(noiseGain).connect(noiseFilter);
     if (independentNoise) noiseFilter.connect(bus);
     filter.connect(gain).connect(bus);
