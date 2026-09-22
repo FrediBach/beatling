@@ -692,15 +692,24 @@ export class SequencerEngine {
   private snare(time: number, p: SynthParameters): void {
     const bus = this.busses.get("snare")!;
     const custom = p.machine === "custom";
-    const duration = (custom ? value(p, "noiseDecay", 260) / 1000 : p.machine === "909" ? 0.28 : 0.2) * p.decay;
+    const attack = custom ? value(p, "noiseAttack", 0) / 1000 : 0;
+    const noiseDuration = (custom ? value(p, "noiseDecay", 260) / 1000 : p.machine === "909" ? 0.28 : 0.2) * p.decay;
+    const duration = attack > 0 ? Math.max(attack + 0.005, noiseDuration) : noiseDuration;
     const noise = this.noiseSource(time, duration);
     const filter = this.filter(custom ? "bandpass" : p.machine === "909" ? "highpass" : "bandpass", custom ? value(p, "noiseFilter", 1800) : p.machine === "909" ? 900 : 2200, custom ? value(p, "noiseQ", 0.9) : 0.9, time);
     const noiseGain = this.gain(0, time);
-    this.decay(noiseGain.gain, time, p.amplitude * (custom ? value(p, "noiseLevel", 80) / 100 : 0.8), duration);
+    const noiseLevel = p.amplitude * (custom ? value(p, "noiseLevel", 80) / 100 : 0.8);
+    if (attack > 0) this.attackDecay(noiseGain.gain, time, noiseLevel, attack, duration);
+    else this.decay(noiseGain.gain, time, noiseLevel, duration);
     noise.connect(filter).connect(noiseGain).connect(bus);
     const base = (custom ? value(p, "toneFrequency", 185) : 185) * 2 ** (p.tune / 12);
     [1, custom ? value(p, "toneSpread", 1.62) : 1.62].forEach((ratio, index) => {
       const oscillator = this.oscillator("triangle", base * ratio, time);
+      const pitchAmount = custom ? value(p, "pitchAmount", 1) : 1;
+      if (pitchAmount > 1) {
+        oscillator.frequency.setValueAtTime(this.safeFrequency(base * ratio * pitchAmount), time);
+        oscillator.frequency.exponentialRampToValueAtTime(this.safeFrequency(base * ratio), time + value(p, "pitchDecay", 30) / 1000);
+      }
       const gain = this.gain(0, time);
       const toneLevel = custom ? value(p, "toneLevel", 42) / 100 : 0.42;
       const toneDuration = (custom ? value(p, "toneDecay", 130) / 1000 : 0.13) * p.decay;

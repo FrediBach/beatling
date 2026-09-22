@@ -160,6 +160,67 @@ it("separates the snare shell decay from the noise tail", () => {
   expect(f.oscillators[0].stop).toHaveBeenCalledWith(1.53);
 });
 
+it("sweeps both snare shell modes together without changing their spread or amplitude lengths", () => {
+  const f = fixture("snare", { pitchAmount: 2, pitchDecay: 30, toneFrequency: 200, toneSpread: 1.5, toneDecay: 400, noiseDecay: 100 });
+  f.patch.voices.snare.tune = 12;
+  f.patch.voices.snare.decay = 0; // quarter-length amplitude, fixed pitch-decay time
+  f.trigger();
+  expect(f.oscillators[0].frequency.setValueAtTime).toHaveBeenLastCalledWith(800, 1);
+  expect(f.oscillators[1].frequency.setValueAtTime).toHaveBeenLastCalledWith(1200, 1);
+  expect(f.oscillators[0].frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(400, 1.03);
+  expect(f.oscillators[1].frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(600, 1.03);
+  for (const oscillator of f.oscillators) expect(oscillator.stop.mock.calls[0][0]).toBeCloseTo(1.13);
+  expect(f.gains[1].gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1.1);
+  expect(f.gains[0].gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1.025);
+});
+
+it("gives snare noise its own attack while the shell begins immediately", () => {
+  const f = fixture("snare", { noiseAttack: 20, noiseDecay: 300, toneDecay: 100, noiseLevel: 60, toneLevel: 40 });
+  f.patch.voices.snare.level = 50;
+  f.trigger();
+  expect(f.gains[0].gain.setValueAtTime).toHaveBeenLastCalledWith(0, 1);
+  expect(f.gains[0].gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.3, 1.02);
+  expect(f.gains[0].gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1.3);
+  expect(f.gains[1].gain.setValueAtTime).toHaveBeenLastCalledWith(0.2, 1);
+  expect(f.gains[1].gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1.1);
+  expect(f.sources[0].stop).toHaveBeenCalledWith(1.35);
+});
+
+it("finishes long snare attacks at minimum Decay without extending the shell", () => {
+  const f = fixture("snare", { noiseAttack: 40, noiseDecay: 40, toneDecay: 30 });
+  f.patch.voices.snare.decay = 0;
+  f.trigger("snare", 1, { decay: -1 });
+  expect(f.gains[0].gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.8, 1.04);
+  expect(f.gains[0].gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1.045);
+  expect(f.gains[0].gain.linearRampToValueAtTime.mock.lastCall![0]).toBe(0);
+  expect(f.gains[0].gain.linearRampToValueAtTime.mock.lastCall![1]).toBeCloseTo(1.05);
+  expect(f.sources[0].stop.mock.calls[0][0]).toBeCloseTo(1.095);
+  expect(f.oscillators[0].stop.mock.calls[0][0]).toBeCloseTo(1.0345);
+});
+
+it.each(["custom", "808", "909"] as const)("retains the original %s snare with shaping disabled or unsupported", (machine) => {
+  const f = fixture("snare", { pitchAmount: machine === "custom" ? 1 : 4, pitchDecay: 150, noiseAttack: machine === "custom" ? 0 : 40 });
+  f.patch.voices.snare.machine = machine;
+  f.trigger();
+  for (const oscillator of f.oscillators) expect(oscillator.frequency.exponentialRampToValueAtTime).not.toHaveBeenCalled();
+  expect(f.gains[0].gain.setValueAtTime).toHaveBeenLastCalledWith(0.8, 1);
+  expect(f.gains[0].gain.linearRampToValueAtTime.mock.calls).toHaveLength(1); // Final silence, no attack.
+  expect(f.gains[0].gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1 + (machine === "custom" ? 0.26 : machine === "909" ? 0.28 : 0.2));
+});
+
+it("keeps a snare layer silent at zero level with pitch sweep and noise attack enabled", () => {
+  for (const mutedLayer of ["toneLevel", "noiseLevel"]) {
+    const f = fixture("snare", { pitchAmount: 4, noiseAttack: 40, [mutedLayer]: 0 });
+    f.trigger();
+    const silentGains = mutedLayer === "toneLevel" ? f.gains.slice(1) : [f.gains[0]];
+    for (const gain of silentGains) {
+      expect(gain.gain.setValueAtTime).toHaveBeenLastCalledWith(0, 1);
+      expect(gain.gain.exponentialRampToValueAtTime).not.toHaveBeenCalled();
+      expect(gain.gain.linearRampToValueAtTime).not.toHaveBeenCalled();
+    }
+  }
+});
+
 it("gives each clap burst its own configured length without stretching the tail", () => {
   const f = fixture("clap", { burstCount: 2, burstSpacing: 20, burstDecay: 50, tailDecay: 200 });
   f.trigger();

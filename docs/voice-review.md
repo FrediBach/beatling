@@ -9,7 +9,7 @@ Drum synthesis controls appear under **Custom → Configure**. Open-hat articula
 | Voice | Limitation found | Implemented improvement and useful settings |
 | --- | --- | --- |
 | Kick | The body is always a sine; its noise click cannot add sustained harmonic presence. | **Body harmonics** blends sine toward triangle without changing pitch sweep or body length. Try 20–40% for more upper harmonics, or 0% for the original sine. |
-| Snare | Shell oscillators always decay in 130 ms × Decay, regardless of wire/noise length. | **Body length**, 30–600 ms, separates shell ring from wire length. Short body plus longer noise gives a tighter shell with a sustained wire tail. |
+| Snare | Shell length was fixed, shell pitch stayed static, and noise always began at full strength. | **Body length** separates shell ring from noise length. **Pitch sweep / Pitch decay** shape the initial knock; **Noise attack** lets the noise build after the shell begins. |
 | Clap | Burst count and spacing are editable, but each burst has a fixed 18 ms decay. | **Burst length**, 5–60 ms, allows separated cracks or overlapping bursts. The diffuse tail retains its own length and level. |
 | Rim | Equal partial levels limit pitch emphasis; the noise crack also follows Tone level and the body envelope. | **Partial balance** emphasizes either partial. **Noise envelope: Independent** separates the crack from the tone, with its own **Noise length**; Linked preserves the original sound. |
 | Closed hat | High-pass controls cannot soften the combined signal; noise and metal share one decay. | **Brightness** applies a final low-pass (20 kHz bypasses it). **Metal length** separates the pitched ring from the noise tick. |
@@ -24,6 +24,18 @@ Drum synthesis controls appear under **Custom → Configure**. Open-hat articula
 | Lead | Filter sweep follows release, and the companion oscillator only thickens the same register. | **Filter decay**, 0–2400 ms, decouples the sweep (zero follows Release). **Sub oscillator** adds a sine one octave down through the same filter and amplitude envelope. |
 
 Suggested values above are starting points for auditioning, not newly imposed preset settings.
+
+## Snare attack shaping
+
+**Snare → Custom → Configure** adds three controls:
+
+- **Pitch sweep**, 1–4×: both shell modes start above their resting pitches and fall together, retaining Tone spread. At 1× their pitch stays fixed.
+- **Pitch decay**, 5–150 ms: time to reach the resting pitch. Like the kick/tom pitch envelope, this does not scale with the main Decay control. A very short body can finish before the sweep reaches its target.
+- **Noise attack**, 0–40 ms: time for the filtered noise to rise from silence. Zero retains the immediate crack. Larger values let the pitched shell lead into the noise.
+
+Noise length still describes the time from the hit to the decay endpoint, scaled by Decay. If Noise attack would exceed that interval, the noise envelope extends to leave at least 5 ms after the attack; the shell length remains unchanged. Noise and tone can still be silenced independently with their level controls.
+
+Try Pitch sweep 1.2–1.5×, Pitch decay 20–35 ms and Noise attack 3–8 ms as starting points for a short pitched knock leading into the noise. Defaults are 1×, 30 ms and 0 ms, preserving the original snare. The 808/909 models keep their existing articulation.
 
 ## Percussion layer envelopes
 
@@ -87,7 +99,7 @@ Try Lead Filter tracking 50–100% with a low cutoff for a phrase spanning sever
 - Zero-level layers stay at zero; positive envelopes finish their exponential tail with a short ramp to exact silence.
 - Shaker attack/decay ordering is valid at the full supported range. All sources retain bounded stop times.
 - Voice filter cutoffs and oscillator creation respect the active sample rate's Nyquist limit, including 32 kHz contexts. Low synth pitches remain available below 20 Hz.
-- Patch and arrangement format **v15** stores the numeric custom settings, including hat choking, bassline accent articulation and synth playback/glide. Readers still migrate v1–v14 storage and JSON. Older patches receive neutral defaults: no added harmonics/overtones/sub, bypassed brightness, centered partial balance, original snare/clap lengths and linked synth envelopes. Choking is off; accent brightness/length are zero and the accent source is Every note. Both synths default to Polyphonic with zero Glide; all existing voice shaping, accent and choke values are retained. Rim noise defaults to Linked (20 ms Noise length when Independent is enabled); hat/cymbal Metal length defaults to zero to follow the original duration. Cymbal Bell level defaults to zero, with 800 Hz Bell pitch and 500 ms Bell length ready when enabled. Both synths default to zero Filter tracking.
+- Patch and arrangement format **v16** stores the numeric custom settings, including hat choking, bassline accent articulation and synth playback/glide. Readers still migrate v1–v15 storage and JSON. Older patches receive neutral defaults: no added harmonics/overtones/sub, bypassed brightness, centered partial balance, original snare/clap lengths and linked synth envelopes. Choking is off; accent brightness/length are zero and the accent source is Every note. Both synths default to Polyphonic with zero Glide; all existing voice shaping, accent and choke values are retained. Rim noise defaults to Linked (20 ms Noise length when Independent is enabled); hat/cymbal Metal length defaults to zero to follow the original duration. Cymbal Bell level defaults to zero, with 800 Hz Bell pitch and 500 ms Bell length ready when enabled. Both synths default to zero Filter tracking. Snare pitch stays fixed (1× with a dormant 30 ms pitch decay), and Noise attack defaults to zero.
 - 808/909 drum selections retain their existing circuits; choose Custom for the added shaping controls. Preset rhythms, balances, effect sends, routing and variation histories retain their existing meaning. The shared envelope/noise bug fixes apply to all models.
 
 ## Remaining synthesis opportunities
@@ -101,12 +113,12 @@ These require separate behavior decisions or auditioning rather than additional 
 
 ## Verification
 
-`src/audio/voices.test.ts` exercises real synthesis dispatch with a recording Web Audio boundary: every voice at parameter extremes, finite automation, bounded source lifetimes, low-sample-rate cutoffs, long noise tails, zero-level envelopes, independent layer lengths, rim noise routing/zero levels, long metal-tail choking, legacy model compatibility, independent bell pitch/decay/routing and high-frequency mode omission, partial balance, brightness routing, added oscillators and synth-envelope independence. These checks validate scheduled graphs; they do not measure rendered spectra or establish subjective sound quality.
+`src/audio/voices.test.ts` exercises real synthesis dispatch with a recording Web Audio boundary: every voice at parameter extremes, finite automation, bounded source lifetimes, low-sample-rate cutoffs, long noise tails, zero-level envelopes, independent layer lengths, rim noise routing/zero levels, long metal-tail choking, legacy model compatibility, independent bell pitch/decay/routing and high-frequency mode omission, partial balance, brightness routing, added oscillators, synth-envelope independence, snare shell sweeps and independent noise attack timing. These checks validate scheduled graphs; they do not measure rendered spectra or establish subjective sound quality.
 
 `src/audio/hat-choke.test.ts` covers audio-time releases, cleanup, repeated closes, mid-fade reset and bounded tracking. The voice integration tests additionally exercise simultaneous routed/Bernoulli hats in both orders, all hat models, bypass/mute behavior, engine teardown and accent modulation/envelope coupling.
 
 `src/audio/synth-articulation.test.ts` checks note stealing, interrupted glides, simultaneous-hit arbitration, gaps, mode changes, audio-time cleanup, reset and bounded tracking. Voice integration tests exercise both synths, synchronized lead oscillators, independent ownership, muted triggers, routed/Bernoulli hits and transport teardown.
 
-`src/lib/voice-config.test.ts` covers v9/v10/v11/v12/v13/v14 storage migration, neutral defaults, new-control round trips, numeric bounds and malformed values. `src/components/voice-bank.test.tsx` verifies accessible editing, reopening and resetting of every new control, including choking across model changes and synth playback/glide. The full quality gate also checks the existing preset and routing suite.
+`src/lib/voice-config.test.ts` covers v9/v10/v11/v12/v13/v14/v15 storage migration, neutral defaults, new-control round trips, numeric bounds and malformed values. `src/components/voice-bank.test.tsx` verifies accessible editing, reopening and resetting of every new control, including choking across model changes and synth playback/glide. The full quality gate also checks the existing preset and routing suite.
 
 `src/lib/synth-filter.test.ts` checks full/partial pitch tracking, overlapping envelope/glide curves, frequency-limit plateaus and bounded automation. Voice integration tests cover quantized V/Oct, both synths, interrupted glides, original zero-tracking behavior and bassline accent coupling.
