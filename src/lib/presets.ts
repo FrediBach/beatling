@@ -31,6 +31,7 @@ import { refineHardgroove } from "@/lib/preset-hardgroove";
 import { refineOffbeatKickTechno } from "@/lib/preset-offbeat-kick-techno";
 import { refineGabberAdjacent } from "@/lib/preset-gabber-adjacent";
 import { refineTwoStep } from "@/lib/preset-two-step";
+import { refineSpeedGarage } from "@/lib/preset-speed-garage";
 
 const PRESET_REFINERS: Partial<Record<string, (patch: Patch, variation: 0 | 1 | 2 | 3) => void>> = {
   "electro-backbeat": refineElectroBackbeat,
@@ -61,6 +62,7 @@ const PRESET_REFINERS: Partial<Record<string, (patch: Patch, variation: 0 | 1 | 
   "offbeat-kick-techno": refineOffbeatKickTechno,
   "gabber-adjacent": refineGabberAdjacent,
   "two-step": refineTwoStep,
+  "speed-garage": refineSpeedGarage,
 };
 
 interface PresetLane {
