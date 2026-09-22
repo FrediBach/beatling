@@ -782,11 +782,11 @@ export class SequencerEngine {
     filter.connect(gain).connect(bus);
   }
 
-  private metallic(time: number, duration: number, tune: number, amplitude: number, destination: AudioNode, highpass: number, baseFrequency = 40): void {
+  private metallic(time: number, duration: number, tune: number, amplitude: number, destination: AudioNode, highpass: number, baseFrequency = 40, focus = 9000, resonance = 0.9): void {
     const ratios = [2, 3, 4.16, 5.43, 6.79, 8.21];
     const base = baseFrequency * 2 ** (tune / 12);
     const hp = this.filter("highpass", highpass, 0.8, time);
-    const bp = this.filter("bandpass", 9000, 0.9, time);
+    const bp = this.filter("bandpass", focus, resonance, time);
     const gain = this.gain(0, time);
     this.decay(gain.gain, time, amplitude, duration);
     ratios.forEach((ratio) => {
@@ -816,7 +816,7 @@ export class SequencerEngine {
       const noiseGain = this.gain(0, time);
       this.decay(noiseGain.gain, time, p.amplitude * value(p, "noiseLevel", 20) / 100, duration);
       this.noiseSource(time, duration).connect(noiseFilter).connect(noiseGain).connect(bus);
-      this.metallic(time, metalDuration, p.tune, p.amplitude * value(p, "metalLevel", 50) / 100, bus, value(p, "highpass", 7400), value(p, "metalBase", 40));
+      this.metallic(time, metalDuration, p.tune, p.amplitude * value(p, "metalLevel", 50) / 100, bus, value(p, "highpass", 7400), value(p, "metalBase", 40), value(p, "metalFocus", 9000), value(p, "metalQ", 0.9));
     } else if (p.machine === "909") {
       const filter = this.filter("highpass", 7800 * 2 ** (p.tune / 24), 0.8, time);
       const gain = this.gain(0, time);
@@ -888,7 +888,7 @@ export class SequencerEngine {
     const custom = p.machine === "custom";
     const duration = (custom ? value(p, "duration", 1400) / 1000 : p.machine === "909" ? 1.6 : 1.15) * p.decay;
     const metalDuration = custom && value(p, "metalDecay", 0) > 0 ? value(p, "metalDecay", 0) / 1000 * p.decay : duration;
-    this.metallic(time, metalDuration, p.tune - 2, p.amplitude * (custom ? value(p, "metalLevel", 40) / 100 : 0.4), bus, custom ? value(p, "highpass", 4200) : 4200, custom ? value(p, "metalBase", 40) : 40);
+    this.metallic(time, metalDuration, p.tune - 2, p.amplitude * (custom ? value(p, "metalLevel", 40) / 100 : 0.4), bus, custom ? value(p, "highpass", 4200) : 4200, custom ? value(p, "metalBase", 40) : 40, custom ? value(p, "metalFocus", 9000) : 9000, custom ? value(p, "metalQ", 0.9) : 0.9);
     const filter = this.filter("highpass", custom ? value(p, "noiseHighpass", 5200) : 5200, 0.7, time);
     const gain = this.gain(0, time);
     this.decay(gain.gain, time, p.amplitude * (custom ? value(p, "noiseLevel", 32) / 100 : p.machine === "909" ? 0.4 : 0.22), duration);

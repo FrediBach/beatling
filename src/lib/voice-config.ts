@@ -35,6 +35,10 @@ const envelope = (...parameters: VoiceParameterDefinition[]): VoiceParameterSect
 const pitch = (...parameters: VoiceParameterDefinition[]): VoiceParameterSection => ({ title: "Pitch quantizer", parameters });
 const optionParameter = (key: string, label: string, options: string[], description: string): VoiceParameterDefinition => ({ key, label, min: 0, max: options.length - 1, step: 1, description, options: options.map((name, value) => ({ value, label: name })) });
 const brightness = () => parameter("lowpass", "Brightness", 1500, 20000, 100, "Low-pass cutoff for all voice layers together; 20000 bypasses it.", "Hz");
+const metalFilter = () => [
+  parameter("metalFocus", "Metal focus", 1000, 14000, 50, "Band-pass center for the metallic oscillators only. 9000 keeps the original focus. Lower the metal high-pass too when exploring lower bands.", "Hz"),
+  parameter("metalQ", "Metal resonance", 0.1, 8, 0.1, "Width of the metallic band: lower values are broad, higher values emphasize a narrower band. 0.9 keeps the original response.", "Q"),
+];
 const balance = () => parameter("balance", "Partial balance", 0, 100, 1, "Blend from the low partial to the high partial; 50 keeps both equal.", "%");
 const filterTracking = () => parameter("filterTracking", "Filter tracking", 0, 100, 1, "Raise or lower the filter with note pitch and Glide. At 100%, each octave doubles the cutoff; C3 is the reference. 0 keeps a fixed cutoff.", "%");
 const synthArticulation = (): VoiceParameterSection => ({
@@ -126,6 +130,7 @@ export const VOICE_PARAMETER_SECTIONS: Record<VoiceId, VoiceParameterSection[]> 
       parameter("metalLevel", "Metal level", 0, 100, 1, "Level of the six inharmonic oscillators.", "%"),
       parameter("metalBase", "Metal base", 20, 120, 1, "Base frequency used by the metallic oscillator bank.", "Hz"),
       parameter("highpass", "High-pass", 2000, 14000, 50, "Removes low frequencies from the metallic layer.", "Hz"),
+      ...metalFilter(),
     ),
     noise(
       parameter("noiseLevel", "Noise level", 0, 100, 1, "Level of the broadband noise layer.", "%"),
@@ -150,6 +155,7 @@ export const VOICE_PARAMETER_SECTIONS: Record<VoiceId, VoiceParameterSection[]> 
       parameter("metalLevel", "Metal level", 0, 100, 1, "Level of the six inharmonic oscillators.", "%"),
       parameter("metalBase", "Metal base", 20, 120, 1, "Base frequency used by the metallic oscillator bank.", "Hz"),
       parameter("highpass", "High-pass", 2000, 14000, 50, "Removes low frequencies from the metallic layer.", "Hz"),
+      ...metalFilter(),
     ),
     noise(
       parameter("noiseLevel", "Noise level", 0, 100, 1, "Level of the broadband noise layer.", "%"),
@@ -183,6 +189,7 @@ export const VOICE_PARAMETER_SECTIONS: Record<VoiceId, VoiceParameterSection[]> 
       parameter("metalBase", "Metal base", 20, 120, 1, "Base frequency used by the metallic oscillator bank.", "Hz"),
       parameter("metalLevel", "Metal level", 0, 100, 1, "Level of the inharmonic oscillator bank.", "%"),
       parameter("highpass", "Metal high-pass", 1000, 10000, 50, "High-pass cutoff for the metallic layer.", "Hz"),
+      ...metalFilter(),
     ),
     noise(
       parameter("noiseLevel", "Noise level", 0, 100, 1, "Level of the broadband noise wash.", "%"),
@@ -299,13 +306,13 @@ export const DEFAULT_CUSTOM_VOICE_SETTINGS: Record<VoiceId, CustomVoiceSettings>
   snare: { pitchAmount: 1, pitchDecay: 30, noiseAttack: 0, toneDecay: 130, toneFrequency: 185, toneSpread: 1.62, toneLevel: 42, noiseLevel: 80, noiseFilter: 1800, noiseQ: 0.9, noiseDecay: 260 },
   clap: { tailFilter: 0, tailAttack: 0, burstDecay: 18, burstCount: 3, burstSpacing: 11, burstLevel: 55, filterFrequency: 1080, filterQ: 1.1, tailLevel: 50, tailDecay: 220 },
   rim: { noiseMode: 0, noiseDecay: 20, balance: 50, lowFrequency: 1670, highFrequency: 2350, filterFrequency: 1750, filterQ: 3.5, toneLevel: 70, noiseLevel: 25, duration: 35 },
-  ch: { metalDecay: 0, lowpass: 20000, metalLevel: 50, metalBase: 40, highpass: 7400, noiseLevel: 18, noiseHighpass: 7800, duration: 58 },
-  oh: { metalDecay: 0, chokeMode: 0, chokeRelease: 10, lowpass: 20000, metalLevel: 48, metalBase: 40, highpass: 7000, noiseLevel: 30, noiseHighpass: 7600, duration: 420 },
+  ch: { metalFocus: 9000, metalQ: 0.9, metalDecay: 0, lowpass: 20000, metalLevel: 50, metalBase: 40, highpass: 7400, noiseLevel: 18, noiseHighpass: 7800, duration: 58 },
+  oh: { metalFocus: 9000, metalQ: 0.9, metalDecay: 0, chokeMode: 0, chokeRelease: 10, lowpass: 20000, metalLevel: 48, metalBase: 40, highpass: 7000, noiseLevel: 30, noiseHighpass: 7600, duration: 420 },
   lt: { overtoneRatio: 1.5, overtoneDecay: 0, overtoneLevel: 0, bodyFrequency: 92, pitchAmount: 1.7, pitchDecay: 70, bodyLevel: 90, noiseLevel: 18, noiseFilter: 368, duration: 450 },
   mt: { overtoneRatio: 1.5, overtoneDecay: 0, overtoneLevel: 0, bodyFrequency: 138, pitchAmount: 1.7, pitchDecay: 70, bodyLevel: 90, noiseLevel: 18, noiseFilter: 552, duration: 450 },
   ht: { overtoneRatio: 1.5, overtoneDecay: 0, overtoneLevel: 0, bodyFrequency: 196, pitchAmount: 1.7, pitchDecay: 70, bodyLevel: 90, noiseLevel: 18, noiseFilter: 784, duration: 450 },
   cow: { highDamping: 0, balance: 50, lowFrequency: 540, highFrequency: 800, filterFrequency: 2640, filterQ: 1.4, toneLevel: 55, duration: 360 },
-  cym: { stickLevel: 0, stickFilter: 4500, stickDecay: 15, bellLevel: 0, bellFrequency: 800, bellDecay: 500, metalDecay: 0, lowpass: 20000, metalBase: 40, metalLevel: 40, highpass: 4200, noiseLevel: 32, noiseHighpass: 5200, duration: 1400 },
+  cym: { metalFocus: 9000, metalQ: 0.9, stickLevel: 0, stickFilter: 4500, stickDecay: 15, bellLevel: 0, bellFrequency: 800, bellDecay: 500, metalDecay: 0, lowpass: 20000, metalBase: 40, metalLevel: 40, highpass: 4200, noiseLevel: 32, noiseHighpass: 5200, duration: 1400 },
   shk: { grainDepth: 0, grainRate: 60, noiseLevel: 50, filterFrequency: 6200, filterQ: 1.6, attack: 6, duration: 75 },
   bassline: { pulseWidth: 50, filterTracking: 0, playMode: 0, glide: 0, accentSource: 0, accentFilter: 0, accentDecay: 0, ampDecay: 0, root: 0, scale: 2, octave: 2, waveform: 0, cutoff: 700, resonance: 12, envelopeAmount: 82, filterDecay: 260, accent: 30 },
   lead: { pulseWidth: 50, filterTracking: 0, playMode: 0, glide: 0, filterDecay: 0, subLevel: 0, root: 0, scale: 1, octave: 4, waveform: 0, pulseMix: 28, detune: 7, cutoff: 3200, resonance: 3.5, envelopeAmount: 38, attack: 8, release: 520 },

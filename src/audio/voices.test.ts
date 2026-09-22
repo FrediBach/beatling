@@ -558,6 +558,71 @@ it.each(["ch", "oh", "cym"] as const)("filters both layers of %s and bypasses br
   expect(legacy.filters.some((filter) => filter.type === "lowpass")).toBe(false);
 });
 
+it.each(["ch", "oh", "cym"] as const)("shapes only the %s metallic bank with independent focus and resonance", (id) => {
+  const f = fixture(id, { metalFocus: 4500, metalQ: 3.2, highpass: 2500, noiseHighpass: 7000, lowpass: 8000, metalDecay: 200, duration: 300 });
+  f.patch.voices[id].tune = 12;
+  f.trigger();
+  expect(f.oscillators).toHaveLength(6);
+  expect(f.gains).toHaveLength(2);
+  expect(f.filters).toHaveLength(4);
+  const hp = f.oscillators[0].connect.mock.calls[0][0] as ReturnType<typeof node>;
+  const focus = hp.connect.mock.calls[0][0] as ReturnType<typeof node>;
+  const metal = focus.connect.mock.calls[0][0] as ReturnType<typeof node>;
+  const brightness = f.filters.find(({ type }) => type === "lowpass")!;
+  for (const oscillator of f.oscillators) expect(oscillator.connect).toHaveBeenCalledWith(hp);
+  expect(hp.frequency.setValueAtTime).toHaveBeenCalledWith(2500, 1);
+  expect(focus.type).toBe("bandpass");
+  expect(focus.frequency.setValueAtTime).toHaveBeenCalledWith(4500, 1); // Tune changes source pitch, not focus.
+  expect(focus.Q.setValueAtTime).toHaveBeenCalledWith(3.2, 1);
+  expect(metal.gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1.2);
+  expect(metal.connect).toHaveBeenCalledWith(brightness);
+  const noiseFilter = f.sources[0].connect.mock.calls[0][0] as ReturnType<typeof node>;
+  expect(noiseFilter).not.toBe(focus);
+  const noise = noiseFilter.connect.mock.calls[0][0] as ReturnType<typeof node>;
+  expect(noiseFilter.frequency.setValueAtTime.mock.calls[0][0]).toBeCloseTo(id === "cym" ? 7000 : 9899.49494);
+  expect(noise.connect).toHaveBeenCalledWith(brightness);
+  expect(noise.gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1.3);
+  for (const oscillator of f.oscillators) expect(oscillator.stop).toHaveBeenCalledWith(1.23);
+});
+
+it.each(["ch", "oh", "cym"] as const)("retains the original %s metal filters by default and in 808/909 models", (id) => {
+  for (const machine of ["custom", "808", "909"] as const) {
+    const f = fixture(id, machine === "custom" ? {} : { metalFocus: 2000, metalQ: 8 });
+    f.patch.voices[id].machine = machine;
+    f.trigger();
+    const filter = f.filters.find(({ type }) => type === "bandpass")!;
+    expect(filter.frequency.setValueAtTime).toHaveBeenCalledWith(9000, 1);
+    expect(filter.Q.setValueAtTime).toHaveBeenCalledWith(0.9, 1);
+  }
+});
+
+it.each(["ch", "oh", "cym"] as const)("bounds %s metal focus to the active sample rate and keeps silent metal silent", (id) => {
+  const f = fixture(id, { metalFocus: 14000, metalQ: 8, metalLevel: 0 });
+  f.context.sampleRate = 22050;
+  f.trigger();
+  const filter = f.filters.find(({ type }) => type === "bandpass")!;
+  const gain = filter.connect.mock.calls[0][0] as ReturnType<typeof node>;
+  expect(filter.frequency.setValueAtTime).toHaveBeenCalledWith(10804.5, 1);
+  expect(gain.gain.setValueAtTime).toHaveBeenLastCalledWith(0, 1);
+  expect(gain.gain.exponentialRampToValueAtTime).not.toHaveBeenCalled();
+  expect(f.sources).toHaveLength(1);
+});
+
+it("keeps cymbal bell and stick paths outside the metal focus filter", () => {
+  const f = fixture("cym", { metalFocus: 3000, metalQ: 5, bellLevel: 40, stickLevel: 30, stickFilter: 6000, lowpass: 7000 });
+  f.trigger();
+  const brightness = f.filters.find(({ type }) => type === "lowpass")!;
+  for (const oscillator of f.oscillators.filter(({ type }) => type === "sine")) {
+    const gain = oscillator.connect.mock.calls[0][0] as ReturnType<typeof node>;
+    expect(gain.connect).toHaveBeenCalledWith(brightness);
+  }
+  const stickFilter = f.sources[1].connect.mock.calls[0][0] as ReturnType<typeof node>;
+  expect(stickFilter.frequency.setValueAtTime).toHaveBeenCalledWith(6000, 1);
+  expect(stickFilter.Q.setValueAtTime).toHaveBeenCalledWith(0.7, 1);
+  const stick = stickFilter.connect.mock.calls[0][0] as ReturnType<typeof node>;
+  expect(stick.connect).toHaveBeenCalledWith(brightness);
+});
+
 it("lets independent rim noise outlast a silent tone layer, with matching filter tuning", () => {
   const f = fixture("rim", { noiseMode: 1, noiseDecay: 180, duration: 20, toneLevel: 0, noiseLevel: 40, filterFrequency: 2000, filterQ: 2 });
   f.patch.voices.rim.decay = 0; // 0.25 multiplier
@@ -629,7 +694,7 @@ it.each(["ch", "oh", "cym"] as const)("ignores custom metal length in the 808/90
 });
 
 it.each([[80, 1000], [1000, 80]])("keeps open-hat choking active through noise %i ms and metal %i ms", (duration, metalDecay) => {
-  const f = fixture("oh", { chokeMode: 1, chokeRelease: 20, duration, metalDecay });
+  const f = fixture("oh", { chokeMode: 1, chokeRelease: 20, duration, metalDecay, metalFocus: 4500, metalQ: 3 });
   f.trigger();
   const gate = f.gains[0];
   f.context.currentTime = 1.3;

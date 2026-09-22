@@ -89,6 +89,8 @@ it.each([
   ["Cowbell", "Partial balance", "75"], ["Closed hat", "Brightness", "6000"],
   ["Cowbell", "High damping", "65"],
   ["Open hat", "Brightness", "7000"], ["Cymbal", "Brightness", "8000"],
+  ["Closed hat", "Metal focus", "4500"], ["Open hat", "Metal focus", "6500"], ["Cymbal", "Metal focus", "8000"],
+  ["Closed hat", "Metal resonance", "3.2"], ["Open hat", "Metal resonance", "1.5"], ["Cymbal", "Metal resonance", "0.5"],
   ["Low tom", "Overtone", "40"], ["Mid tom", "Overtone", "50"], ["Hi tom", "Overtone", "60"],
   ["Low tom", "Overtone ratio", "2.25"], ["Mid tom", "Overtone ratio", "1.75"], ["Hi tom", "Overtone ratio", "3"],
   ["Low tom", "Overtone length", "80"], ["Mid tom", "Overtone length", "350"], ["Hi tom", "Overtone length", "800"],
