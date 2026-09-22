@@ -1,6 +1,7 @@
 import { quantizeVoiceCv } from "@/lib/quantizer";
 import { rhythmsFor } from "@/lib/rhythm-series";
 import type { Patch, RhythmPattern, SequencerBlock, VoiceId } from "@/lib/types";
+import { hasSoloedVoices, isVoiceAudible } from "@/lib/voice-audibility";
 
 const SOUND_NAMES: Record<Exclude<VoiceId, "bassline" | "lead">, string> = {
   kick: "bd",
@@ -62,10 +63,11 @@ function blockPattern(patch: Patch, block: SequencerBlock): string {
 }
 
 export function buildStrudel(patch: Patch): string {
+  const soloActive = hasSoloedVoices(patch.voices);
   const blocks = patch.blocks.filter((block) => {
     if (block.mute || !rhythmsFor(block).some((rhythm) => rhythm.pulses > 0)) return false;
-    if (block.kind === "bernoulli") return block.branchVoices.some((id) => !patch.voices[id].mute);
-    return block.kind === "voice" && block.voice && !patch.voices[block.voice].mute;
+    if (block.kind === "bernoulli") return block.branchVoices.some((id) => isVoiceAudible(patch.voices, id, soloActive));
+    return block.kind === "voice" && block.voice && isVoiceAudible(patch.voices, block.voice, soloActive);
   });
   const patterns = blocks.map((block) => blockPattern(patch, block));
   const routingNote = patch.blocks.some((block) => block.clk.some((source) => source !== "G") || block.rst || block.mut || block.modulations.length)

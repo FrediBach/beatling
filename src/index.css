@@ -194,16 +194,17 @@ button { transition: background-color 120ms, color 120ms, border-color 120ms; }
 .voice-led { flex: 0 0 5px; height: 5px; border-radius: 50%; background: var(--rule); }
 .voice-led.active { background: var(--signal); box-shadow: 0 0 5px color-mix(in srgb,var(--signal) 35%,transparent); }
 .voice-name { flex: 1; min-width: 0; font-size: 11px; font-weight: 600; white-space: nowrap; }
-.model-button, .voice-mute, .voice-settings { flex-shrink: 0; font: 8px var(--font-mono); padding: 2px 4px; border: 1px solid var(--rule); border-radius: 3px; color: var(--muted); }
+.model-button, .voice-mute, .voice-solo, .voice-settings { flex-shrink: 0; font: 8px var(--font-mono); padding: 2px 4px; border: 1px solid var(--rule); border-radius: 3px; color: var(--muted); }
 .model-button.is-909 { background: var(--ink); color: var(--paper); border-color: var(--ink); }
 .model-button.is-custom { border-color: var(--signal); color: var(--signal); background: color-mix(in srgb,var(--signal) 8%,transparent); }
-.model-button:hover, .voice-mute:hover, .voice-settings:hover { border-color: var(--signal); color: var(--signal); }
-.voice-settings, .voice-mute { display: grid; place-items: center; width: 22px; height: 22px; padding: 0; }
+.model-button:hover, .voice-mute:hover, .voice-solo:hover, .voice-settings:hover { border-color: var(--signal); color: var(--signal); }
+.voice-settings, .voice-mute, .voice-solo { display: grid; place-items: center; width: 22px; height: 22px; padding: 0; }
 .voice-settings { border-color: transparent; }
 .voice-settings.variation-changed { color: var(--signal); border-color: var(--signal); }
 .voice-row button:focus-visible { outline: 2px solid var(--signal); outline-offset: 1px; }
 .voice-row.is-muted .voice-name, .voice-row.is-muted .voice-tag-badge, .voice-row.is-muted .voice-range { opacity: .45; }
 .voice-mute[aria-pressed=true] { background: var(--signal); border-color: var(--signal); color: white; }
+.voice-solo[aria-pressed=true] { background: var(--ink); border-color: var(--ink); color: var(--paper); }
 .voice-level { display: flex; align-items: center; gap: 8px; padding: 2px 7px; margin: auto 0; }
 .voice-level .voice-range { flex: 1; min-width: 0; line-height: 12px; }
 .voice-level label, .voice-level output { font-size: 9px; }
@@ -414,7 +415,7 @@ button { transition: background-color 120ms, color 120ms, border-color 120ms; }
 .parameter-row.variation-changed .parameter-value > span, .parameter-row.variation-changed .parameter-value > b { color: var(--signal); }
 .routing-strip.variation-changed { color: var(--signal); background: color-mix(in srgb,var(--signal) 8%,var(--sheet)); }
 .voice-row.has-variation-change { background: linear-gradient(90deg,color-mix(in srgb,var(--signal) 8%,transparent),transparent 72%); }
-.model-button.variation-changed, .voice-mute.variation-changed { border-color: var(--signal); box-shadow: 0 0 0 1px color-mix(in srgb,var(--signal) 25%,transparent); }
+.model-button.variation-changed, .voice-mute.variation-changed, .voice-solo.variation-changed { border-color: var(--signal); box-shadow: 0 0 0 1px color-mix(in srgb,var(--signal) 25%,transparent); }
 .voice-ranges .voice-range.variation-changed, .voice-ranges .voice-range.variation-changed output { color: var(--signal); }
 
 @media (max-width:1200px) {

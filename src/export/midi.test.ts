@@ -24,4 +24,20 @@ describe("MIDI export", () => {
     expect([...midi.slice(10, 14)]).toEqual([0, 1, 1, 224]);
     expect(text(midi.slice(-4))).not.toBe("");
   });
+
+  it("exports soloed voices unless they are muted", () => {
+    const patch = createEmptyPatch();
+    patch.blocks[0].pulses = 4;
+    patch.blocks[1].pulses = 2;
+    patch.voices.kick.solo = true;
+
+    let bytes = [...buildMidi(patch)];
+    expect(bytes).toEqual(expect.arrayContaining([0x99, 36]));
+    expect(bytes).not.toEqual(expect.arrayContaining([0x99, 38]));
+
+    patch.voices.kick.mute = true;
+    bytes = [...buildMidi(patch)];
+    expect(bytes).not.toEqual(expect.arrayContaining([0x99, 36]));
+    expect(bytes).not.toEqual(expect.arrayContaining([0x99, 38]));
+  });
 });

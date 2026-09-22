@@ -39,7 +39,7 @@ it("does not persist preview drafts and restores the committed patch on cancel",
   vi.spyOn(SequencerEngine.prototype, "start").mockResolvedValue();
   const begin = vi.spyOn(SequencerEngine.prototype, "beginAudition");
   render(<App />);
-  await waitFor(() => expect(save.mock.calls.some(([key]) => key === "egs.patch.v27")).toBe(true));
+  await waitFor(() => expect(save.mock.calls.some(([key]) => key === "egs.patch.v28")).toBe(true));
   save.mockClear();
   fireEvent.click(screen.getByRole("button", { name: "Musical randomizer" }));
   fireEvent.click(screen.getByRole("button", { name: "Next: character" }));

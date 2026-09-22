@@ -27,4 +27,17 @@ describe("Strudel export", () => {
     patch.blocks[0].series = [];
     expect(buildStrudel(patch)).toContain("silence");
   });
+
+  it("exports only audible soloed voices and still respects their mutes", () => {
+    const patch = createDemoPatch();
+    patch.voices.kick.solo = true;
+    let code = buildStrudel(patch);
+    expect(code).toContain('s("bd")');
+    expect(code).not.toContain('s("sd")');
+
+    patch.voices.kick.mute = true;
+    code = buildStrudel(patch);
+    expect(code).not.toContain('s("bd")');
+    expect(code).not.toContain('s("sd")');
+  });
 });

@@ -3,6 +3,7 @@ import { VOICE_DEFS } from "@/lib/constants";
 import { clamp, effectiveBlock, euclidHit, volumeGain } from "@/lib/euclid";
 import { effectiveVoiceModulation } from "@/lib/modulation";
 import { quantizeVoiceCv } from "@/lib/quantizer";
+import { isVoiceAudible } from "@/lib/voice-audibility";
 import { synthFilterSweep } from "@/lib/synth-filter";
 import { pulseWaveCoefficients } from "@/lib/pulse-wave";
 import { shakerTextureCurve } from "@/lib/shaker-texture";
@@ -662,8 +663,9 @@ export class SequencerEngine {
 
   private playVoice(id: VoiceId, time: number, modulation: EffectiveBlock): void {
     if (!this.context) return;
-    const voice = this.getPatch().voices[id];
-    if (!voice || voice.mute) return;
+    const voices = this.getPatch().voices;
+    const voice = voices[id];
+    if (!voice || !isVoiceAudible(voices, id)) return;
     const routed = effectiveVoiceModulation(voice, (source) => this.sourceLfo(source, time));
     const tune = clamp(voice.tune + (modulation.tune + routed.tune) * 12, -24, 24);
     const parameters = {

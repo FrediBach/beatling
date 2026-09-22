@@ -1,6 +1,6 @@
 export const BLOCK_COUNT = 16;
-export const PATCH_FORMAT = "euclid-grid.v27";
-export const ARRANGEMENT_FORMAT = "euclid-grid.arrangement.v27";
+export const PATCH_FORMAT = "euclid-grid.v28";
+export const ARRANGEMENT_FORMAT = "euclid-grid.arrangement.v28";
 
 export type VoiceId =
   | "kick"
@@ -87,6 +87,7 @@ export interface VoiceState {
   tune: number;
   decay: number;
   mute: boolean;
+  solo: boolean;
   modulations: VoiceModulationRoute[];
   custom: CustomVoiceSettings;
 }

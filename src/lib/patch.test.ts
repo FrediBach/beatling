@@ -41,6 +41,18 @@ describe("patches", () => {
     expect(patch.voices.kick.custom.clickFrequency).toBe(1800);
   });
 
+  it("defaults missing solo state off and retains explicit solos", () => {
+    const source = createEmptyPatch() as unknown as { voices: Record<string, Record<string, unknown>>; blocks: SequencerBlock[] };
+    delete source.voices.kick.solo;
+    source.voices.snare.solo = true;
+    source.voices.clap.solo = "yes";
+
+    const patch = normalizePatch(source)!;
+    expect(patch.voices.kick.solo).toBe(false);
+    expect(patch.voices.snare.solo).toBe(true);
+    expect(patch.voices.clap.solo).toBe(false);
+  });
+
   it("normalizes quantized V/Oct only for synth voices", () => {
     const source = createEmptyPatch();
     source.voices.kick.modulations = [{ source: "12", destination: "vOct", amount: 1 }];
@@ -57,7 +69,7 @@ describe("patches", () => {
     legacy.format = "euclid-grid.v1";
     delete legacy.effects;
     const migrated = normalizePatch(legacy)!;
-    expect(migrated.format).toBe("euclid-grid.v27");
+    expect(migrated.format).toBe("euclid-grid.v28");
     expect(migrated.effects.distortion.enabled).toBe(false);
     expect(migrated.effects.sends.kick.reverb).toBe(0);
     expect(migrated.effects.karplus).toMatchObject({ enabled: false, model: "string", tune: 48, body: 60, decay: 65 });

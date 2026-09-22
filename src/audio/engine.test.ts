@@ -6,6 +6,35 @@ import { waveguideDamping, waveguideFeedback, waveguideFrequency } from "@/lib/e
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 
+it("applies solo without bypassing a voice mute", () => {
+  const patch = createEmptyPatch();
+  patch.voices.kick.solo = true;
+  const engine = new SequencerEngine(patch);
+  const runtime = engine as unknown as {
+    context: AudioContext | null;
+    playVoice: (id: "kick" | "snare", time: number, modulation: { steps: number; pulses: number; rot: number; div: number; prob: number; tune: number; decay: number; level: number }) => void;
+    kick: (time: number, parameters: unknown) => void;
+    snare: (time: number, parameters: unknown) => void;
+  };
+  runtime.context = { sampleRate: 48_000 } as AudioContext;
+  const kick = vi.spyOn(runtime, "kick").mockImplementation(() => undefined);
+  const snare = vi.spyOn(runtime, "snare").mockImplementation(() => undefined);
+  const modulation = { steps: 16, pulses: 4, rot: 0, div: 1, prob: 100, tune: 0, decay: 0, level: 0 };
+  try {
+    runtime.playVoice("kick", 1, modulation);
+    runtime.playVoice("snare", 1, modulation);
+    expect(kick).toHaveBeenCalledOnce();
+    expect(snare).not.toHaveBeenCalled();
+
+    patch.voices.kick.mute = true;
+    runtime.playVoice("kick", 2, modulation);
+    expect(kick).toHaveBeenCalledOnce();
+  } finally {
+    runtime.context = null;
+    engine.destroy();
+  }
+});
+
 it.each([0, 1, 2, 3])("preserves Acid with Tom Fill's routed drum gaps and loop restart in variation %i", (variation) => {
   const patch = createPresetArrangement("acid-tom-fill").variations[variation].patch;
   const engine = new SequencerEngine(patch);

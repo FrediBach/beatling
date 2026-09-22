@@ -1,5 +1,6 @@
 import { euclidHit } from "@/lib/euclid";
 import { quantizeVoiceCv } from "@/lib/quantizer";
+import { hasSoloedVoices, isVoiceAudible } from "@/lib/voice-audibility";
 import { rhythmsFor } from "@/lib/rhythm-series";
 import type { Patch, SequencerBlock, VoiceId } from "@/lib/types";
 
@@ -77,7 +78,7 @@ function voicesForHit(block: SequencerBlock, blockIndex: number, step: number): 
   return [block.branchVoices[deterministicHit(blockIndex, step, block.prob) ? 0 : 1]];
 }
 
-function laneEvents(patch: Patch, block: SequencerBlock, blockIndex: number, endTick: number, channel: number): MidiEvent[] {
+function laneEvents(patch: Patch, block: SequencerBlock, blockIndex: number, endTick: number, channel: number, soloActive: boolean): MidiEvent[] {
   const pulseTicks = PPQ / patch.rate;
   const cycleLength = sequenceLength(block, pulseTicks);
   const events: MidiEvent[] = [{ tick: 0, priority: 0, bytes: textEvent(0x03, `Block ${blockIndex + 1}`) }];
@@ -100,7 +101,7 @@ function laneEvents(patch: Patch, block: SequencerBlock, blockIndex: number, end
           const swing = (absoluteStep * block.div) % 2 === 1 ? Math.round((patch.swing / 100) * pulseTicks * 0.5) : 0;
           for (const id of voicesForHit(block, blockIndex, absoluteStep)) {
             const voice = patch.voices[id];
-            if (voice.mute) continue;
+            if (!isVoiceAudible(patch.voices, id, soloActive)) continue;
             const drumNote = DRUM_NOTES[id];
             const note = drumNote ?? Math.round(quantizeVoiceCv(voice.custom, 0, voice.tune).midi);
             const midiChannel = drumNote === undefined ? channel : 9;
@@ -120,6 +121,7 @@ function laneEvents(patch: Patch, block: SequencerBlock, blockIndex: number, end
 }
 
 export function buildMidi(patch: Patch): Uint8Array {
+  const soloActive = hasSoloedVoices(patch.voices);
   const pulseTicks = PPQ / patch.rate;
   const barTicks = PPQ * 4;
   const audible = patch.blocks
@@ -136,7 +138,7 @@ export function buildMidi(patch: Patch): Uint8Array {
   const tracks = [track(tempoEvents, endTick)];
   let synthChannel = 0;
   for (const { block, index } of audible) {
-    tracks.push(track(laneEvents(patch, block, index, endTick, synthChannel), endTick));
+    tracks.push(track(laneEvents(patch, block, index, endTick, synthChannel, soloActive), endTick));
     if (block.kind === "voice" && (block.voice === "bassline" || block.voice === "lead")) synthChannel = synthChannel === 8 ? 10 : synthChannel + 1;
   }
   const header = chunk("MThd", [...u16(1), ...u16(tracks.length), ...u16(PPQ)]);

@@ -9,6 +9,7 @@ import { effectiveVoiceModulation } from "@/lib/modulation";
 import type { Connection } from "@/lib/routing";
 import type { SequencerBlock, VoiceBank as VoiceBankState, VoiceId, VoiceState } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { hasSoloedVoices, isVoiceAudible } from "@/lib/voice-audibility";
 
 interface VoiceBankProps {
   voices: VoiceBankState;
@@ -26,6 +27,7 @@ export function VoiceBank({ voices, activeVoices, onChange, changedFields = {}, 
   const [editingVoice, setEditingVoice] = useState<VoiceId | null>(null);
   const [routingVoice, setRoutingVoice] = useState<VoiceId | null>(null);
   const settingsTrigger = useRef<HTMLButtonElement | null>(null);
+  const soloActive = useMemo(() => hasSoloedVoices(voices), [voices]);
   const incomingByVoice = useMemo(() => {
     const grouped = new Map<VoiceId, Connection[]>();
     for (const connection of connections) {
@@ -47,7 +49,7 @@ export function VoiceBank({ voices, activeVoices, onChange, changedFields = {}, 
           const incoming = incomingByVoice.get(definition.id) ?? [];
           const effective = effectiveVoiceModulation(voice, (source) => lfoValues[source] ?? 0.5);
           return (
-            <section key={definition.id} className={cn("voice-row", voice.mute && "is-muted", changedFields[definition.id]?.size && "has-variation-change")} aria-label={`${definition.name} voice`} data-routing-node data-voice-id={definition.id}>
+            <section key={definition.id} className={cn("voice-row", !isVoiceAudible(voices, definition.id, soloActive) && "is-muted", changedFields[definition.id]?.size && "has-variation-change")} aria-label={`${definition.name} voice`} data-routing-node data-voice-id={definition.id}>
               <div className="voice-heading">
                 <span className={cn("voice-led", activeVoices[definition.id] && "active")} />
                 <abbr className="voice-tag-badge" title={`Roland voice code for ${definition.name}`}>{definition.tag}</abbr>
@@ -63,6 +65,14 @@ export function VoiceBank({ voices, activeVoices, onChange, changedFields = {}, 
               </div>
               <div className="voice-level">
                 <VoiceRange voiceName={definition.name} label="Level" min={0} max={100} value={voice.level} changed={changedFields[definition.id]?.has("level")} effectiveValue={voice.modulations.some((route) => route.destination === "level") ? voice.level * (1 + effective.level * 0.6) : undefined} onChange={(value) => update("level", value)} />
+                <button
+                  type="button"
+                  className={cn("voice-solo", changedFields[definition.id]?.has("solo") && "variation-changed")}
+                  aria-label={`${voice.solo ? "Unsolo" : "Solo"} ${definition.name} voice`}
+                  aria-pressed={voice.solo}
+                  onClick={() => update("solo", !voice.solo)}
+                  title={`${voice.solo ? "Unsolo" : "Solo"} ${definition.name}`}
+                >S</button>
                 <button
                   type="button"
                   className={cn("voice-mute", changedFields[definition.id]?.has("mute") && "variation-changed")}

@@ -54,6 +54,25 @@ it.each(["Kick", "Clap", "Bassline", "Lead"])("edits %s tune and decay in settin
   expect(screen.getByRole("slider", { name: `${name} decay` })).toHaveValue("31");
 });
 
+it("layers solo over mute without changing either control", () => {
+  render(<Fixture />);
+  const kick = screen.getByRole("region", { name: "Kick voice" });
+  const snare = screen.getByRole("region", { name: "Snare voice" });
+
+  fireEvent.click(within(kick).getByRole("button", { name: "Solo Kick voice" }));
+  expect(within(kick).getByRole("button", { name: "Unsolo Kick voice" })).toHaveAttribute("aria-pressed", "true");
+  expect(kick).not.toHaveClass("is-muted");
+  expect(snare).toHaveClass("is-muted");
+
+  fireEvent.click(within(kick).getByRole("button", { name: "Mute Kick voice" }));
+  expect(kick).toHaveClass("is-muted");
+  expect(within(kick).getByRole("button", { name: "Unmute Kick voice" })).toHaveAttribute("aria-pressed", "true");
+
+  fireEvent.click(within(kick).getByRole("button", { name: "Unsolo Kick voice" }));
+  expect(kick).toHaveClass("is-muted");
+  expect(snare).not.toHaveClass("is-muted");
+});
+
 it("keeps tune and decay when resetting custom synthesis", () => {
   render(<Fixture />);
   fireEvent.click(screen.getByRole("button", { name: "Use custom Kick" }));

@@ -4,6 +4,7 @@ import { effectiveVoiceModulation } from "@/lib/modulation";
 import { quantizeVoiceCv } from "@/lib/quantizer";
 import { rhythmsFor } from "@/lib/rhythm-series";
 import type { Patch, VoiceId } from "@/lib/types";
+import { hasSoloedVoices, isVoiceAudible } from "@/lib/voice-audibility";
 import { simpleClock } from "./constraints";
 import type { MusicalRequest } from "./types";
 
@@ -15,6 +16,7 @@ export function musicalEvents(patch: Patch, bars = 4): MusicalEvent[] {
   const frames = new Map<number, LfoFrame>();
   const events: MusicalEvent[] = [];
   const interval = 60 / patch.bpm / patch.rate;
+  const soloActive = hasSoloedVoices(patch.voices);
   const cycles = patch.blocks.map((block) => rhythmsFor(block).flatMap((rhythm) =>
     Array.from({ length: rhythm.repeats }, () => rhythm)));
   for (let pulse = 0; pulse < Math.min(bars, 8) * patch.rate * 4; pulse++) {
@@ -31,7 +33,7 @@ export function musicalEvents(patch: Patch, bars = 4): MusicalEvent[] {
       }
       const previous = frames.get(slot);
       frames.set(slot, { time, position, stepDuration: previous ? Math.max(0.008, time - previous.time) : interval, rhythm, shape: block.shape, random: 0.5, euclidean: block.kind !== "voice" });
-      if (block.kind !== "voice" || !block.voice || block.mute || patch.voices[block.voice].mute || patch.voices[block.voice].level === 0 || block.prob === 0 || !euclidHit(position, rhythm.steps, rhythm.pulses, rhythm.rot)) return;
+      if (block.kind !== "voice" || !block.voice || block.mute || !isVoiceAudible(patch.voices, block.voice, soloActive) || patch.voices[block.voice].level === 0 || block.prob === 0 || !euclidHit(position, rhythm.steps, rhythm.pulses, rhythm.rot)) return;
       const event: MusicalEvent = { slot, voice: block.voice, pulse };
       if (block.voice === "bassline" || block.voice === "lead") {
         const voice = patch.voices[block.voice];
