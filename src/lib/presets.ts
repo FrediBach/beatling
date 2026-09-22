@@ -27,6 +27,7 @@ import { refineRollingTechno } from "@/lib/preset-rolling-techno";
 import { refineTomDrivenTechno } from "@/lib/preset-tom-driven-techno";
 import { refineMinimalDubTechno } from "@/lib/preset-minimal-dub-techno";
 import { refineRaveStomp } from "@/lib/preset-rave-stomp";
+import { refineHardgroove } from "@/lib/preset-hardgroove";
 
 const PRESET_REFINERS: Partial<Record<string, (patch: Patch, variation: 0 | 1 | 2 | 3) => void>> = {
   "electro-backbeat": refineElectroBackbeat,
@@ -53,6 +54,7 @@ const PRESET_REFINERS: Partial<Record<string, (patch: Patch, variation: 0 | 1 | 
   "tom-driven-techno": refineTomDrivenTechno,
   "minimal-dub-techno": refineMinimalDubTechno,
   "rave-stomp": refineRaveStomp,
+  "hardgroove": refineHardgroove,
 };
 
 interface PresetLane {
