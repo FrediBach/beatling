@@ -94,6 +94,7 @@ it.each([
   ["Rim", "Noise length", "90"], ["Closed hat", "Metal length", "100"],
   ["Open hat", "Metal length", "900"], ["Cymbal", "Metal length", "2200"],
   ["Cymbal", "Bell level", "35"], ["Cymbal", "Bell pitch", "1100"], ["Cymbal", "Bell length", "900"],
+  ["Bassline", "Filter tracking", "100"], ["Lead", "Filter tracking", "50"],
 ])("retains the new %s %s control when reopening its editor", (name, label, value) => {
   render(<Fixture />);
   const card = screen.getByRole("region", { name: `${name} voice` });

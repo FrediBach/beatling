@@ -36,6 +36,7 @@ const pitch = (...parameters: VoiceParameterDefinition[]): VoiceParameterSection
 const optionParameter = (key: string, label: string, options: string[], description: string): VoiceParameterDefinition => ({ key, label, min: 0, max: options.length - 1, step: 1, description, options: options.map((name, value) => ({ value, label: name })) });
 const brightness = () => parameter("lowpass", "Brightness", 1500, 20000, 100, "Low-pass cutoff for all voice layers together; 20000 bypasses it.", "Hz");
 const balance = () => parameter("balance", "Partial balance", 0, 100, 1, "Blend from the low partial to the high partial; 50 keeps both equal.", "%");
+const filterTracking = () => parameter("filterTracking", "Filter tracking", 0, 100, 1, "Raise or lower the filter with note pitch and Glide. At 100%, each octave doubles the cutoff; C3 is the reference. 0 keeps a fixed cutoff.", "%");
 const synthArticulation = (): VoiceParameterSection => ({
   title: "Articulation",
   parameters: [
@@ -209,6 +210,7 @@ export const VOICE_PARAMETER_SECTIONS: Record<VoiceId, VoiceParameterSection[]> 
     tone(
       optionParameter("waveform", "Oscillator", ["Saw", "Square"], "Core oscillator shape."),
       parameter("cutoff", "Filter cutoff", 80, 8000, 10, "Resting cutoff of the resonant low-pass filter.", "Hz"),
+      filterTracking(),
       parameter("resonance", "Resonance", 0.1, 18, 0.1, "Emphasis around the filter cutoff.", "Q"),
       parameter("envelopeAmount", "Envelope amount", 0, 100, 1, "How far the filter opens on each note.", "%"),
     ),
@@ -235,6 +237,7 @@ export const VOICE_PARAMETER_SECTIONS: Record<VoiceId, VoiceParameterSection[]> 
       parameter("pulseMix", "Companion mix", 0, 100, 1, "Level of a detuned square companion oscillator.", "%"),
       parameter("detune", "Companion detune", -30, 30, 1, "Detuning of the companion oscillator.", "ct"),
       parameter("cutoff", "Filter cutoff", 200, 12000, 25, "Resting cutoff of the low-pass filter.", "Hz"),
+      filterTracking(),
       parameter("resonance", "Resonance", 0.1, 14, 0.1, "Emphasis around the filter cutoff.", "Q"),
       parameter("envelopeAmount", "Envelope amount", 0, 100, 1, "How far the filter opens on each note.", "%"),
     ),
@@ -278,8 +281,8 @@ export const DEFAULT_CUSTOM_VOICE_SETTINGS: Record<VoiceId, CustomVoiceSettings>
   cow: { balance: 50, lowFrequency: 540, highFrequency: 800, filterFrequency: 2640, filterQ: 1.4, toneLevel: 55, duration: 360 },
   cym: { bellLevel: 0, bellFrequency: 800, bellDecay: 500, metalDecay: 0, lowpass: 20000, metalBase: 40, metalLevel: 40, highpass: 4200, noiseLevel: 32, noiseHighpass: 5200, duration: 1400 },
   shk: { noiseLevel: 50, filterFrequency: 6200, filterQ: 1.6, attack: 6, duration: 75 },
-  bassline: { playMode: 0, glide: 0, accentSource: 0, accentFilter: 0, accentDecay: 0, ampDecay: 0, root: 0, scale: 2, octave: 2, waveform: 0, cutoff: 700, resonance: 12, envelopeAmount: 82, filterDecay: 260, accent: 30 },
-  lead: { playMode: 0, glide: 0, filterDecay: 0, subLevel: 0, root: 0, scale: 1, octave: 4, waveform: 0, pulseMix: 28, detune: 7, cutoff: 3200, resonance: 3.5, envelopeAmount: 38, attack: 8, release: 520 },
+  bassline: { filterTracking: 0, playMode: 0, glide: 0, accentSource: 0, accentFilter: 0, accentDecay: 0, ampDecay: 0, root: 0, scale: 2, octave: 2, waveform: 0, cutoff: 700, resonance: 12, envelopeAmount: 82, filterDecay: 260, accent: 30 },
+  lead: { filterTracking: 0, playMode: 0, glide: 0, filterDecay: 0, subLevel: 0, root: 0, scale: 1, octave: 4, waveform: 0, pulseMix: 28, detune: 7, cutoff: 3200, resonance: 3.5, envelopeAmount: 38, attack: 8, release: 520 },
 };
 
 export function createCustomVoiceSettings(id: VoiceId): CustomVoiceSettings {

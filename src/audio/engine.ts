@@ -3,6 +3,7 @@ import { VOICE_DEFS } from "@/lib/constants";
 import { clamp, effectiveBlock, euclidHit, volumeGain } from "@/lib/euclid";
 import { effectiveVoiceModulation } from "@/lib/modulation";
 import { quantizeVoiceCv } from "@/lib/quantizer";
+import { synthFilterSweep } from "@/lib/synth-filter";
 import { sampleLfo, type LfoFrame } from "@/lib/lfo";
 import { EFFECT_IDS, effectGain, waveguideDamping, waveguideFeedback, waveguideFrequency, delaySeconds, distortionSample, REVERB_SECONDS } from "@/lib/effects";
 import { rhythmAt, rhythmsFor } from "@/lib/rhythm-series";
@@ -910,12 +911,12 @@ export class SequencerEngine {
     const envelopeAmount = value(p, "envelopeAmount", 82) / 100;
     const filter = this.filter("lowpass", cutoff, value(p, "resonance", 12), time);
     const accentOctaves = 2 * accent * value(p, "accentFilter", 0) / 100;
-    filter.frequency.setValueAtTime(this.safeFrequency(Math.min(16000, cutoff * (1 + envelopeAmount * 10) * 2 ** accentOctaves)), time);
-    filter.frequency.exponentialRampToValueAtTime(this.safeFrequency(Math.max(40, cutoff)), time + filterDuration);
+    const peak = this.safeFrequency(Math.min(16000, cutoff * (1 + envelopeAmount * 10) * 2 ** accentOctaves));
     const gain = this.gain(0, time);
     this.attackDecay(gain.gain, time, p.amplitude * (0.72 + accent * 0.28), 0.004, duration);
     const note = this.beginSynthNote("bassline", bus, time, duration, p);
     if (!note) return;
+    this.synthFilter(filter.frequency, note, peak, this.safeFrequency(Math.max(40, cutoff)), filterDuration, value(p, "filterTracking", 0), 16000);
     const oscillator = this.synthOscillator(value(p, "waveform", 0) >= 0.5 ? "square" : "sawtooth", note);
     oscillator.connect(filter).connect(gain).connect(note.output);
     oscillator.start(time);
@@ -929,14 +930,14 @@ export class SequencerEngine {
     const cutoff = value(p, "cutoff", 3200);
     const envelopeAmount = value(p, "envelopeAmount", 38) / 100;
     const filter = this.filter("lowpass", cutoff, value(p, "resonance", 3.5), time);
-    filter.frequency.setValueAtTime(this.safeFrequency(Math.min(18000, cutoff * (1 + envelopeAmount * 4))), time);
+    const peak = this.safeFrequency(Math.min(18000, cutoff * (1 + envelopeAmount * 4)));
     const filterDecay = value(p, "filterDecay", 0);
     const filterDuration = filterDecay > 0 ? Math.max(0.01, filterDecay / 1000 * p.decay) : duration;
-    filter.frequency.exponentialRampToValueAtTime(this.safeFrequency(Math.max(80, cutoff)), time + filterDuration);
     const gain = this.gain(0, time);
     this.attackDecay(gain.gain, time, p.amplitude * 0.72, attack, duration);
     const note = this.beginSynthNote("lead", bus, time, duration, p);
     if (!note) return;
+    this.synthFilter(filter.frequency, note, peak, this.safeFrequency(Math.max(80, cutoff)), filterDuration, value(p, "filterTracking", 0), 18000);
     const waveforms: OscillatorType[] = ["sawtooth", "square", "triangle"];
     const main = this.synthOscillator(waveforms[Math.round(value(p, "waveform", 0))] ?? "sawtooth", note);
     main.connect(filter);
@@ -963,6 +964,15 @@ export class SequencerEngine {
   private beginSynthNote(id: "bassline" | "lead", bus: AudioNode, time: number, duration: number, p: SynthParameters): SynthNote | null {
     const mono = value(p, "playMode", 0) === 1;
     return this.synthArticulation[id].begin(this.context!, bus, time, duration + 0.005, mono ? this.safeFrequency(p.frequency) : p.frequency, mono, value(p, "glide", 0) / 1000);
+  }
+
+  private synthFilter(parameter: AudioParam, note: SynthNote, peak: number, resting: number, duration: number, tracking: number, ceiling: number): void {
+    const points = synthFilterSweep({
+      start: note.start, duration, peak, resting, from: this.safeFrequency(note.from), target: this.safeFrequency(note.target),
+      glideEnd: note.glideEnd, tracking: tracking / 100, ceiling: this.safeFrequency(ceiling),
+    });
+    parameter.setValueAtTime(points[0].frequency, points[0].time);
+    for (const point of points.slice(1)) parameter.exponentialRampToValueAtTime(point.frequency, point.time);
   }
 
   private synthOscillator(type: OscillatorType, note: SynthNote, ratio = 1): OscillatorNode {

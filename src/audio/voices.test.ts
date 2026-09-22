@@ -411,6 +411,54 @@ it("retains the original bassline envelope with added accent controls disabled",
   expect(f.gains[0].gain.linearRampToValueAtTime).toHaveBeenCalledWith(1.3, 1.004);
 });
 
+it.each(["bassline", "lead"] as const)("tracks %s cutoff above and below C3 without changing amplitude", (id) => {
+  for (const tracking of [0, 50, 100]) {
+    for (const tune of [-12, 12]) {
+      const f = fixture(id, { filterTracking: tracking, octave: 3, root: 0, cutoff: 400, envelopeAmount: 0, filterDecay: 200 });
+      f.patch.voices[id].tune = tune;
+      f.trigger();
+      const expected = 400 * 2 ** (tune / 12 * tracking / 100);
+      expect(f.filters[0].frequency.setValueAtTime.mock.lastCall![0]).toBeCloseTo(expected);
+      expect(f.filters[0].frequency.exponentialRampToValueAtTime.mock.lastCall![0]).toBeCloseTo(expected);
+      expect(f.gains[0].gain.linearRampToValueAtTime.mock.calls[0][0]).toBeCloseTo(id === "lead" ? 0.72 : 0.804);
+    }
+  }
+});
+
+it.each(["bassline", "lead"] as const)("uses the quantized V/Oct note for %s filter tracking", (id) => {
+  const f = fixture(id, { filterTracking: 100, octave: 3, root: 0, scale: 1, cutoff: 400, envelopeAmount: 0 });
+  f.patch.voices[id].modulations = [{ source: "0", destination: "vOct", amount: 1 }];
+  vi.spyOn(f.engine as unknown as { sourceLfo: () => number }, "sourceLfo").mockReturnValue(0.26);
+  f.trigger();
+  // 3.12 incoming semitones snap to E3 in C major (four semitones).
+  expect(f.filters[0].frequency.setValueAtTime.mock.lastCall![0]).toBeCloseTo(400 * 2 ** (4 / 12));
+});
+
+it.each(["bassline", "lead"] as const)("keeps %s tracking a glide after filter decay ends and across an interrupted slide", (id) => {
+  const f = fixture(id, { filterTracking: 100, octave: 3, root: 0, playMode: 1, glide: 200, ampDecay: 1000, release: 1000, cutoff: 400, envelopeAmount: 0, filterDecay: 100, pulseMix: 0 });
+  f.trigger();
+  f.trigger(id, 1.1, { tune: 1 });
+  expect(f.filters[1].frequency.setValueAtTime.mock.lastCall![0]).toBeCloseTo(400);
+  const ramps = f.filters[1].frequency.exponentialRampToValueAtTime.mock.calls;
+  expect(ramps[0][0]).toBeCloseTo(400 * Math.sqrt(2));
+  expect(ramps[0][1]).toBeCloseTo(1.2);
+  expect(ramps[1][0]).toBeCloseTo(800);
+  expect(ramps[1][1]).toBeCloseTo(1.3);
+  f.trigger(id, 1.2, { tune: -1 });
+  expect(f.filters[2].frequency.setValueAtTime.mock.lastCall![0]).toBeCloseTo(400 * Math.sqrt(2));
+  expect(f.filters[2].frequency.exponentialRampToValueAtTime.mock.lastCall![0]).toBeCloseTo(200);
+});
+
+it("combines bassline tracking with accent brightness and keeps accent timing", () => {
+  const f = fixture("bassline", { filterTracking: 100, octave: 3, root: 0, accent: 100, accentFilter: 50, accentDecay: 100, filterDecay: 100, cutoff: 200, envelopeAmount: 50, ampDecay: 500 });
+  f.trigger("bassline", 1, { tune: 1 });
+  expect(f.filters[0].frequency.setValueAtTime.mock.lastCall![0]).toBeCloseTo(4800);
+  const ramp = f.filters[0].frequency.exponentialRampToValueAtTime.mock.lastCall!;
+  expect(ramp[0]).toBeCloseTo(400);
+  expect(ramp[1]).toBeCloseTo(1.2);
+  expect(f.gains[0].gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1.5);
+});
+
 it.each(["bassline", "lead"] as const)("retriggers %s in mono and glides from the sounding pitch", (id) => {
   const f = fixture(id, { playMode: 1, glide: 100, ampDecay: 1000, release: 1000, pulseMix: 0 });
   f.trigger();

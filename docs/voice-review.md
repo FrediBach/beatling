@@ -69,13 +69,25 @@ Try Mono retrigger with Glide around 60–100 ms and an amplitude length longer 
 
 Stop and pattern reset now fade synth output and cancel scheduled synth notes in both playback modes, clearing glide memory. This fixes pending synth hits continuing after transport reset. Existing shared effect tails are left to decay. Note gates are reclaimed using the actual audio clock and bounded to 256 retained notes per synth; excessive routed bursts skip additional notes until capacity is available. JSON retains the controls; MIDI/Strudel exports do not reproduce this articulation.
 
+## Synth filter tracking
+
+**Bassline / Lead → Configure → Tone → Filter tracking** adjusts the filter with the main note pitch:
+
+- **0%** retains the original fixed cutoff and filter sweep.
+- **100%** moves the filter one octave for each octave of pitch, keeping its relationship to the note until frequency limits are reached.
+- **50%** moves the filter half an octave for each octave of pitch.
+
+The reference is **C3**: Filter cutoff is the resting cutoff for that note. Root, Base octave, quantized V/Oct and Tune all contribute to tracking. Mono retrigger also tracks the actual Glide trajectory, including slides interrupted by another note. Filter decay and Glide can finish in either order; the remaining motion continues independently. The bassline's accent brightness and length still apply, while amplitude envelopes remain independent of tracking.
+
+Try Lead Filter tracking 50–100% with a low cutoff for a phrase spanning several octaves. Bassline tracking around 30–60% gives a gentler register-dependent change. Notes below C3 lower the cutoff, so a bass patch may need its base Filter cutoff raised when enabling tracking. Frequency limits still apply; high settings can reach a ceiling. Existing patches default to 0% and retain their original filter automation.
+
 ## Shared corrections and compatibility
 
 - Noise loops the existing buffer from a randomized offset and stops explicitly after the requested duration. No new noise buffer is generated per hit.
 - Zero-level layers stay at zero; positive envelopes finish their exponential tail with a short ramp to exact silence.
 - Shaker attack/decay ordering is valid at the full supported range. All sources retain bounded stop times.
 - Voice filter cutoffs and oscillator creation respect the active sample rate's Nyquist limit, including 32 kHz contexts. Low synth pitches remain available below 20 Hz.
-- Patch and arrangement format **v14** stores the numeric custom settings, including hat choking, bassline accent articulation and synth playback/glide. Readers still migrate v1–v13 storage and JSON. Older patches receive neutral defaults: no added harmonics/overtones/sub, bypassed brightness, centered partial balance, original snare/clap lengths and linked synth envelopes. Choking is off; accent brightness/length are zero and the accent source is Every note. Both synths default to Polyphonic with zero Glide; all existing voice shaping, accent and choke values are retained. Rim noise defaults to Linked (20 ms Noise length when Independent is enabled); hat/cymbal Metal length defaults to zero to follow the original duration. Cymbal Bell level defaults to zero, with 800 Hz Bell pitch and 500 ms Bell length ready when enabled.
+- Patch and arrangement format **v15** stores the numeric custom settings, including hat choking, bassline accent articulation and synth playback/glide. Readers still migrate v1–v14 storage and JSON. Older patches receive neutral defaults: no added harmonics/overtones/sub, bypassed brightness, centered partial balance, original snare/clap lengths and linked synth envelopes. Choking is off; accent brightness/length are zero and the accent source is Every note. Both synths default to Polyphonic with zero Glide; all existing voice shaping, accent and choke values are retained. Rim noise defaults to Linked (20 ms Noise length when Independent is enabled); hat/cymbal Metal length defaults to zero to follow the original duration. Cymbal Bell level defaults to zero, with 800 Hz Bell pitch and 500 ms Bell length ready when enabled. Both synths default to zero Filter tracking.
 - 808/909 drum selections retain their existing circuits; choose Custom for the added shaping controls. Preset rhythms, balances, effect sends, routing and variation histories retain their existing meaning. The shared envelope/noise bug fixes apply to all models.
 
 ## Remaining synthesis opportunities
@@ -95,4 +107,6 @@ These require separate behavior decisions or auditioning rather than additional 
 
 `src/audio/synth-articulation.test.ts` checks note stealing, interrupted glides, simultaneous-hit arbitration, gaps, mode changes, audio-time cleanup, reset and bounded tracking. Voice integration tests exercise both synths, synchronized lead oscillators, independent ownership, muted triggers, routed/Bernoulli hits and transport teardown.
 
-`src/lib/voice-config.test.ts` covers v9/v10/v11/v12/v13 storage migration, neutral defaults, new-control round trips, numeric bounds and malformed values. `src/components/voice-bank.test.tsx` verifies accessible editing, reopening and resetting of every new control, including choking across model changes and synth playback/glide. The full quality gate also checks the existing preset and routing suite.
+`src/lib/voice-config.test.ts` covers v9/v10/v11/v12/v13/v14 storage migration, neutral defaults, new-control round trips, numeric bounds and malformed values. `src/components/voice-bank.test.tsx` verifies accessible editing, reopening and resetting of every new control, including choking across model changes and synth playback/glide. The full quality gate also checks the existing preset and routing suite.
+
+`src/lib/synth-filter.test.ts` checks full/partial pitch tracking, overlapping envelope/glide curves, frequency-limit plateaus and bounded automation. Voice integration tests cover quantized V/Oct, both synths, interrupted glides, original zero-tracking behavior and bassline accent coupling.

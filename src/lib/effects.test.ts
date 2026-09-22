@@ -17,7 +17,7 @@ describe("expanded effect settings", () => {
     } };
     localStorage.setItem("egs.patch.v8", JSON.stringify(legacy));
     const patch = loadStoredPatch()!;
-    expect(patch.format).toBe("euclid-grid.v14");
+    expect(patch.format).toBe("euclid-grid.v15");
     for (const id of ["distortion", "reverb", "delay", "karplus", "compressor"] as const) expect(patch.effects[id]).toMatchObject(legacy.effects[id]);
     expect(patch.effects.distortion).toMatchObject({ mode: "soft", trim: 0 });
     expect(patch.effects.reverb).toMatchObject({ space: "studio", preDelay: 0, lowCut: 0 });
