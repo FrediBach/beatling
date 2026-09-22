@@ -699,7 +699,84 @@ describe("Triplet Trap", () => {
   });
 });
 
-describe.each(["electro-backbeat", "electro-funk-maracas", "stripped-808-breakbeat", "bass-tempo-standard", "double-time-bass", "half-time-bass-groove", "boom-bap", "sparse-808-ballad", "modern-808-hip-hop", "trap-standard", "triplet-trap"])("%s persistence", (id) => {
+describe("Drill Variant", () => {
+  it("preserves the first bar and develops the backbeat and melody across the 32-step grid", () => {
+    const patch = createPresetPatch("drill-variant", 63);
+    expect(patch).toMatchObject({ bpm: 142, rate: 8, swing: 16, vol: 63 });
+    expect(hitsFor(patch, "kick", 2)).toEqual([0, 16, 32, 48]);
+    expect(hitsFor(patch, "snare", 4)).toEqual([16, 52, 80, 116]);
+    expect(hitsFor(patch, "rim", 4)).toEqual([8, 40, 72, 120]);
+    expect(hitsFor(patch, "ch", 1)).toEqual([0, 4, 8, 12, 13, 16, 20, 24, 28, 29]);
+    expect(hitsFor(patch, "ch", 2).filter((step) => step >= 32)).toEqual([32, 36, 40, 44, 48, 52, 56, 60]);
+    expect(hitsFor(patch, "bassline", 2)).toEqual([3, 14, 25, 38, 54]);
+    expect(hitsFor(patch, "lead", 4)).toEqual([11, 59, 75, 123]);
+    expect(patch.effects.distortion).toMatchObject({ enabled: true, mode: "soft" });
+    expect(patch.effects.sends.bassline.distortion).toBeGreaterThan(0);
+    expect(patch.effects.reverb).toMatchObject({ enabled: true, space: "studio" });
+    expect(patch.effects.delay).toMatchObject({ enabled: true, sync: true, division: "1/8D" });
+    expect(patch.effects.sends.lead.reverb).toBeGreaterThan(0);
+    expect(patch.effects.sends.lead.delay).toBeGreaterThan(0);
+    for (const voice of ["kick", "bassline", "ch"] as const) {
+      expect(patch.effects.sends[voice].reverb).toBe(0);
+      expect(patch.effects.sends[voice].delay).toBe(0);
+    }
+  });
+
+  it("plays octave bass in D minor and makes the fast hat pickups quieter", () => {
+    const patch = createPresetPatch("drill-variant");
+    const modulationAt = (voice: VoiceId, step: number) => effectiveVoiceModulation(patch.voices[voice], (source) => {
+      const block = patch.blocks[source];
+      return euclideanLfoValue(block.shape, step, block, 0.5);
+    });
+    const notesFor = (voice: "bassline" | "lead") => hitsFor(patch, voice, 2).map((step) => quantizeVoiceCv(patch.voices[voice].custom, modulationAt(voice, step).vOct).name);
+    expect(notesFor("bassline")).toEqual(["D2", "D2", "D3", "D2", "D3"]);
+    expect(notesFor("lead")).toEqual(["B♭4", "F4"]);
+    expect(modulationAt("ch", 13).level).toBeLessThan(modulationAt("ch", 12).level);
+    expect(modulationAt("ch", 29).level).toBeLessThan(modulationAt("ch", 28).level);
+    expect(modulationAt("ch", 61).level).toBeLessThan(modulationAt("ch", 60).level);
+    expect(quantizeVoiceCv(patch.voices.bassline.custom, modulationAt("bassline", 62).vOct).name).toBe("D3");
+    for (const { patch: variation } of createPresetArrangement("drill-variant").variations) {
+      const kicks = new Set(hitsFor(variation, "kick", 4));
+      expect(hitsFor(variation, "bassline", 4).some((step) => kicks.has(step))).toBe(false);
+    }
+  });
+
+  it("builds a lift, drops to a rim backbeat and exposes an octave pickup after the hat stutter", () => {
+    const [groove, lift, breakdown, fill] = createPresetArrangement("drill-variant").variations.map(({ patch }) => patch);
+    expect(hitsFor(lift, "kick", 4)).toEqual(hitsFor(groove, "kick", 4));
+    expect(hitsFor(lift, "snare", 4)).toEqual(hitsFor(groove, "snare", 4));
+    expect(hitsFor(lift, "bassline", 2)).toEqual([3, 11, 19, 27, 38, 46, 54, 62]);
+    expect(hitsFor(lift, "lead", 2)).toEqual([11, 27, 51]);
+    expect(hitsFor(lift, "ch", 2)).toContain(45);
+    expect(hitsFor(lift, "ch", 2)).toContain(61);
+    expect(hitsFor(breakdown, "kick", 2)).toEqual([0, 32]);
+    expect(hitsFor(breakdown, "snare", 2)).toEqual([]);
+    expect(hitsFor(breakdown, "rim", 2)).toEqual([16, 48]);
+    expect(hitsFor(breakdown, "ch", 2)).toEqual([4, 12, 20, 28, 36, 44, 52, 60]);
+    expect(hitsFor(breakdown, "bassline", 2)).toEqual([3, 38]);
+    expect(hitsFor(breakdown, "lead", 2)).toEqual([11, 59]);
+    expect(hitsFor(fill, "kick", 2)).toEqual([0, 16, 32]);
+    expect(hitsFor(fill, "snare", 2)).toEqual([16, 52]);
+    expect(hitsFor(fill, "rim", 2)).toEqual([8, 40]);
+    expect(hitsFor(fill, "bassline", 2)).toEqual([3, 14, 25, 38, 62]);
+    expect(hitsFor(fill, "lead", 2)).toEqual([11]);
+    expect(hitsFor(fill, "ch", 2).filter((step) => step >= 32)).toEqual([32, 36, 40, 44, 48, 52, 56, 60, 61]);
+    // The stutter replaces the main hat at step 60 instead of doubling it.
+    const hatLayers = fill.blocks.filter((block) => block.voice === "ch").map((block) =>
+      rhythmsFor(block).flatMap((rhythm) => Array.from({ length: rhythm.steps * rhythm.repeats }, (_, step) => euclidHit(step % rhythm.steps, rhythm.steps, rhythm.pulses, rhythm.rot))));
+    for (const step of [60, 61, 124, 125]) {
+      expect(hatLayers.filter((cycle) => cycle[step % cycle.length])).toHaveLength(1);
+    }
+    for (const voice of Object.keys(fill.voices) as VoiceId[]) {
+      expect(hitsFor(fill, voice, 2)).not.toContain(63);
+    }
+    expect(hitsFor(fill, "bassline", 4)).toContain(126);
+    expect(hitsFor(fill, "kick", 3)).toContain(80);
+    expect(hitsFor(fill, "ch", 3)).toContain(93);
+  });
+});
+
+describe.each(["electro-backbeat", "electro-funk-maracas", "stripped-808-breakbeat", "bass-tempo-standard", "double-time-bass", "half-time-bass-groove", "boom-bap", "sparse-808-ballad", "modern-808-hip-hop", "trap-standard", "triplet-trap", "drill-variant"])("%s persistence", (id) => {
   it("round-trips every variation and keeps series, routes and sends independently editable", () => {
     const arrangement = createPresetArrangement(id);
     for (const { patch } of arrangement.variations) {
