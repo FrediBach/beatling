@@ -160,7 +160,7 @@ export interface EffectsState {
 }
 
 export interface Patch {
-  format: "euclid-grid.v9";
+  format: "euclid-grid.v10";
   bpm: number;
   rate: number;
   swing: number;
@@ -183,7 +183,7 @@ export interface SongPart {
 }
 
 export interface Arrangement {
-  format: "euclid-grid.arrangement.v9";
+  format: "euclid-grid.arrangement.v10";
   variations: Variation[];
   songParts: SongPart[];
   activeIndex: number;

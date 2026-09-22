@@ -558,7 +558,7 @@ export class SequencerEngine {
   private oscillator(type: OscillatorType, frequency: number, time: number): OscillatorNode {
     const oscillator = this.context!.createOscillator();
     oscillator.type = type;
-    oscillator.frequency.setValueAtTime(frequency, time);
+    oscillator.frequency.setValueAtTime(this.safeFrequency(frequency), time);
     return oscillator;
   }
 
@@ -569,22 +569,51 @@ export class SequencerEngine {
   }
 
   private decay(parameter: AudioParam, time: number, peak: number, duration: number): void {
+    if (peak <= 0) {
+      parameter.setValueAtTime(0, time);
+      return;
+    }
     parameter.setValueAtTime(Math.max(0.0001, peak), time);
     parameter.exponentialRampToValueAtTime(0.0001, time + Math.max(0.01, duration));
+    parameter.linearRampToValueAtTime(0, time + Math.max(0.01, duration) + 0.005);
   }
 
   private noiseSource(time: number, duration: number): AudioBufferSourceNode {
     const source = this.context!.createBufferSource();
     source.buffer = this.noise;
     source.playbackRate.value = 1;
-    source.start(time, Math.random() * 1.5, duration + 0.05);
+    // A random offset must not shorten long hats/cymbals to the buffer remainder.
+    source.loop = true;
+    source.start(time, Math.random() * this.noise!.duration);
+    source.stop(time + duration + 0.05);
     return source;
+  }
+
+  private safeFrequency(frequency: number): number {
+    return clamp(frequency, 1, this.context!.sampleRate * 0.49);
+  }
+
+  private brightnessDestination(time: number, p: SynthParameters, bus: AudioNode): AudioNode {
+    const cutoff = value(p, "lowpass", 20000);
+    if (p.machine !== "custom" || cutoff >= 20000) return bus;
+    const filter = this.filter("lowpass", cutoff, BUTTERWORTH_Q_DB, time);
+    filter.connect(bus);
+    return filter;
+  }
+
+  private attackDecay(parameter: AudioParam, time: number, peak: number, attack: number, duration: number): void {
+    parameter.setValueAtTime(0, time);
+    if (peak <= 0) return;
+    const end = Math.max(duration, attack + 0.005);
+    parameter.linearRampToValueAtTime(peak, time + attack);
+    parameter.exponentialRampToValueAtTime(0.0001, time + end);
+    parameter.linearRampToValueAtTime(0, time + end + 0.005);
   }
 
   private filter(type: BiquadFilterType, frequency: number, q: number, time: number): BiquadFilterNode {
     const filter = this.context!.createBiquadFilter();
     filter.type = type;
-    filter.frequency.setValueAtTime(frequency, time);
+    filter.frequency.setValueAtTime(this.safeFrequency(frequency), time);
     filter.Q.setValueAtTime(q, time);
     return filter;
   }
@@ -626,14 +655,20 @@ export class SequencerEngine {
     const custom = p.machine === "custom";
     const frequency = (custom ? value(p, "bodyFrequency", 50) : 50) * 2 ** (p.tune / 12);
     const duration = (custom ? value(p, "bodyDecay", 620) / 1000 : p.machine === "909" ? 0.42 : 0.85) * p.decay;
-    const oscillator = this.oscillator("sine", frequency, time);
-    oscillator.frequency.setValueAtTime(frequency * (custom ? value(p, "pitchAmount", 5.5) : p.machine === "909" ? 7 : 4.4), time);
-    oscillator.frequency.exponentialRampToValueAtTime(frequency, time + (custom ? value(p, "pitchDecay", 55) / 1000 : p.machine === "909" ? 0.035 : 0.07));
     const gain = this.gain(0, time);
     this.decay(gain.gain, time, p.amplitude, duration);
-    oscillator.connect(gain).connect(bus);
-    oscillator.start(time);
-    oscillator.stop(time + duration + 0.05);
+    gain.connect(bus);
+    const harmonics = custom ? value(p, "bodyTone", 0) / 100 : 0;
+    const shapes: Array<[OscillatorType, number]> = [["sine", 1 - harmonics], ["triangle", harmonics]];
+    for (const [shape, level] of shapes) {
+      if (level === 0) continue;
+      const oscillator = this.oscillator(shape, frequency, time);
+      oscillator.frequency.setValueAtTime(this.safeFrequency(frequency * (custom ? value(p, "pitchAmount", 5.5) : p.machine === "909" ? 7 : 4.4)), time);
+      oscillator.frequency.exponentialRampToValueAtTime(frequency, time + (custom ? value(p, "pitchDecay", 55) / 1000 : p.machine === "909" ? 0.035 : 0.07));
+      oscillator.connect(this.gain(level, time)).connect(gain);
+      oscillator.start(time);
+      oscillator.stop(time + duration + 0.05);
+    }
     const clickDuration = custom ? value(p, "clickDecay", 16) / 1000 : 0.016;
     const click = this.noiseSource(time, clickDuration);
     const filter = this.filter("highpass", custom ? value(p, "clickFrequency", 1800) : 1400, 0.7, time);
@@ -656,10 +691,11 @@ export class SequencerEngine {
       const oscillator = this.oscillator("triangle", base * ratio, time);
       const gain = this.gain(0, time);
       const toneLevel = custom ? value(p, "toneLevel", 42) / 100 : 0.42;
-      this.decay(gain.gain, time, p.amplitude * toneLevel * (index ? 0.67 : 1), 0.13 * p.decay);
+      const toneDuration = (custom ? value(p, "toneDecay", 130) / 1000 : 0.13) * p.decay;
+      this.decay(gain.gain, time, p.amplitude * toneLevel * (index ? 0.67 : 1), toneDuration);
       oscillator.connect(gain).connect(bus);
       oscillator.start(time);
-      oscillator.stop(time + 0.2 * p.decay + 0.03);
+      oscillator.stop(time + toneDuration + 0.03);
     });
   }
 
@@ -673,8 +709,9 @@ export class SequencerEngine {
     for (let index = 0; index < burstCount; index += 1) {
       const start = time + index * spread;
       const gain = this.gain(0, start);
-      this.decay(gain.gain, start, p.amplitude * (custom ? value(p, "burstLevel", 55) / 100 : 0.55), 0.018);
-      this.noiseSource(start, 0.03).connect(gain).connect(filter);
+      const burstDuration = custom ? value(p, "burstDecay", 18) / 1000 : 0.018;
+      this.decay(gain.gain, start, p.amplitude * (custom ? value(p, "burstLevel", 55) / 100 : 0.55), burstDuration);
+      this.noiseSource(start, burstDuration).connect(gain).connect(filter);
     }
     const tailGain = this.gain(0, time);
     const tailStart = time + spread * Math.max(0, burstCount - 1);
@@ -690,9 +727,10 @@ export class SequencerEngine {
     const gain = this.gain(0, time);
     const duration = (custom ? value(p, "duration", 35) / 1000 : 0.035) * p.decay;
     this.decay(gain.gain, time, p.amplitude * (custom ? value(p, "toneLevel", 70) / 100 : 0.7), duration);
-    [custom ? value(p, "lowFrequency", 1670) : 1670, custom ? value(p, "highFrequency", 2350) : 2350].forEach((frequency) => {
+    [custom ? value(p, "lowFrequency", 1670) : 1670, custom ? value(p, "highFrequency", 2350) : 2350].forEach((frequency, index) => {
       const oscillator = this.oscillator("square", frequency * 2 ** (p.tune / 12), time);
-      oscillator.connect(filter);
+      const balance = custom ? value(p, "balance", 50) / 100 : 0.5;
+      oscillator.connect(this.gain(2 * (index ? balance : 1 - balance), time)).connect(filter);
       oscillator.start(time);
       oscillator.stop(time + duration + 0.015);
     });
@@ -719,7 +757,7 @@ export class SequencerEngine {
   }
 
   private hat(time: number, p: SynthParameters, open: boolean): void {
-    const bus = this.busses.get(open ? "oh" : "ch")!;
+    const bus = this.brightnessDestination(time, p, this.busses.get(open ? "oh" : "ch")!);
     const custom = p.machine === "custom";
     const duration = (custom ? value(p, "duration", open ? 420 : 58) / 1000 : open ? 0.42 : 0.058) * p.decay;
     if (custom) {
@@ -752,6 +790,15 @@ export class SequencerEngine {
     oscillator.connect(gain).connect(bus);
     oscillator.start(time);
     oscillator.stop(time + duration + 0.05);
+    const overtone = custom ? value(p, "overtoneLevel", 0) / 100 : 0;
+    if (overtone > 0) {
+      const mode = this.oscillator("sine", base * 1.5, time);
+      const modeGain = this.gain(0, time);
+      this.decay(modeGain.gain, time, p.amplitude * overtone * 0.45, duration * 0.45);
+      mode.connect(modeGain).connect(bus);
+      mode.start(time);
+      mode.stop(time + duration * 0.45 + 0.03);
+    }
     const filter = this.filter("bandpass", custom ? value(p, "noiseFilter", base * 4) : base * 4, 1.2, time);
     const noiseGain = this.gain(0, time);
     this.decay(noiseGain.gain, time, p.amplitude * (custom ? value(p, "noiseLevel", 18) / 100 : 0.18), 0.05);
@@ -763,12 +810,12 @@ export class SequencerEngine {
     const custom = p.machine === "custom";
     const duration = (custom ? value(p, "duration", 360) / 1000 : 0.36) * p.decay;
     const filter = this.filter("bandpass", custom ? value(p, "filterFrequency", 2640) : 2640, custom ? value(p, "filterQ", 1.4) : 1.4, time);
-    const gain = this.gain(0.0001, time);
-    gain.gain.linearRampToValueAtTime(p.amplitude * (custom ? value(p, "toneLevel", 55) / 100 : 0.55), time + 0.003);
-    gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
-    [custom ? value(p, "lowFrequency", 540) : 540, custom ? value(p, "highFrequency", 800) : 800].forEach((frequency) => {
+    const gain = this.gain(0, time);
+    this.attackDecay(gain.gain, time, p.amplitude * (custom ? value(p, "toneLevel", 55) / 100 : 0.55), 0.003, duration);
+    [custom ? value(p, "lowFrequency", 540) : 540, custom ? value(p, "highFrequency", 800) : 800].forEach((frequency, index) => {
       const oscillator = this.oscillator("square", frequency * 2 ** (p.tune / 12), time);
-      oscillator.connect(filter);
+      const balance = custom ? value(p, "balance", 50) / 100 : 0.5;
+      oscillator.connect(this.gain(2 * (index ? balance : 1 - balance), time)).connect(filter);
       oscillator.start(time);
       oscillator.stop(time + duration + 0.03);
     });
@@ -776,7 +823,7 @@ export class SequencerEngine {
   }
 
   private cymbal(time: number, p: SynthParameters): void {
-    const bus = this.busses.get("cym")!;
+    const bus = this.brightnessDestination(time, p, this.busses.get("cym")!);
     const custom = p.machine === "custom";
     const duration = (custom ? value(p, "duration", 1400) / 1000 : p.machine === "909" ? 1.6 : 1.15) * p.decay;
     this.metallic(time, duration, p.tune - 2, p.amplitude * (custom ? value(p, "metalLevel", 40) / 100 : 0.4), bus, custom ? value(p, "highpass", 4200) : 4200, custom ? value(p, "metalBase", 40) : 40);
@@ -789,26 +836,27 @@ export class SequencerEngine {
   private shaker(time: number, p: SynthParameters): void {
     const bus = this.busses.get("shk")!;
     const custom = p.machine === "custom";
-    const duration = (custom ? value(p, "duration", 75) / 1000 : 0.075) * p.decay;
+    const attack = custom ? value(p, "attack", 6) / 1000 : 0.006;
+    const duration = Math.max(attack + 0.005, (custom ? value(p, "duration", 75) / 1000 : 0.075) * p.decay);
     const filter = this.filter("bandpass", (custom ? value(p, "filterFrequency", 6200) : 6200) * 2 ** (p.tune / 24), custom ? value(p, "filterQ", 1.6) : 1.6, time);
-    const gain = this.gain(0.0001, time);
-    gain.gain.linearRampToValueAtTime(p.amplitude * (custom ? value(p, "noiseLevel", 50) / 100 : 0.5), time + (custom ? value(p, "attack", 6) / 1000 : 0.006));
-    gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+    const gain = this.gain(0, time);
+    this.attackDecay(gain.gain, time, p.amplitude * (custom ? value(p, "noiseLevel", 50) / 100 : 0.5), attack, duration);
     this.noiseSource(time, duration).connect(filter).connect(gain).connect(bus);
   }
 
   private bassline(time: number, p: SynthParameters): void {
     const bus = this.busses.get("bassline")!;
-    const duration = Math.max(0.06, value(p, "filterDecay", 260) / 1000 * p.decay);
+    const filterDuration = Math.max(0.06, value(p, "filterDecay", 260) / 1000 * p.decay);
+    const ampDecay = value(p, "ampDecay", 0);
+    const duration = ampDecay > 0 ? Math.max(0.01, ampDecay / 1000 * p.decay) : filterDuration;
     const cutoff = value(p, "cutoff", 700);
     const envelopeAmount = value(p, "envelopeAmount", 82) / 100;
     const accent = value(p, "accent", 30) / 100;
     const filter = this.filter("lowpass", cutoff, value(p, "resonance", 12), time);
-    filter.frequency.setValueAtTime(Math.min(16000, cutoff * (1 + envelopeAmount * 10)), time);
-    filter.frequency.exponentialRampToValueAtTime(Math.max(40, cutoff), time + duration);
-    const gain = this.gain(0.0001, time);
-    gain.gain.linearRampToValueAtTime(p.amplitude * (0.72 + accent * 0.28), time + 0.004);
-    gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+    filter.frequency.setValueAtTime(this.safeFrequency(Math.min(16000, cutoff * (1 + envelopeAmount * 10))), time);
+    filter.frequency.exponentialRampToValueAtTime(this.safeFrequency(Math.max(40, cutoff)), time + filterDuration);
+    const gain = this.gain(0, time);
+    this.attackDecay(gain.gain, time, p.amplitude * (0.72 + accent * 0.28), 0.004, duration);
     const oscillator = this.oscillator(value(p, "waveform", 0) >= 0.5 ? "square" : "sawtooth", p.frequency, time);
     oscillator.connect(filter).connect(gain).connect(bus);
     oscillator.start(time);
@@ -822,16 +870,24 @@ export class SequencerEngine {
     const cutoff = value(p, "cutoff", 3200);
     const envelopeAmount = value(p, "envelopeAmount", 38) / 100;
     const filter = this.filter("lowpass", cutoff, value(p, "resonance", 3.5), time);
-    filter.frequency.setValueAtTime(Math.min(18000, cutoff * (1 + envelopeAmount * 4)), time);
-    filter.frequency.exponentialRampToValueAtTime(Math.max(80, cutoff), time + duration);
-    const gain = this.gain(0.0001, time);
-    gain.gain.linearRampToValueAtTime(p.amplitude * 0.72, time + attack);
-    gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+    filter.frequency.setValueAtTime(this.safeFrequency(Math.min(18000, cutoff * (1 + envelopeAmount * 4))), time);
+    const filterDecay = value(p, "filterDecay", 0);
+    const filterDuration = filterDecay > 0 ? Math.max(0.01, filterDecay / 1000 * p.decay) : duration;
+    filter.frequency.exponentialRampToValueAtTime(this.safeFrequency(Math.max(80, cutoff)), time + filterDuration);
+    const gain = this.gain(0, time);
+    this.attackDecay(gain.gain, time, p.amplitude * 0.72, attack, duration);
     const waveforms: OscillatorType[] = ["sawtooth", "square", "triangle"];
     const main = this.oscillator(waveforms[Math.round(value(p, "waveform", 0))] ?? "sawtooth", p.frequency, time);
     main.connect(filter);
     main.start(time);
     main.stop(time + duration + 0.04);
+    const subLevel = value(p, "subLevel", 0) / 100;
+    if (subLevel > 0) {
+      const sub = this.oscillator("sine", p.frequency / 2, time);
+      sub.connect(this.gain(subLevel, time)).connect(filter);
+      sub.start(time);
+      sub.stop(time + duration + 0.04);
+    }
     const companionMix = value(p, "pulseMix", 28) / 100;
     if (companionMix > 0) {
       const companionGain = this.gain(companionMix, time);

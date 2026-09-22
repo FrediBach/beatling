@@ -81,3 +81,29 @@ it("offers quantized V/Oct and musical scale controls for synth voices", () => {
   fireEvent.change(screen.getByRole("combobox", { name: "Bassline Scale" }), { target: { value: "5" } });
   expect(screen.getByRole("combobox", { name: "Bassline Scale" })).toHaveValue("5");
 });
+
+it.each([
+  ["Kick", "Body harmonics", "65"], ["Snare", "Body length", "350"],
+  ["Clap", "Burst length", "40"], ["Rim", "Partial balance", "25"],
+  ["Cowbell", "Partial balance", "75"], ["Closed hat", "Brightness", "6000"],
+  ["Open hat", "Brightness", "7000"], ["Cymbal", "Brightness", "8000"],
+  ["Low tom", "Overtone", "40"], ["Mid tom", "Overtone", "50"], ["Hi tom", "Overtone", "60"],
+  ["Bassline", "Amplitude length", "900"], ["Lead", "Filter decay", "200"], ["Lead", "Sub oscillator", "35"],
+])("retains the new %s %s control when reopening its editor", (name, label, value) => {
+  render(<Fixture />);
+  const card = screen.getByRole("region", { name: `${name} voice` });
+  const next909 = within(card).queryByRole("button", { name: `Use 909 ${name}` });
+  if (next909) fireEvent.click(next909);
+  const custom = within(card).queryByRole("button", { name: `Use custom ${name}` });
+  if (custom) fireEvent.click(custom);
+  fireEvent.click(within(card).getByRole("button", { name: /^Configure/ }));
+  const slider = screen.getByRole("slider", { name: `${name} ${label}` });
+  const original = slider.getAttribute("value");
+  fireEvent.change(slider, { target: { value } });
+  expect(screen.getByRole("spinbutton", { name: `${name} ${label} value` })).toHaveValue(Number(value));
+  fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
+  fireEvent.click(within(card).getByRole("button", { name: /^Configure/ }));
+  expect(screen.getByRole("slider", { name: `${name} ${label}` })).toHaveValue(value);
+  fireEvent.click(screen.getByRole("button", { name: "Reset synthesis" }));
+  expect(screen.getByRole("slider", { name: `${name} ${label}` })).toHaveValue(original);
+});
