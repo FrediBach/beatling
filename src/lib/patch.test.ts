@@ -176,8 +176,8 @@ describe("patches", () => {
 
   it("uses genre-aware four-hit endings for presets with generated fill variations", () => {
     const house = createPresetArrangement("basic-house").variations[3].patch;
-    const trap = createPresetArrangement("triplet-trap").variations[3].patch;
-    const endingHits = (patch: typeof house, voices: string[]) => Array.from({ length: 4 }, (_, offset) => patch.blocks.some((block) => voices.includes(block.voice) && euclidHit(12 + offset, block.steps, block.pulses, block.rot)));
+    const trap = createPresetArrangement("drill-variant").variations[3].patch;
+    const endingHits = (patch: typeof house, voices: string[]) => Array.from({ length: 4 }, (_, offset) => patch.blocks.some((block) => voices.includes(block.voice) && euclidHit(patch.rate * 4 - 4 + offset, block.steps, block.pulses, block.rot)));
     expect(endingHits(house, ["ht", "mt", "lt", "snare"])).toEqual([true, true, true, true]);
     expect(endingHits(trap, ["rim", "snare", "lt"])).toEqual([true, true, true, true]);
   });

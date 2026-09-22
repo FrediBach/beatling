@@ -626,7 +626,80 @@ describe("Trap Standard", () => {
   });
 });
 
-describe.each(["electro-backbeat", "electro-funk-maracas", "stripped-808-breakbeat", "bass-tempo-standard", "double-time-bass", "half-time-bass-groove", "boom-bap", "sparse-808-ballad", "modern-808-hip-hop", "trap-standard"])("%s persistence", (id) => {
+describe("Triplet Trap", () => {
+  it("preserves the swung half-time drums and leaves room for a second-bar synth response", () => {
+    const patch = createPresetPatch("triplet-trap", 62);
+    expect(patch).toMatchObject({ bpm: 144, rate: 4, swing: 33, vol: 62 });
+    expect(hitsFor(patch, "kick", 1)).toEqual([0, 5, 12]);
+    expect(hitsFor(patch, "snare", 2)).toEqual([8, 24]);
+    expect(hitsFor(patch, "rim", 2)).toEqual([6, 14, 22, 30]);
+    expect(hitsFor(patch, "ch", 1)).toEqual(Array.from({ length: 16 }, (_, index) => index));
+    expect(hitsFor(patch, "ch", 4).filter((step) => step >= 48)).toEqual([48, 50, 52, 54, 56, 58, 60, 62]);
+    expect(hitsFor(patch, "oh", 4)).toEqual([63]);
+    expect(hitsFor(patch, "bassline", 4)).toEqual([2, 10, 19, 27, 34, 42, 51, 59]);
+    expect(hitsFor(patch, "lead", 4)).toEqual([19, 27, 51, 59]);
+    expect(patch.effects.delay).toMatchObject({ enabled: true, sync: true, division: "1/8T" });
+    expect(patch.effects.reverb).toMatchObject({ enabled: true, space: "room" });
+    expect(patch.effects.sends.lead.delay).toBeGreaterThan(0);
+    expect(patch.effects.sends.rim.delay).toBeGreaterThan(0);
+    expect(patch.effects.compressor.enabled).toBe(true);
+    expect(patch.effects.sends.kick.compressor).toBeGreaterThan(0);
+    for (const voice of ["kick", "bassline", "ch"] as const) {
+      expect(patch.effects.sends[voice].reverb).toBe(0);
+      expect(patch.effects.sends[voice].delay).toBe(0);
+    }
+  });
+
+  it("outlines A minor across two bars and softens the delayed hats and snare anticipation", () => {
+    const patch = createPresetPatch("triplet-trap");
+    const modulationAt = (voice: VoiceId, step: number) => effectiveVoiceModulation(patch.voices[voice], (source) => {
+      const block = patch.blocks[source];
+      return euclideanLfoValue(block.shape, step, block, 0.5);
+    });
+    const notesFor = (voice: "bassline" | "lead") => hitsFor(patch, voice, 2).map((step) => quantizeVoiceCv(patch.voices[voice].custom, modulationAt(voice, step).vOct).name);
+    expect(notesFor("bassline")).toEqual(["A2", "C3", "E3", "G3"]);
+    expect(notesFor("lead")).toEqual(["G4", "C4"]);
+    expect(modulationAt("ch", 1).level).toBeLessThan(modulationAt("ch", 0).level);
+    expect(modulationAt("ch", 15).level).toBeLessThan(modulationAt("ch", 14).level);
+    expect(modulationAt("snare", 27).level).toBeLessThan(modulationAt("snare", 24).level);
+    for (const { patch: variation } of createPresetArrangement("triplet-trap").variations) {
+      const kicks = new Set(hitsFor(variation, "kick", 4));
+      expect(hitsFor(variation, "bassline", 4).some((step) => kicks.has(step))).toBe(false);
+    }
+  });
+
+  it("lifts the call/response, keeps swing in the break and closes with a spaced percussion reply", () => {
+    const [groove, lift, breakdown, fill] = createPresetArrangement("triplet-trap").variations.map(({ patch }) => patch);
+    expect(hitsFor(lift, "kick", 4)).toEqual(hitsFor(groove, "kick", 4));
+    expect(hitsFor(lift, "snare", 4)).toEqual(hitsFor(groove, "snare", 4));
+    expect(hitsFor(lift, "rim", 4)).toEqual(hitsFor(groove, "rim", 4));
+    expect(hitsFor(lift, "bassline", 2)).toEqual([2, 6, 10, 14, 19, 23, 27, 31]);
+    expect(hitsFor(lift, "lead", 2)).toEqual([3, 11, 19, 27]);
+    expect(hitsFor(lift, "oh", 4)).toEqual([15, 31, 47, 63]);
+    expect(hitsFor(lift, "ch", 4)).toHaveLength(64);
+    expect(hitsFor(breakdown, "kick", 2)).toEqual([0, 12, 16, 28]);
+    expect(hitsFor(breakdown, "snare", 2)).toEqual([8, 24]);
+    expect(hitsFor(breakdown, "rim", 2)).toEqual([14]);
+    expect(hitsFor(breakdown, "ch", 2)).toEqual(Array.from({ length: 16 }, (_, index) => index * 2 + 1));
+    expect(hitsFor(breakdown, "oh", 2)).toEqual([]);
+    expect(hitsFor(breakdown, "bassline", 2)).toEqual([2]);
+    expect(hitsFor(breakdown, "lead", 2)).toEqual([19, 27]);
+    expect(hitsFor(fill, "kick", 2)).toEqual([0, 5, 12, 16, 21]);
+    expect(hitsFor(fill, "bassline", 2)).toEqual([2, 10, 19]);
+    expect(hitsFor(fill, "lead", 2)).toEqual([19]);
+    expect(hitsFor(fill, "snare", 2)).toEqual([8, 24, 27]);
+    expect(hitsFor(fill, "rim", 2)).toEqual([6, 14, 29]);
+    expect(hitsFor(fill, "lt", 4)).toEqual([30, 62]);
+    expect(hitsFor(fill, "ch", 2)).toEqual(Array.from({ length: 28 }, (_, index) => index));
+    for (const voice of Object.keys(fill.voices) as VoiceId[]) {
+      expect(hitsFor(fill, voice, 2)).not.toContain(31);
+    }
+    expect(hitsFor(fill, "kick", 3)).toContain(44);
+    expect(hitsFor(fill, "ch", 3)).toContain(47);
+  });
+});
+
+describe.each(["electro-backbeat", "electro-funk-maracas", "stripped-808-breakbeat", "bass-tempo-standard", "double-time-bass", "half-time-bass-groove", "boom-bap", "sparse-808-ballad", "modern-808-hip-hop", "trap-standard", "triplet-trap"])("%s persistence", (id) => {
   it("round-trips every variation and keeps series, routes and sends independently editable", () => {
     const arrangement = createPresetArrangement(id);
     for (const { patch } of arrangement.variations) {
