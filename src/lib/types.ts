@@ -1,6 +1,6 @@
 export const BLOCK_COUNT = 16;
-export const PATCH_FORMAT = "euclid-grid.v17";
-export const ARRANGEMENT_FORMAT = "euclid-grid.arrangement.v17";
+export const PATCH_FORMAT = "euclid-grid.v18";
+export const ARRANGEMENT_FORMAT = "euclid-grid.arrangement.v18";
 
 export type VoiceId =
   | "kick"

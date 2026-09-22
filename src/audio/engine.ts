@@ -5,6 +5,7 @@ import { effectiveVoiceModulation } from "@/lib/modulation";
 import { quantizeVoiceCv } from "@/lib/quantizer";
 import { synthFilterSweep } from "@/lib/synth-filter";
 import { pulseWaveCoefficients } from "@/lib/pulse-wave";
+import { shakerTextureCurve } from "@/lib/shaker-texture";
 import { sampleLfo, type LfoFrame } from "@/lib/lfo";
 import { EFFECT_IDS, effectGain, waveguideDamping, waveguideFeedback, waveguideFrequency, delaySeconds, distortionSample, REVERB_SECONDS } from "@/lib/effects";
 import { rhythmAt, rhythmsFor } from "@/lib/rhythm-series";
@@ -908,8 +909,20 @@ export class SequencerEngine {
     const duration = Math.max(attack + 0.005, (custom ? value(p, "duration", 75) / 1000 : 0.075) * p.decay);
     const filter = this.filter("bandpass", (custom ? value(p, "filterFrequency", 6200) : 6200) * 2 ** (p.tune / 24), custom ? value(p, "filterQ", 1.6) : 1.6, time);
     const gain = this.gain(0, time);
-    this.attackDecay(gain.gain, time, p.amplitude * (custom ? value(p, "noiseLevel", 50) / 100 : 0.5), attack, duration);
-    this.noiseSource(time, duration).connect(filter).connect(gain).connect(bus);
+    const level = p.amplitude * (custom ? value(p, "noiseLevel", 50) / 100 : 0.5);
+    this.attackDecay(gain.gain, time, level, attack, duration);
+    const depth = custom ? value(p, "grainDepth", 0) / 100 : 0;
+    if (depth > 0 && level > 0) {
+      const texture = this.context!.createGain();
+      const seed = Math.floor(time * this.context!.sampleRate) >>> 0;
+      // This parameter owns only the curve: no overlapping point automation.
+      texture.gain.setValueCurveAtTime(shakerTextureCurve(depth, value(p, "grainRate", 60), duration, seed), time, duration);
+      filter.connect(texture).connect(gain);
+    } else {
+      filter.connect(gain);
+    }
+    this.noiseSource(time, duration).connect(filter);
+    gain.connect(bus);
   }
 
   private bassline(time: number, p: SynthParameters): void {

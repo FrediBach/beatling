@@ -8,7 +8,7 @@ import type { EffectiveBlock, VoiceId } from "@/lib/types";
 // Record only the native Web Audio boundary; exercise the real voice dispatch,
 // synthesis graph and scheduled envelopes without mocking synthesis helpers.
 function parameter() {
-  return { value: 0, setValueAtTime: vi.fn(), cancelScheduledValues: vi.fn(), linearRampToValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() };
+  return { value: 0, setValueAtTime: vi.fn(), setValueCurveAtTime: vi.fn(), cancelScheduledValues: vi.fn(), linearRampToValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn() };
 }
 function node() {
   return {
@@ -50,6 +50,12 @@ it.each(VOICE_DEFS)("schedules finite, bounded $id voices at parameter extremes"
           expect(time).toBeGreaterThanOrEqual(1);
         }
         for (const [value] of p.exponentialRampToValueAtTime.mock.calls) expect(value).toBeGreaterThan(0);
+        for (const [curve, time, duration] of p.setValueCurveAtTime.mock.calls) {
+          expect(curve).toHaveLength(1024);
+          expect(Array.from(curve as Float32Array).every((value) => Number.isFinite(value) && value >= 0 && value <= 1)).toBe(true);
+          expect(time).toBeGreaterThanOrEqual(1);
+          expect(duration).toBeGreaterThan(0);
+        }
       }
     }
     for (const source of [...f.sources, ...f.oscillators]) {
@@ -150,6 +156,68 @@ it("finishes a short shaker after its attack, and allows a truly silent noise la
   silent.trigger();
   expect(silent.gains[0].gain.linearRampToValueAtTime).not.toHaveBeenCalled();
   expect(silent.gains[0].gain.exponentialRampToValueAtTime).not.toHaveBeenCalled();
+});
+
+it("textures shaker noise before the amplitude envelope and effect bus", () => {
+  const f = fixture("shk", { grainDepth: 75, grainRate: 80, duration: 200 });
+  f.trigger();
+  expect(f.sources).toHaveLength(1);
+  expect(f.oscillators).toHaveLength(0);
+  expect(f.gains).toHaveLength(2);
+  const [envelope, texture] = f.gains;
+  expect(f.sources[0].connect).toHaveBeenCalledWith(f.filters[0]);
+  expect(f.filters[0].connect).toHaveBeenCalledWith(texture);
+  expect(texture.connect).toHaveBeenCalledWith(envelope);
+  expect(envelope.connect).toHaveBeenCalledOnce();
+  expect(texture.gain.setValueCurveAtTime).toHaveBeenCalledOnce();
+  const [curve, time, duration] = texture.gain.setValueCurveAtTime.mock.calls[0];
+  expect(time).toBe(1);
+  expect(duration).toBe(0.2);
+  expect(Math.min(...curve)).toBeCloseTo(0.25);
+  expect(Math.max(...curve)).toBeGreaterThan(0.9);
+  // The curve owns a fresh parameter, with no overlapping automation events.
+  expect(texture.gain.setValueAtTime).not.toHaveBeenCalled();
+  expect(texture.gain.linearRampToValueAtTime).not.toHaveBeenCalled();
+  expect(texture.gain.exponentialRampToValueAtTime).not.toHaveBeenCalled();
+  expect(envelope.gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1.2);
+  expect(f.sources[0].stop).toHaveBeenCalledWith(1.25);
+});
+
+it.each(["custom", "808", "909"] as const)("preserves the original %s shaker when texture is off or unsupported", (machine) => {
+  const f = fixture("shk", { grainDepth: machine === "custom" ? 0 : 100, grainRate: 120 });
+  f.patch.voices.shk.machine = machine;
+  f.trigger();
+  expect(f.gains).toHaveLength(1);
+  expect(f.gains[0].gain.setValueCurveAtTime).not.toHaveBeenCalled();
+  expect(f.filters[0].connect).toHaveBeenCalledWith(f.gains[0]);
+  expect(f.gains[0].gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.5, 1.006);
+  expect(f.gains[0].gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1.075);
+});
+
+it("fits shaker texture to the attack-safe duration and skips silent texture", () => {
+  const f = fixture("shk", { grainDepth: 100, attack: 40, duration: 15 });
+  f.patch.voices.shk.decay = 0;
+  f.trigger();
+  expect(f.gains[1].gain.setValueCurveAtTime.mock.calls[0][2]).toBeCloseTo(0.045);
+  expect(f.gains[0].gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1.045);
+  expect(f.sources[0].stop.mock.calls[0][0]).toBeCloseTo(1.095);
+  const silent = fixture("shk", { grainDepth: 100, noiseLevel: 0 });
+  silent.trigger();
+  expect(silent.gains).toHaveLength(1);
+  expect(silent.gains[0].gain.exponentialRampToValueAtTime).not.toHaveBeenCalled();
+});
+
+it("varies shaker grains per hit without consuming additional rhythm randomness", () => {
+  const f = fixture("shk", { grainDepth: 100 });
+  const random = vi.spyOn(Math, "random").mockReturnValue(0.25);
+  try {
+    f.trigger();
+    f.trigger("shk", 1.1);
+    expect(random).toHaveBeenCalledTimes(2); // One noise-buffer offset per hit.
+    expect(f.gains[1].gain.setValueCurveAtTime.mock.calls[0][0]).not.toEqual(f.gains[3].gain.setValueCurveAtTime.mock.calls[0][0]);
+  } finally {
+    random.mockRestore();
+  }
 });
 
 it("separates the snare shell decay from the noise tail", () => {

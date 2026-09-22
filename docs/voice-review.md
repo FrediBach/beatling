@@ -19,11 +19,22 @@ Drum synthesis controls appear under **Custom → Configure**. Open-hat articula
 | High tom | Same single-mode design; extra attack noise adds broadband energy rather than a pitched mode. | Independent **Overtone** level for a pitched attack component. |
 | Cowbell | Its two square oscillators always have equal levels. | **Partial balance** shifts emphasis between the two pitches, preserving the centered mix. Zero Tone level also stays silent throughout the envelope. |
 | Cymbal | Metal ring and noise wash share a decay and the source lacks a distinct pitched strike. | **Metal length** separates ring from wash. Optional **Bell level/pitch/length** adds an independently shaped strike. **Brightness** softens all layers; noise lasts for the full requested tail. |
-| Shaker | Attack can exceed the requested duration at short Decay settings, putting the decay endpoint before the attack peak. Zero Noise level can also ramp up to the old envelope floor. | The envelope now ends at least 5 ms after the attack and honors zero level. Existing Attack, Length, filter and resonance controls suffice; no extra parameter was needed. |
+| Shaker | One smooth filtered-noise envelope limits the sense of separate grain impacts. Short envelope ordering and silent-noise handling also needed correction. | **Grain depth** (0–100%) and **Grain rate** (20–120 Hz) add optional pulses with varying peaks. Zero depth retains the original swish. The envelope ends at least 5 ms after the attack and honors zero level. |
 | Bassline | Filter decay also determines amplitude decay, preventing a sustained bass under a short filter sweep. | **Amplitude length**, 0–2400 ms. Zero follows Filter decay; positive values decouple the envelopes. Both still scale with the main Decay control. |
 | Lead | Filter sweep follows release, and the companion oscillator only thickens the same register. | **Filter decay**, 0–2400 ms, decouples the sweep (zero follows Release). **Sub oscillator** adds a sine one octave down through the same filter and amplitude envelope. |
 
 Suggested values above are starting points for auditioning, not newly imposed preset settings.
+
+## Shaker grain texture
+
+**Shaker → Custom → Configure → Texture** adds two controls:
+
+- **Grain depth:** 0% keeps the original smooth noise. Increasing it breaks the shake into more distinct pulses, with varying peak positions and levels.
+- **Grain rate:** 20–120 Hz controls pulse density within each shake. Lower rates give coarser texture; higher rates give denser texture. Rate is independent of Tune and Decay.
+
+Try Grain depth around 60%, Grain rate around 70 Hz and Length around 100–150 ms as a starting point for auditioning. Longer shakes contain more grains. A very short shake at a low rate may cover only part of a grain, softening its attack. Texture only attenuates the noise, so deeper settings reduce average loudness; adjust Noise level if needed. The existing Attack, Length, filter and effect sends still shape the whole shake.
+
+Grain shapes vary between hit times without changing rhythm probability randomness. Edits apply to new hits. This is designed amplitude texture, not a physical shaker model. Old patches default to zero depth and a dormant 60 Hz rate; 808/909 ignore these custom controls.
 
 ## Snare attack shaping
 
@@ -109,7 +120,7 @@ Try Lead Filter tracking 50–100% with a low cutoff for a phrase spanning sever
 - Zero-level layers stay at zero; positive envelopes finish their exponential tail with a short ramp to exact silence.
 - Shaker attack/decay ordering is valid at the full supported range. All sources retain bounded stop times.
 - Voice filter cutoffs and oscillator creation respect the active sample rate's Nyquist limit, including 32 kHz contexts. Low synth pitches remain available below 20 Hz.
-- Patch and arrangement format **v17** stores the numeric custom settings, including hat choking, bassline accent articulation and synth playback/glide. Readers still migrate v1–v16 storage and JSON. Older patches receive neutral defaults: no added harmonics/overtones/sub, bypassed brightness, centered partial balance, original snare/clap lengths and linked synth envelopes. Choking is off; accent brightness/length are zero and the accent source is Every note. Both synths default to Polyphonic with zero Glide; all existing voice shaping, accent and choke values are retained. Rim noise defaults to Linked (20 ms Noise length when Independent is enabled); hat/cymbal Metal length defaults to zero to follow the original duration. Cymbal Bell level defaults to zero, with 800 Hz Bell pitch and 500 ms Bell length ready when enabled. Both synths default to zero Filter tracking. Snare pitch stays fixed (1× with a dormant 30 ms pitch decay), and Noise attack defaults to zero. Synth Pulse width defaults to the original 50% square.
+- Patch and arrangement format **v18** stores the numeric custom settings, including hat choking, bassline accent articulation and synth playback/glide. Readers still migrate v1–v17 storage and JSON. Older patches receive neutral defaults: no added harmonics/overtones/sub, bypassed brightness, centered partial balance, original snare/clap lengths and linked synth envelopes. Choking is off; accent brightness/length are zero and the accent source is Every note. Both synths default to Polyphonic with zero Glide; all existing voice shaping, accent and choke values are retained. Rim noise defaults to Linked (20 ms Noise length when Independent is enabled); hat/cymbal Metal length defaults to zero to follow the original duration. Cymbal Bell level defaults to zero, with 800 Hz Bell pitch and 500 ms Bell length ready when enabled. Both synths default to zero Filter tracking. Snare pitch stays fixed (1× with a dormant 30 ms pitch decay), and Noise attack defaults to zero. Synth Pulse width defaults to the original 50% square. Shaker Grain depth defaults to zero with a dormant 60 Hz Grain rate.
 - 808/909 drum selections retain their existing circuits; choose Custom for the added shaping controls. Preset rhythms, balances, effect sends, routing and variation histories retain their existing meaning. The shared envelope/noise bug fixes apply to all models.
 
 ## Remaining synthesis opportunities
@@ -129,8 +140,10 @@ These require separate behavior decisions or auditioning rather than additional 
 
 `src/audio/synth-articulation.test.ts` checks note stealing, interrupted glides, simultaneous-hit arbitration, gaps, mode changes, audio-time cleanup, reset and bounded tracking. Voice integration tests exercise both synths, synchronized lead oscillators, independent ownership, muted triggers, routed/Bernoulli hits and transport teardown.
 
-`src/lib/voice-config.test.ts` covers v9/v10/v11/v12/v13/v14/v15/v16 storage migration, neutral defaults, new-control round trips, numeric bounds and malformed values. `src/components/voice-bank.test.tsx` verifies accessible editing, reopening and resetting of every new control, including choking across model changes and synth playback/glide. The full quality gate also checks the existing preset and routing suite.
+`src/lib/voice-config.test.ts` covers v9/v10/v11/v12/v13/v14/v15/v16/v17 storage migration, neutral defaults, new-control round trips, numeric bounds and malformed values. `src/components/voice-bank.test.tsx` verifies accessible editing, reopening and resetting of every new control, including choking across model changes and synth playback/glide. The full quality gate also checks the existing preset and routing suite.
 
 `src/lib/synth-filter.test.ts` checks full/partial pitch tracking, overlapping envelope/glide curves, frequency-limit plateaus and bounded automation. Voice integration tests cover quantized V/Oct, both synths, interrupted glides, original zero-tracking behavior and bassline accent coupling.
 
 `src/lib/pulse-wave.test.ts` reconstructs pulse plateaus at several widths and verifies zero DC, bounded coefficients and the native square series. Voice tests cover square-only routing, main/companion sharing, native 50% bypass, glide/tracking, cache bounds, eviction and teardown. These are coefficient and scheduling checks, not browser-rendered audio or listening comparisons.
+
+`src/lib/shaker-texture.test.ts` checks depth, grain density, varying crests, reproducible seeds, random-stream independence and bounded work/gain. Voice tests verify texture routing, native curve scheduling without overlapping events, source lifetimes, short attack-safe durations, silent-layer bypass and legacy model behavior. UI and migration tests cover editing, resetting and retaining both grain controls. These checks validate curves and scheduling; a listening comparison remains necessary to assess the timbre.

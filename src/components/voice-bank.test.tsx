@@ -97,6 +97,7 @@ it.each([
   ["Bassline", "Filter tracking", "100"], ["Lead", "Filter tracking", "50"],
   ["Snare", "Pitch sweep", "1.75"], ["Snare", "Pitch decay", "45"], ["Snare", "Noise attack", "8"],
   ["Bassline", "Pulse width", "25"], ["Lead", "Pulse width", "70"],
+  ["Shaker", "Grain depth", "65"], ["Shaker", "Grain rate", "90"],
 ])("retains the new %s %s control when reopening its editor", (name, label, value) => {
   render(<Fixture />);
   const card = screen.getByRole("region", { name: `${name} voice` });
