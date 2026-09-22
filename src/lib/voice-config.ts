@@ -34,7 +34,7 @@ const noise = (...parameters: VoiceParameterDefinition[]): VoiceParameterSection
 const envelope = (...parameters: VoiceParameterDefinition[]): VoiceParameterSection => ({ title: "Envelope", parameters });
 const pitch = (...parameters: VoiceParameterDefinition[]): VoiceParameterSection => ({ title: "Pitch quantizer", parameters });
 const optionParameter = (key: string, label: string, options: string[], description: string): VoiceParameterDefinition => ({ key, label, min: 0, max: options.length - 1, step: 1, description, options: options.map((name, value) => ({ value, label: name })) });
-const brightness = () => parameter("lowpass", "Brightness", 1500, 20000, 100, "Low-pass cutoff for metal and noise together; 20000 bypasses it.", "Hz");
+const brightness = () => parameter("lowpass", "Brightness", 1500, 20000, 100, "Low-pass cutoff for all voice layers together; 20000 bypasses it.", "Hz");
 const balance = () => parameter("balance", "Partial balance", 0, 100, 1, "Blend from the low partial to the high partial; 50 keeps both equal.", "%");
 const synthArticulation = (): VoiceParameterSection => ({
   title: "Articulation",
@@ -179,6 +179,14 @@ export const VOICE_PARAMETER_SECTIONS: Record<VoiceId, VoiceParameterSection[]> 
       parameter("noiseLevel", "Noise level", 0, 100, 1, "Level of the broadband noise wash.", "%"),
       parameter("noiseHighpass", "Noise high-pass", 1000, 12000, 50, "High-pass cutoff for the noise wash.", "Hz"),
     ),
+    {
+      title: "Bell",
+      parameters: [
+        parameter("bellLevel", "Bell level", 0, 100, 1, "Level of a separate pitched strike; 0 disables it. Brightness shapes the bell together with metal and noise.", "%"),
+        parameter("bellFrequency", "Bell pitch", 200, 2000, 10, "Base pitch of the bell layer before Tune. Its upper partials fade faster than the fundamental.", "Hz"),
+        parameter("bellDecay", "Bell length", 20, 2000, 10, "Bell decay independent of the metal and noise lengths, scaled by Decay.", "ms"),
+      ],
+    },
     envelope(
       parameter("duration", "Length", 100, 4000, 10, "Noise wash length and linked metal length, scaled by Decay.", "ms"),
       parameter("metalDecay", "Metal length", 0, 4000, 10, "Independent metallic decay; 0 follows Length. Scaled by Decay.", "ms"),
@@ -268,7 +276,7 @@ export const DEFAULT_CUSTOM_VOICE_SETTINGS: Record<VoiceId, CustomVoiceSettings>
   mt: { overtoneLevel: 0, bodyFrequency: 138, pitchAmount: 1.7, pitchDecay: 70, bodyLevel: 90, noiseLevel: 18, noiseFilter: 552, duration: 450 },
   ht: { overtoneLevel: 0, bodyFrequency: 196, pitchAmount: 1.7, pitchDecay: 70, bodyLevel: 90, noiseLevel: 18, noiseFilter: 784, duration: 450 },
   cow: { balance: 50, lowFrequency: 540, highFrequency: 800, filterFrequency: 2640, filterQ: 1.4, toneLevel: 55, duration: 360 },
-  cym: { metalDecay: 0, lowpass: 20000, metalBase: 40, metalLevel: 40, highpass: 4200, noiseLevel: 32, noiseHighpass: 5200, duration: 1400 },
+  cym: { bellLevel: 0, bellFrequency: 800, bellDecay: 500, metalDecay: 0, lowpass: 20000, metalBase: 40, metalLevel: 40, highpass: 4200, noiseLevel: 32, noiseHighpass: 5200, duration: 1400 },
   shk: { noiseLevel: 50, filterFrequency: 6200, filterQ: 1.6, attack: 6, duration: 75 },
   bassline: { playMode: 0, glide: 0, accentSource: 0, accentFilter: 0, accentDecay: 0, ampDecay: 0, root: 0, scale: 2, octave: 2, waveform: 0, cutoff: 700, resonance: 12, envelopeAmount: 82, filterDecay: 260, accent: 30 },
   lead: { playMode: 0, glide: 0, filterDecay: 0, subLevel: 0, root: 0, scale: 1, octave: 4, waveform: 0, pulseMix: 28, detune: 7, cutoff: 3200, resonance: 3.5, envelopeAmount: 38, attack: 8, release: 520 },

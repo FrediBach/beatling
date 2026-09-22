@@ -74,6 +74,72 @@ it("keeps cymbal noise alive for its full envelope even beyond the noise buffer"
   expect(f.sources[0].stop).toHaveBeenCalledWith(5.05);
 });
 
+it("adds an independently pitched cymbal bell with faster-damping upper partials", () => {
+  const f = fixture("cym", { bellLevel: 50, bellFrequency: 600, bellDecay: 800, duration: 100, metalDecay: 200, lowpass: 6000 });
+  f.patch.voices.cym.tune = 12;
+  f.patch.voices.cym.decay = 0; // quarter-length envelopes
+  f.trigger();
+  const bell = f.oscillators.filter(({ type }) => type === "sine");
+  expect(bell).toHaveLength(3);
+  expect(bell.map(({ frequency }) => frequency.setValueAtTime.mock.calls[0][0])).toEqual([1200, 2880, 4680]);
+  const gains = bell.map((oscillator) => oscillator.connect.mock.calls[0][0] as ReturnType<typeof node>);
+  const brightness = f.filters.find(({ type }) => type === "lowpass")!;
+  for (const gain of gains) expect(gain.connect).toHaveBeenCalledWith(brightness);
+  expect(gains.reduce((sum, gain) => sum + gain.gain.linearRampToValueAtTime.mock.calls[0][0], 0)).toBeCloseTo(0.5);
+  expect(gains[0].gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1.2);
+  expect(gains[1].gain.exponentialRampToValueAtTime.mock.calls[0][1]).toBeLessThan(1.2);
+  expect(gains[2].gain.exponentialRampToValueAtTime.mock.calls[0][1]).toBeLessThan(gains[1].gain.exponentialRampToValueAtTime.mock.calls[0][1]);
+  expect(bell[0].stop).toHaveBeenCalledWith(1.23);
+  expect(f.sources[0].stop).toHaveBeenCalledWith(1.075);
+  for (const oscillator of f.oscillators.filter(({ type }) => type === "square")) expect(oscillator.stop).toHaveBeenCalledWith(1.08);
+});
+
+it("lets the cymbal bell sound by itself before the dry/effect-send split", () => {
+  const f = fixture("cym", { bellLevel: 40, metalLevel: 0, noiseLevel: 0 });
+  f.trigger();
+  const bus = f.gains[0].connect.mock.calls[0][0];
+  for (const gain of f.gains.slice(0, 2)) expect(gain.gain.exponentialRampToValueAtTime).not.toHaveBeenCalled();
+  const bell = f.oscillators.filter(({ type }) => type === "sine");
+  expect(bell).toHaveLength(3);
+  for (const oscillator of bell) {
+    const gain = oscillator.connect.mock.calls[0][0] as ReturnType<typeof node>;
+    expect(gain.connect).toHaveBeenCalledWith(bus);
+    expect(gain.gain.linearRampToValueAtTime.mock.calls[0][0]).toBeGreaterThan(0);
+  }
+});
+
+it.each(["custom", "808", "909"] as const)("preserves the original %s cymbal when the bell is off or unsupported", (machine) => {
+  const f = fixture("cym", { bellLevel: machine === "custom" ? 0 : 100 });
+  f.patch.voices.cym.machine = machine;
+  f.trigger();
+  expect(f.oscillators).toHaveLength(6);
+  expect(f.oscillators.every(({ type }) => type === "square")).toBe(true);
+  expect(f.gains).toHaveLength(2);
+});
+
+it("omits cymbal bell partials above the sample-rate ceiling instead of folding them together", () => {
+  const f = fixture("cym", { bellLevel: 100, bellFrequency: 2000 });
+  f.patch.voices.cym.tune = 12;
+  f.trigger("cym", 1, { tune: 12 });
+  const bell = f.oscillators.filter(({ type }) => type === "sine");
+  expect(bell).toHaveLength(1);
+  expect(bell[0].frequency.setValueAtTime).toHaveBeenCalledWith(8000, 1);
+});
+
+it("keeps short bell envelopes ordered under minimum Decay modulation", () => {
+  const f = fixture("cym", { bellLevel: 100, bellDecay: 20 });
+  f.patch.voices.cym.decay = 0;
+  f.trigger("cym", 1, { decay: -1 });
+  for (const oscillator of f.oscillators.filter(({ type }) => type === "sine")) {
+    const gain = oscillator.connect.mock.calls[0][0] as ReturnType<typeof node>;
+    const peakTime = gain.gain.linearRampToValueAtTime.mock.calls[0][1];
+    const endTime = gain.gain.exponentialRampToValueAtTime.mock.calls[0][1];
+    expect(endTime).toBeGreaterThan(peakTime);
+    expect(oscillator.stop.mock.calls[0][0]).toBeGreaterThan(endTime);
+    expect(gain.gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(0, endTime + 0.005);
+  }
+});
+
 it("finishes a short shaker after its attack, and allows a truly silent noise layer", () => {
   const f = fixture("shk", { attack: 40, duration: 15 });
   f.patch.voices.shk.decay = 0;

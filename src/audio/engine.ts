@@ -860,6 +860,32 @@ export class SequencerEngine {
     const gain = this.gain(0, time);
     this.decay(gain.gain, time, p.amplitude * (custom ? value(p, "noiseLevel", 32) / 100 : p.machine === "909" ? 0.4 : 0.22), duration);
     this.noiseSource(time, duration).connect(filter).connect(gain).connect(bus);
+    if (custom && value(p, "bellLevel", 0) > 0) this.cymbalBell(time, p, bus);
+  }
+
+  private cymbalBell(time: number, p: SynthParameters, destination: AudioNode): void {
+    const frequency = value(p, "bellFrequency", 800) * 2 ** (p.tune / 12);
+    const duration = value(p, "bellDecay", 500) / 1000 * p.decay;
+    const amplitude = p.amplitude * value(p, "bellLevel", 0) / 100;
+    // A compact additive bell: unit-sum weights, with upper modes damping sooner.
+    // These are chosen timbres, not a model of a specific acoustic cymbal.
+    const modes = [
+      { ratio: 1, level: 0.6, decay: 1 },
+      { ratio: 2.4, level: 0.25, decay: 0.6 },
+      { ratio: 3.9, level: 0.15, decay: 0.35 },
+    ];
+    for (const mode of modes) {
+      const pitch = frequency * mode.ratio;
+      // Drop inaudible modes instead of piling them up at the frequency ceiling.
+      if (pitch >= this.context!.sampleRate * 0.49) continue;
+      const oscillator = this.oscillator("sine", pitch, time);
+      const gain = this.gain(0, time);
+      const length = Math.max(0.006, duration * mode.decay);
+      this.attackDecay(gain.gain, time, amplitude * mode.level, 0.001, length);
+      oscillator.connect(gain).connect(destination);
+      oscillator.start(time);
+      oscillator.stop(time + length + 0.03);
+    }
   }
 
   private shaker(time: number, p: SynthParameters): void {
