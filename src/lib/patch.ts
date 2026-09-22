@@ -6,7 +6,8 @@ import { normalizeModulations, normalizeVoiceModulations } from "@/lib/modulatio
 import { createEffects, normalizeEffects } from "@/lib/effects";
 import { MAX_RHYTHMS, normalizeRhythmPattern } from "@/lib/rhythm-series";
 
-const STORAGE_KEY = "egs.patch.v23";
+const STORAGE_KEY = "egs.patch.v24";
+const V23_STORAGE_KEY = "egs.patch.v23";
 const V22_STORAGE_KEY = "egs.patch.v22";
 const V21_STORAGE_KEY = "egs.patch.v21";
 const V20_STORAGE_KEY = "egs.patch.v20";
@@ -197,7 +198,7 @@ export function normalizePatch(value: unknown): Patch | null {
 
 export function loadStoredPatch(): Patch | null {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(V22_STORAGE_KEY) ?? localStorage.getItem(V21_STORAGE_KEY) ?? localStorage.getItem(V20_STORAGE_KEY) ?? localStorage.getItem(V19_STORAGE_KEY) ?? localStorage.getItem(V18_STORAGE_KEY) ?? localStorage.getItem(V17_STORAGE_KEY) ?? localStorage.getItem(V16_STORAGE_KEY) ?? localStorage.getItem(V15_STORAGE_KEY) ?? localStorage.getItem(V14_STORAGE_KEY) ?? localStorage.getItem(V13_STORAGE_KEY) ?? localStorage.getItem(V12_STORAGE_KEY) ?? localStorage.getItem(V11_STORAGE_KEY) ?? localStorage.getItem(V10_STORAGE_KEY) ?? localStorage.getItem(V9_STORAGE_KEY) ?? localStorage.getItem(V8_STORAGE_KEY) ?? localStorage.getItem(V7_STORAGE_KEY) ?? localStorage.getItem(V6_STORAGE_KEY) ?? localStorage.getItem(V5_STORAGE_KEY) ?? localStorage.getItem(V4_STORAGE_KEY) ?? localStorage.getItem(V3_STORAGE_KEY) ?? localStorage.getItem(V2_STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(V23_STORAGE_KEY) ?? localStorage.getItem(V22_STORAGE_KEY) ?? localStorage.getItem(V21_STORAGE_KEY) ?? localStorage.getItem(V20_STORAGE_KEY) ?? localStorage.getItem(V19_STORAGE_KEY) ?? localStorage.getItem(V18_STORAGE_KEY) ?? localStorage.getItem(V17_STORAGE_KEY) ?? localStorage.getItem(V16_STORAGE_KEY) ?? localStorage.getItem(V15_STORAGE_KEY) ?? localStorage.getItem(V14_STORAGE_KEY) ?? localStorage.getItem(V13_STORAGE_KEY) ?? localStorage.getItem(V12_STORAGE_KEY) ?? localStorage.getItem(V11_STORAGE_KEY) ?? localStorage.getItem(V10_STORAGE_KEY) ?? localStorage.getItem(V9_STORAGE_KEY) ?? localStorage.getItem(V8_STORAGE_KEY) ?? localStorage.getItem(V7_STORAGE_KEY) ?? localStorage.getItem(V6_STORAGE_KEY) ?? localStorage.getItem(V5_STORAGE_KEY) ?? localStorage.getItem(V4_STORAGE_KEY) ?? localStorage.getItem(V3_STORAGE_KEY) ?? localStorage.getItem(V2_STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
     return raw ? normalizePatch(JSON.parse(raw)) : null;
   } catch {
     return null;

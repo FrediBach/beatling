@@ -705,6 +705,67 @@ it.each([[80, 1000], [1000, 80]])("keeps open-hat choking active through noise %
   expect(gate.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0, 1.42);
 });
 
+it("shapes both kick body oscillators independently of the click and pitch sweep", () => {
+  const f = fixture("kick", { bodyLevel: 60, bodyAttack: 8, bodyTone: 40, bodyDecay: 400, bodyFrequency: 60, pitchAmount: 4, pitchDecay: 30, clickLevel: 50, clickDecay: 20 });
+  f.patch.voices.kick.level = 50;
+  f.patch.voices.kick.tune = 12;
+  f.trigger("kick", 1, { level: 0.5 }); // Effective amplitude 0.65.
+  expect(f.gains).toHaveLength(4);
+  expect(f.filters).toHaveLength(1);
+  expect(f.oscillators.map(({ type }) => type)).toEqual(["sine", "triangle"]);
+  const body = f.gains[0];
+  expect(body.gain.setValueAtTime).toHaveBeenLastCalledWith(0, 1);
+  expect(body.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.39, 1.008);
+  expect(body.gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1.4);
+  expect(body.gain.linearRampToValueAtTime.mock.lastCall![1]).toBeCloseTo(1.405);
+  for (const oscillator of f.oscillators) {
+    const blend = oscillator.connect.mock.calls[0][0] as ReturnType<typeof node>;
+    expect(blend.connect).toHaveBeenCalledWith(body);
+    expect(oscillator.frequency.setValueAtTime).toHaveBeenLastCalledWith(480, 1);
+    expect(oscillator.frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(120, 1.03);
+    expect(oscillator.stop.mock.calls[0][0]).toBeCloseTo(1.45);
+  }
+  const click = f.gains[3];
+  expect(click.gain.setValueAtTime).toHaveBeenLastCalledWith(0.325, 1);
+  expect(click.gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1.02);
+  expect(click.connect).toHaveBeenCalledWith(body.connect.mock.calls[0][0]);
+  expect(f.filters[0].frequency.setValueAtTime).toHaveBeenCalledWith(1800, 1);
+  expect(f.sources[0].stop).toHaveBeenCalledWith(1.07);
+});
+
+it.each([0, 30])("silences the kick body independently with %s ms attack", (bodyAttack) => {
+  const f = fixture("kick", { bodyLevel: 0, bodyAttack, bodyTone: 50, clickLevel: 70 });
+  f.trigger();
+  expect(f.gains[0].gain.setValueAtTime).toHaveBeenLastCalledWith(0, 1);
+  expect(f.gains[0].gain.linearRampToValueAtTime).not.toHaveBeenCalled();
+  expect(f.gains[0].gain.exponentialRampToValueAtTime).not.toHaveBeenCalled();
+  expect(f.gains[3].gain.setValueAtTime).toHaveBeenLastCalledWith(0.7, 1);
+});
+
+it.each([-1, 1])("keeps kick attack fixed under Decay modulation %s and completes short envelopes", (decay) => {
+  const f = fixture("kick", { bodyAttack: 30, bodyDecay: 80, clickLevel: 0 });
+  f.patch.voices.kick.decay = decay < 0 ? 0 : 100;
+  f.trigger("kick", 1, { decay });
+  const duration = decay < 0 ? 0.035 : 0.08 * 2.4;
+  expect(f.gains[0].gain.linearRampToValueAtTime).toHaveBeenCalledWith(1, 1.03);
+  expect(f.gains[0].gain.exponentialRampToValueAtTime.mock.calls[0][1]).toBeCloseTo(1 + duration);
+  expect(f.gains[0].gain.linearRampToValueAtTime.mock.lastCall![1]).toBeCloseTo(1 + duration + 0.005);
+  expect(f.oscillators[0].stop.mock.calls[0][0]).toBeCloseTo(1 + duration + 0.05);
+  expect(f.gains[2].gain.exponentialRampToValueAtTime).not.toHaveBeenCalled();
+  expect(f.sources[0].stop.mock.calls[0][0]).toBeCloseTo(1.066);
+});
+
+it.each(["custom", "808", "909"] as const)("retains the original %s kick envelope at defaults or unsupported settings", (machine) => {
+  const f = fixture("kick", machine === "custom" ? {} : { bodyLevel: 0, bodyAttack: 30 });
+  f.patch.voices.kick.machine = machine;
+  f.trigger();
+  expect(f.oscillators).toHaveLength(1);
+  expect(f.gains).toHaveLength(3);
+  expect(f.gains[0].gain.setValueAtTime).toHaveBeenLastCalledWith(1, 1);
+  expect(f.gains[0].gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1 + (machine === "custom" ? 0.62 : machine === "909" ? 0.42 : 0.85));
+  expect(f.gains[0].gain.linearRampToValueAtTime.mock.calls.map(([value]) => value)).toEqual([0]);
+});
+
 it("adds kick harmonics only when requested", () => {
   const f = fixture("kick", { bodyTone: 50 });
   f.trigger();

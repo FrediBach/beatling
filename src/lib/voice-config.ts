@@ -57,6 +57,7 @@ const quantizerParameters = () => pitch(
 export const VOICE_PARAMETER_SECTIONS: Record<VoiceId, VoiceParameterSection[]> = {
   kick: [
     tone(
+      parameter("bodyLevel", "Body level", 0, 100, 1, "Level of the pitched body, independent of the click. 100 keeps the original level.", "%"),
       parameter("bodyTone", "Body harmonics", 0, 100, 1, "Blend the sine body toward triangle for more audible upper harmonics.", "%"),
       parameter("bodyFrequency", "Body frequency", 30, 100, 1, "Fundamental pitch of the drum body.", "Hz"),
       parameter("pitchAmount", "Pitch sweep", 1, 12, 0.1, "Starting pitch as a multiple of the body pitch.", "×"),
@@ -67,7 +68,10 @@ export const VOICE_PARAMETER_SECTIONS: Record<VoiceId, VoiceParameterSection[]> 
       parameter("clickFrequency", "Click filter", 400, 8000, 50, "High-pass cutoff for the attack click.", "Hz"),
       parameter("clickDecay", "Click decay", 3, 80, 1, "Length of the attack click.", "ms"),
     ),
-    envelope(parameter("bodyDecay", "Body length", 80, 1800, 10, "Base amplitude decay before the main Decay control is applied.", "ms")),
+    envelope(
+      parameter("bodyAttack", "Body attack", 0, 30, 1, "Fade-in of the pitched body, independent of Decay and the click. 0 keeps the immediate onset; short bodies extend to finish the attack.", "ms"),
+      parameter("bodyDecay", "Body length", 80, 1800, 10, "Time from the hit to the body decay endpoint, scaled by Decay.", "ms"),
+    ),
   ],
   snare: [
     tone(
@@ -302,7 +306,7 @@ VOICE_PARAMETER_SECTIONS.mt = tomSections("Mid tom");
 VOICE_PARAMETER_SECTIONS.ht = tomSections("High tom");
 
 export const DEFAULT_CUSTOM_VOICE_SETTINGS: Record<VoiceId, CustomVoiceSettings> = {
-  kick: { bodyTone: 0, bodyFrequency: 50, pitchAmount: 5.5, pitchDecay: 55, clickLevel: 32, clickFrequency: 1800, clickDecay: 16, bodyDecay: 620 },
+  kick: { bodyLevel: 100, bodyAttack: 0, bodyTone: 0, bodyFrequency: 50, pitchAmount: 5.5, pitchDecay: 55, clickLevel: 32, clickFrequency: 1800, clickDecay: 16, bodyDecay: 620 },
   snare: { pitchAmount: 1, pitchDecay: 30, noiseAttack: 0, toneDecay: 130, toneFrequency: 185, toneSpread: 1.62, toneLevel: 42, noiseLevel: 80, noiseFilter: 1800, noiseQ: 0.9, noiseDecay: 260 },
   clap: { tailFilter: 0, tailAttack: 0, burstDecay: 18, burstCount: 3, burstSpacing: 11, burstLevel: 55, filterFrequency: 1080, filterQ: 1.1, tailLevel: 50, tailDecay: 220 },
   rim: { noiseMode: 0, noiseDecay: 20, balance: 50, lowFrequency: 1670, highFrequency: 2350, filterFrequency: 1750, filterQ: 3.5, toneLevel: 70, noiseLevel: 25, duration: 35 },

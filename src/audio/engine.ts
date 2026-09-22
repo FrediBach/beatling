@@ -670,9 +670,13 @@ export class SequencerEngine {
     const bus = this.busses.get("kick")!;
     const custom = p.machine === "custom";
     const frequency = (custom ? value(p, "bodyFrequency", 50) : 50) * 2 ** (p.tune / 12);
-    const duration = (custom ? value(p, "bodyDecay", 620) / 1000 : p.machine === "909" ? 0.42 : 0.85) * p.decay;
+    const attack = custom ? value(p, "bodyAttack", 0) / 1000 : 0;
+    const bodyDuration = (custom ? value(p, "bodyDecay", 620) / 1000 : p.machine === "909" ? 0.42 : 0.85) * p.decay;
+    const duration = attack > 0 ? Math.max(bodyDuration, attack + 0.005) : bodyDuration;
+    const bodyLevel = p.amplitude * (custom ? value(p, "bodyLevel", 100) / 100 : 1);
     const gain = this.gain(0, time);
-    this.decay(gain.gain, time, p.amplitude, duration);
+    if (attack > 0) this.attackDecay(gain.gain, time, bodyLevel, attack, duration);
+    else this.decay(gain.gain, time, bodyLevel, duration);
     gain.connect(bus);
     const harmonics = custom ? value(p, "bodyTone", 0) / 100 : 0;
     const shapes: Array<[OscillatorType, number]> = [["sine", 1 - harmonics], ["triangle", harmonics]];
