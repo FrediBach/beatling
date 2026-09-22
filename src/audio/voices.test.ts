@@ -415,6 +415,70 @@ it.each(["lt", "mt", "ht"] as const)("adds a shorter shell mode to %s without re
   expect(f.oscillators).toHaveLength(2);
   expect(f.oscillators[1].frequency.setValueAtTime).toHaveBeenCalledWith(f.patch.voices[id].custom.bodyFrequency * 1.5, 1);
   expect(f.oscillators[1].stop.mock.calls[0][0]).toBeLessThan(f.oscillators[0].stop.mock.calls[0][0]);
+  expect(f.gains[1].gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1 + 0.45 * 0.45);
+  expect(f.oscillators[1].stop).toHaveBeenCalledWith(1 + 0.45 * 0.45 + 0.03);
+});
+
+it.each(["lt", "mt", "ht"] as const)("tunes the %s shell and lets it ring beyond the body through the same voice bus", (id) => {
+  const f = fixture(id, { bodyFrequency: 100, pitchAmount: 3, pitchDecay: 80, duration: 200, overtoneLevel: 60, overtoneRatio: 2.25, overtoneDecay: 800 });
+  f.patch.voices[id].tune = 7;
+  f.patch.voices[id].decay = 0;
+  f.trigger(id, 1, { tune: 5 / 12 }); // Combined Tune = one octave; Decay = quarter length.
+  expect(f.oscillators[0].frequency.setValueAtTime).toHaveBeenLastCalledWith(600, 1);
+  expect(f.oscillators[0].frequency.exponentialRampToValueAtTime).toHaveBeenCalledWith(200, 1.08);
+  expect(f.oscillators[1].frequency.setValueAtTime).toHaveBeenCalledWith(450, 1);
+  expect(f.oscillators[1].frequency.exponentialRampToValueAtTime).not.toHaveBeenCalled();
+  expect(f.gains[0].gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1.05);
+  expect(f.gains[1].gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1.2);
+  expect(f.oscillators[1].stop).toHaveBeenCalledWith(1.23);
+  expect(f.gains[1].gain.setValueAtTime).toHaveBeenLastCalledWith(0.6 * 0.45, 1);
+  expect(f.gains[1].connect).toHaveBeenCalledWith(f.gains[0].connect.mock.calls[0][0]);
+  expect(f.sources[0].stop).toHaveBeenCalledWith(1.09); // Stick transient stays independent.
+});
+
+it.each(["lt", "mt", "ht"] as const)("keeps %s shell damping linked at zero and supports a short independent knock", (id) => {
+  for (const [length, end] of [[0, 1.70875], [80, 1.084]]) {
+    const f = fixture(id, { duration: 1500, overtoneLevel: 50, overtoneDecay: length });
+    f.patch.voices[id].decay = 0;
+    f.trigger(id, 1, { decay: 1 }); // Multiplier = 1.05, including routed Decay.
+    expect(f.gains[1].gain.exponentialRampToValueAtTime.mock.calls[0][1]).toBeCloseTo(end);
+    expect(f.oscillators[1].stop.mock.calls[0][0]).toBeCloseTo(end + 0.03);
+    expect(f.gains[0].gain.exponentialRampToValueAtTime.mock.calls[0][1]).toBeCloseTo(2.575);
+  }
+});
+
+it.each(["lt", "mt", "ht"] as const)("preserves %s model bypass and silent overtone settings", (id) => {
+  for (const machine of ["custom", "808", "909"] as const) {
+    const f = fixture(id, { overtoneLevel: machine === "custom" ? 0 : 100, overtoneRatio: 4, overtoneDecay: 1500 });
+    f.patch.voices[id].machine = machine;
+    f.trigger();
+    expect(f.oscillators).toHaveLength(1);
+    expect(f.gains).toHaveLength(2);
+    expect(f.sources).toHaveLength(1);
+  }
+});
+
+it("allows an isolated tom shell and bounds very short envelopes", () => {
+  const f = fixture("lt", { bodyLevel: 0, noiseLevel: 0, overtoneLevel: 100, overtoneDecay: 5 });
+  f.patch.voices.lt.decay = 0;
+  f.trigger("lt", 1, { decay: -1 });
+  expect(f.gains[0].gain.exponentialRampToValueAtTime).not.toHaveBeenCalled();
+  expect(f.gains[2].gain.exponentialRampToValueAtTime).not.toHaveBeenCalled();
+  expect(f.gains[1].gain.setValueAtTime).toHaveBeenLastCalledWith(0.45, 1);
+  expect(f.gains[1].gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1.01);
+  expect(f.gains[1].gain.linearRampToValueAtTime).toHaveBeenCalledWith(0, 1.015);
+  expect(f.oscillators[1].stop.mock.calls[0][0]).toBeGreaterThan(1.015);
+});
+
+it("omits a tom overtone above the sample-rate ceiling while retaining body and noise", () => {
+  const f = fixture("ht", { bodyFrequency: 320, pitchAmount: 1, overtoneLevel: 100, overtoneRatio: 4 });
+  f.context.sampleRate = 8000;
+  f.patch.voices.ht.tune = 12;
+  f.trigger("ht", 1, { tune: 1 });
+  expect(f.oscillators).toHaveLength(1);
+  expect(f.oscillators[0].frequency.setValueAtTime).toHaveBeenLastCalledWith(1280, 1);
+  expect(f.sources).toHaveLength(1);
+  expect(f.gains).toHaveLength(2);
 });
 
 it("lets the bass sustain after its filter sweep, retaining linked envelopes at zero", () => {

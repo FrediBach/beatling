@@ -14,9 +14,9 @@ Drum synthesis controls appear under **Custom → Configure**. Open-hat articula
 | Rim | Equal partial levels limit pitch emphasis; the noise crack also follows Tone level and the body envelope. | **Partial balance** emphasizes either partial. **Noise envelope: Independent** separates the crack from the tone, with its own **Noise length**; Linked preserves the original sound. |
 | Closed hat | High-pass controls cannot soften the combined signal; noise and metal share one decay. | **Brightness** applies a final low-pass (20 kHz bypasses it). **Metal length** separates the pitched ring from the noise tick. |
 | Open hat | Shared metal/noise decay restricts articulation; randomized noise offsets can truncate long tails. | **Brightness**, full-length looping noise and independent **Metal length**. Choking covers both layers through the longer tail. |
-| Low tom | A single sine body and short noise attack offer no independently adjustable shell mode. | **Overtone** adds a sine at 1.5 × body pitch with 45% of its decay time, useful for a shorter pitched knock over the low body. |
-| Mid tom | Same single-mode design; changing body pitch does not change the balance of body and shell. | Independent **Overtone** level for the mid register. Fundamental pitch and sweep remain intact. |
-| High tom | Same single-mode design; extra attack noise adds broadband energy rather than a pitched mode. | Independent **Overtone** level for a pitched attack component. |
+| Low tom | A single sine body and noise attack lack a pitched shell layer; the added shell initially had fixed tuning and linked damping. | **Overtone** adds a sine shell mode. **Overtone ratio** tunes it relative to the body; **Overtone length** gives it an independent decay. Defaults retain 1.5× pitch and 45% of body length. |
+| Mid tom | Body and shell need separate balance, pitch interval and damping. | Independent **Overtone**, **Overtone ratio** and **Overtone length** for the mid register. Fundamental pitch and sweep remain intact. |
+| High tom | Extra attack noise adds broadband energy rather than an independently shaped pitched mode. | **Overtone**, **Overtone ratio** and **Overtone length** shape a separate pitched attack or ring. |
 | Cowbell | Its two square oscillators always have equal levels. | **Partial balance** shifts emphasis between the two pitches, preserving the centered mix. Zero Tone level also stays silent throughout the envelope. |
 | Cymbal | Metal ring and noise wash share a decay and the source lacks a distinct pitched strike. | **Metal length** separates ring from wash. Optional **Bell level/pitch/length** adds an independently shaped strike. **Brightness** softens all layers; noise lasts for the full requested tail. |
 | Shaker | One smooth filtered-noise envelope limits the sense of separate grain impacts. Short envelope ordering and silent-noise handling also needed correction. | **Grain depth** (0–100%) and **Grain rate** (20–120 Hz) add optional pulses with varying peaks. Zero depth retains the original swish. The envelope ends at least 5 ms after the attack and honors zero level. |
@@ -24,6 +24,19 @@ Drum synthesis controls appear under **Custom → Configure**. Open-hat articula
 | Lead | Filter sweep follows release, and the companion oscillator only thickens the same register. | **Filter decay**, 0–2400 ms, decouples the sweep (zero follows Release). **Sub oscillator** adds a sine one octave down through the same filter and amplitude envelope. |
 
 Suggested values above are starting points for auditioning, not newly imposed preset settings.
+
+## Tom shell tuning and damping
+
+**Low / Mid / Hi tom → Custom → Configure** now exposes:
+
+- **Tone → Overtone ratio:** 1–4× the resting body pitch. It follows Tune while remaining steady through the body pitch sweep.
+- **Envelope → Overtone length:** 5–1500 ms sets a separate shell decay; **0** keeps the original link to 45% of body Length. Both lengths still scale with the main Decay control and its modulation.
+
+Raise **Overtone** above zero to hear these controls. Try 30–50% Overtone, a 2.25× ratio and 60–100 ms Overtone length for a short pitched knock. For a longer ring, try a 1.5–2× ratio and 500–800 ms Overtone length over a shorter body. These are starting points for auditioning. Each tom stores its own settings, so a fill can use a different interval or damping in each register.
+
+The body pitch sweep, body level and stick transient keep their existing behavior. Setting Body level and Attack noise to zero isolates the shell. The existing effect sends receive the complete sound, including shell tails longer than the body. Edits apply to new hits. At extreme tuning in a low-sample-rate context, shell modes above the frequency ceiling are omitted.
+
+Old patches retain a 1.5× ratio and linked length, including patches with Overtone already enabled. Default Overtone level remains zero; 808/909 ignore the shell controls. This extends the existing designed sine mode, not a physical drum model.
 
 ## Shaker grain texture
 
@@ -120,7 +133,7 @@ Try Lead Filter tracking 50–100% with a low cutoff for a phrase spanning sever
 - Zero-level layers stay at zero; positive envelopes finish their exponential tail with a short ramp to exact silence.
 - Shaker attack/decay ordering is valid at the full supported range. All sources retain bounded stop times.
 - Voice filter cutoffs and oscillator creation respect the active sample rate's Nyquist limit, including 32 kHz contexts. Low synth pitches remain available below 20 Hz.
-- Patch and arrangement format **v18** stores the numeric custom settings, including hat choking, bassline accent articulation and synth playback/glide. Readers still migrate v1–v17 storage and JSON. Older patches receive neutral defaults: no added harmonics/overtones/sub, bypassed brightness, centered partial balance, original snare/clap lengths and linked synth envelopes. Choking is off; accent brightness/length are zero and the accent source is Every note. Both synths default to Polyphonic with zero Glide; all existing voice shaping, accent and choke values are retained. Rim noise defaults to Linked (20 ms Noise length when Independent is enabled); hat/cymbal Metal length defaults to zero to follow the original duration. Cymbal Bell level defaults to zero, with 800 Hz Bell pitch and 500 ms Bell length ready when enabled. Both synths default to zero Filter tracking. Snare pitch stays fixed (1× with a dormant 30 ms pitch decay), and Noise attack defaults to zero. Synth Pulse width defaults to the original 50% square. Shaker Grain depth defaults to zero with a dormant 60 Hz Grain rate.
+- Patch and arrangement format **v19** stores the numeric custom settings, including hat choking, bassline accent articulation and synth playback/glide. Readers still migrate v1–v18 storage and JSON. Older patches receive neutral defaults: no added harmonics/overtones/sub, bypassed brightness, centered partial balance, original snare/clap lengths and linked synth envelopes. Choking is off; accent brightness/length are zero and the accent source is Every note. Both synths default to Polyphonic with zero Glide; all existing voice shaping, accent and choke values are retained. Rim noise defaults to Linked (20 ms Noise length when Independent is enabled); hat/cymbal Metal length defaults to zero to follow the original duration. Cymbal Bell level defaults to zero, with 800 Hz Bell pitch and 500 ms Bell length ready when enabled. Both synths default to zero Filter tracking. Snare pitch stays fixed (1× with a dormant 30 ms pitch decay), and Noise attack defaults to zero. Synth Pulse width defaults to the original 50% square. Shaker Grain depth defaults to zero with a dormant 60 Hz Grain rate. Tom Overtone ratio defaults to 1.5×, with zero Overtone length preserving the original 45% body-duration link.
 - 808/909 drum selections retain their existing circuits; choose Custom for the added shaping controls. Preset rhythms, balances, effect sends, routing and variation histories retain their existing meaning. The shared envelope/noise bug fixes apply to all models.
 
 ## Remaining synthesis opportunities
@@ -140,10 +153,12 @@ These require separate behavior decisions or auditioning rather than additional 
 
 `src/audio/synth-articulation.test.ts` checks note stealing, interrupted glides, simultaneous-hit arbitration, gaps, mode changes, audio-time cleanup, reset and bounded tracking. Voice integration tests exercise both synths, synchronized lead oscillators, independent ownership, muted triggers, routed/Bernoulli hits and transport teardown.
 
-`src/lib/voice-config.test.ts` covers v9/v10/v11/v12/v13/v14/v15/v16/v17 storage migration, neutral defaults, new-control round trips, numeric bounds and malformed values. `src/components/voice-bank.test.tsx` verifies accessible editing, reopening and resetting of every new control, including choking across model changes and synth playback/glide. The full quality gate also checks the existing preset and routing suite.
+`src/lib/voice-config.test.ts` covers v9/v10/v11/v12/v13/v14/v15/v16/v17/v18 storage migration, neutral defaults, new-control round trips, numeric bounds and malformed values. `src/components/voice-bank.test.tsx` verifies accessible editing, reopening and resetting of every new control, including choking across model changes and synth playback/glide. The full quality gate also checks the existing preset and routing suite.
 
 `src/lib/synth-filter.test.ts` checks full/partial pitch tracking, overlapping envelope/glide curves, frequency-limit plateaus and bounded automation. Voice integration tests cover quantized V/Oct, both synths, interrupted glides, original zero-tracking behavior and bassline accent coupling.
 
 `src/lib/pulse-wave.test.ts` reconstructs pulse plateaus at several widths and verifies zero DC, bounded coefficients and the native square series. Voice tests cover square-only routing, main/companion sharing, native 50% bypass, glide/tracking, cache bounds, eviction and teardown. These are coefficient and scheduling checks, not browser-rendered audio or listening comparisons.
 
 `src/lib/shaker-texture.test.ts` checks depth, grain density, varying crests, reproducible seeds, random-stream independence and bounded work/gain. Voice tests verify texture routing, native curve scheduling without overlapping events, source lifetimes, short attack-safe durations, silent-layer bypass and legacy model behavior. UI and migration tests cover editing, resetting and retaining both grain controls. These checks validate curves and scheduling; a listening comparison remains necessary to assess the timbre.
+
+Tom voice tests cover all three registers, independent and linked shell lengths, Tune/Decay modulation, unchanged fundamental sweep and stick timing, routing before effect sends, isolated/silent layers, bounded short tails, frequency-ceiling omission and 808/909 bypass. Migration and UI tests cover retaining, editing and resetting the two shell controls. These are scheduling checks, not rendered-audio or listening comparisons.

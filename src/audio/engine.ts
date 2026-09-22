@@ -833,13 +833,16 @@ export class SequencerEngine {
     oscillator.start(time);
     oscillator.stop(time + duration + 0.05);
     const overtone = custom ? value(p, "overtoneLevel", 0) / 100 : 0;
-    if (overtone > 0) {
-      const mode = this.oscillator("sine", base * 1.5, time);
+    const overtoneFrequency = base * value(p, "overtoneRatio", 1.5);
+    if (overtone > 0 && overtoneFrequency < this.context!.sampleRate * 0.49) {
+      const overtoneDecay = value(p, "overtoneDecay", 0);
+      const overtoneDuration = overtoneDecay > 0 ? overtoneDecay / 1000 * p.decay : duration * 0.45;
+      const mode = this.oscillator("sine", overtoneFrequency, time);
       const modeGain = this.gain(0, time);
-      this.decay(modeGain.gain, time, p.amplitude * overtone * 0.45, duration * 0.45);
+      this.decay(modeGain.gain, time, p.amplitude * overtone * 0.45, overtoneDuration);
       mode.connect(modeGain).connect(bus);
       mode.start(time);
-      mode.stop(time + duration * 0.45 + 0.03);
+      mode.stop(time + overtoneDuration + 0.03);
     }
     const filter = this.filter("bandpass", custom ? value(p, "noiseFilter", base * 4) : base * 4, 1.2, time);
     const noiseGain = this.gain(0, time);

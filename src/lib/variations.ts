@@ -2,7 +2,8 @@ import { normalizePatch } from "@/lib/patch";
 import { ARRANGEMENT_FORMAT, type Arrangement, type Patch, type SequencerBlock, type SongPart, type Variation, type VoiceId, type VoiceState } from "@/lib/types";
 import { effectsHaveChanges } from "@/lib/effects";
 
-const STORAGE_KEY = "egs.arrangement.v18";
+const STORAGE_KEY = "egs.arrangement.v19";
+const V18_STORAGE_KEY = "egs.arrangement.v18";
 const V17_STORAGE_KEY = "egs.arrangement.v17";
 const V16_STORAGE_KEY = "egs.arrangement.v16";
 const V15_STORAGE_KEY = "egs.arrangement.v15";
@@ -78,7 +79,7 @@ export function normalizeArrangement(value: unknown, fallback: Patch): Arrangeme
 
 export function loadStoredArrangement(fallback: Patch): Arrangement {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(V17_STORAGE_KEY) ?? localStorage.getItem(V16_STORAGE_KEY) ?? localStorage.getItem(V15_STORAGE_KEY) ?? localStorage.getItem(V14_STORAGE_KEY) ?? localStorage.getItem(V13_STORAGE_KEY) ?? localStorage.getItem(V12_STORAGE_KEY) ?? localStorage.getItem(V11_STORAGE_KEY) ?? localStorage.getItem(V10_STORAGE_KEY) ?? localStorage.getItem(V9_STORAGE_KEY) ?? localStorage.getItem(V8_STORAGE_KEY) ?? localStorage.getItem(V7_STORAGE_KEY) ?? localStorage.getItem(V6_STORAGE_KEY) ?? localStorage.getItem(V5_STORAGE_KEY) ?? localStorage.getItem(V4_STORAGE_KEY) ?? localStorage.getItem(V3_STORAGE_KEY) ?? localStorage.getItem(V2_STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(V18_STORAGE_KEY) ?? localStorage.getItem(V17_STORAGE_KEY) ?? localStorage.getItem(V16_STORAGE_KEY) ?? localStorage.getItem(V15_STORAGE_KEY) ?? localStorage.getItem(V14_STORAGE_KEY) ?? localStorage.getItem(V13_STORAGE_KEY) ?? localStorage.getItem(V12_STORAGE_KEY) ?? localStorage.getItem(V11_STORAGE_KEY) ?? localStorage.getItem(V10_STORAGE_KEY) ?? localStorage.getItem(V9_STORAGE_KEY) ?? localStorage.getItem(V8_STORAGE_KEY) ?? localStorage.getItem(V7_STORAGE_KEY) ?? localStorage.getItem(V6_STORAGE_KEY) ?? localStorage.getItem(V5_STORAGE_KEY) ?? localStorage.getItem(V4_STORAGE_KEY) ?? localStorage.getItem(V3_STORAGE_KEY) ?? localStorage.getItem(V2_STORAGE_KEY) ?? localStorage.getItem(LEGACY_STORAGE_KEY);
     return raw ? normalizeArrangement(JSON.parse(raw), fallback) : createArrangement(fallback);
   } catch {
     return createArrangement(fallback);

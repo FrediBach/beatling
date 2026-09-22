@@ -266,14 +266,18 @@ const tomSections = (name: string): VoiceParameterSection[] => [
     parameter("bodyFrequency", `${name} pitch`, 45, 320, 1, "Fundamental pitch of the tom body.", "Hz"),
     parameter("pitchAmount", "Pitch sweep", 1, 4, 0.05, "Starting pitch as a multiple of the body pitch.", "×"),
     parameter("pitchDecay", "Pitch decay", 10, 300, 1, "Time for the pitch to fall to the body frequency.", "ms"),
-    parameter("overtoneLevel", "Overtone", 0, 100, 1, "Short shell mode at 1.5 times the body pitch; adds a woody knock.", "%"),
+    parameter("overtoneLevel", "Overtone", 0, 100, 1, "Level of a separate pitched shell mode. Raise this to hear Overtone ratio and Overtone length.", "%"),
+    parameter("overtoneRatio", "Overtone ratio", 1, 4, 0.05, "Shell pitch relative to the resting body pitch. Follows Tune, without the body's pitch sweep; 1.5 keeps the original interval.", "×"),
     parameter("bodyLevel", "Body level", 0, 100, 1, "Level of the sine-wave drum body.", "%"),
   ),
   noise(
     parameter("noiseLevel", "Attack noise", 0, 100, 1, "Level of the short stick transient.", "%"),
     parameter("noiseFilter", "Noise filter", 150, 5000, 25, "Band-pass center frequency for the transient.", "Hz"),
   ),
-  envelope(parameter("duration", "Length", 50, 1500, 5, "Base length before the main Decay control is applied.", "ms")),
+  envelope(
+    parameter("duration", "Length", 50, 1500, 5, "Body length before the main Decay control is applied.", "ms"),
+    parameter("overtoneDecay", "Overtone length", 0, 1500, 5, "Independent shell decay, scaled by Decay. 0 follows 45% of Length, preserving the original shorter ring.", "ms"),
+  ),
 ];
 
 VOICE_PARAMETER_SECTIONS.lt = tomSections("Low tom");
@@ -287,9 +291,9 @@ export const DEFAULT_CUSTOM_VOICE_SETTINGS: Record<VoiceId, CustomVoiceSettings>
   rim: { noiseMode: 0, noiseDecay: 20, balance: 50, lowFrequency: 1670, highFrequency: 2350, filterFrequency: 1750, filterQ: 3.5, toneLevel: 70, noiseLevel: 25, duration: 35 },
   ch: { metalDecay: 0, lowpass: 20000, metalLevel: 50, metalBase: 40, highpass: 7400, noiseLevel: 18, noiseHighpass: 7800, duration: 58 },
   oh: { metalDecay: 0, chokeMode: 0, chokeRelease: 10, lowpass: 20000, metalLevel: 48, metalBase: 40, highpass: 7000, noiseLevel: 30, noiseHighpass: 7600, duration: 420 },
-  lt: { overtoneLevel: 0, bodyFrequency: 92, pitchAmount: 1.7, pitchDecay: 70, bodyLevel: 90, noiseLevel: 18, noiseFilter: 368, duration: 450 },
-  mt: { overtoneLevel: 0, bodyFrequency: 138, pitchAmount: 1.7, pitchDecay: 70, bodyLevel: 90, noiseLevel: 18, noiseFilter: 552, duration: 450 },
-  ht: { overtoneLevel: 0, bodyFrequency: 196, pitchAmount: 1.7, pitchDecay: 70, bodyLevel: 90, noiseLevel: 18, noiseFilter: 784, duration: 450 },
+  lt: { overtoneRatio: 1.5, overtoneDecay: 0, overtoneLevel: 0, bodyFrequency: 92, pitchAmount: 1.7, pitchDecay: 70, bodyLevel: 90, noiseLevel: 18, noiseFilter: 368, duration: 450 },
+  mt: { overtoneRatio: 1.5, overtoneDecay: 0, overtoneLevel: 0, bodyFrequency: 138, pitchAmount: 1.7, pitchDecay: 70, bodyLevel: 90, noiseLevel: 18, noiseFilter: 552, duration: 450 },
+  ht: { overtoneRatio: 1.5, overtoneDecay: 0, overtoneLevel: 0, bodyFrequency: 196, pitchAmount: 1.7, pitchDecay: 70, bodyLevel: 90, noiseLevel: 18, noiseFilter: 784, duration: 450 },
   cow: { balance: 50, lowFrequency: 540, highFrequency: 800, filterFrequency: 2640, filterQ: 1.4, toneLevel: 55, duration: 360 },
   cym: { bellLevel: 0, bellFrequency: 800, bellDecay: 500, metalDecay: 0, lowpass: 20000, metalBase: 40, metalLevel: 40, highpass: 4200, noiseLevel: 32, noiseHighpass: 5200, duration: 1400 },
   shk: { grainDepth: 0, grainRate: 60, noiseLevel: 50, filterFrequency: 6200, filterQ: 1.6, attack: 6, duration: 75 },
