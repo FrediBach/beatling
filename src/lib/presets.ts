@@ -22,6 +22,7 @@ import { refineJackinHouse } from "@/lib/preset-jackin-house";
 import { refineAcidBasic } from "@/lib/preset-acid-basic";
 import { refineAcidTomFill } from "@/lib/preset-acid-tom-fill";
 import { refineHypnoticAcid } from "@/lib/preset-hypnotic-acid";
+import { refineDetroitSyncopatedClap } from "@/lib/preset-detroit-syncopated-clap";
 
 const PRESET_REFINERS: Partial<Record<string, (patch: Patch, variation: 0 | 1 | 2 | 3) => void>> = {
   "electro-backbeat": refineElectroBackbeat,
@@ -43,6 +44,7 @@ const PRESET_REFINERS: Partial<Record<string, (patch: Patch, variation: 0 | 1 | 
   "acid-basic": refineAcidBasic,
   "acid-tom-fill": refineAcidTomFill,
   "hypnotic-acid": refineHypnoticAcid,
+  "detroit-syncopated-clap": refineDetroitSyncopatedClap,
 };
 
 interface PresetLane {
