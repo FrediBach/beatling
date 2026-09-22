@@ -176,10 +176,10 @@ describe("patches", () => {
 
   it("uses genre-aware four-hit endings for presets with generated fill variations", () => {
     const dancehall = createPresetArrangement("dembow").variations[3].patch;
-    const garage = createPresetArrangement("future-garage").variations[3].patch;
+    const breakbeat = createPresetArrangement("machine-breakbeat").variations[3].patch;
     const endingHits = (patch: typeof dancehall, voices: string[]) => Array.from({ length: 4 }, (_, offset) => patch.blocks.some((block) => voices.includes(block.voice) && euclidHit(patch.rate * 4 - 4 + offset, block.steps, block.pulses, block.rot)));
     expect(endingHits(dancehall, ["lt", "mt", "rim", "snare"])).toEqual([true, true, true, true]);
-    expect(endingHits(garage, ["snare", "rim", "clap"])).toEqual([true, true, true, true]);
+    expect(endingHits(breakbeat, ["snare", "rim", "clap"])).toEqual([true, true, true, true]);
   });
 
   it("builds the two-bar acid fill with Euclidean mute gates", () => {
