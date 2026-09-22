@@ -3,6 +3,7 @@ import { createBlock, createVoices } from "@/lib/patch";
 import { BLOCK_COUNT, type Arrangement, type Machine, type Patch, type SequencerBlock, type Variation, type VoiceBank, type VoiceId } from "@/lib/types";
 import { createEffects } from "@/lib/effects";
 import { VOICE_DEFS } from "@/lib/constants";
+import { refineElectroBackbeat } from "@/lib/preset-electro-backbeat";
 
 interface PresetLane {
   voice: VoiceId;
@@ -233,7 +234,7 @@ export function createPresetPatch(id: string, volume = 72): Patch {
   });
   const voices = createVoices();
   applyPresetCharacter(preset, voices);
-  return {
+  const patch: Patch = {
     format: "euclid-grid.v9",
     bpm: preset.bpm,
     rate: preset.rate ?? 4,
@@ -243,11 +244,13 @@ export function createPresetPatch(id: string, volume = 72): Patch {
     voices,
     effects: createEffects(),
   };
+  if (id === "electro-backbeat") refineElectroBackbeat(patch, 0);
+  return patch;
 }
 
 const clonePatch = (patch: Patch): Patch => ({
   ...patch,
-  blocks: patch.blocks.map((block) => ({ ...block, clk: [...block.clk], branchVoices: [...block.branchVoices], modulations: block.modulations.map((route) => ({ ...route })) })),
+  blocks: patch.blocks.map((block) => ({ ...block, series: block.series.map((rhythm) => ({ ...rhythm })), clk: [...block.clk], branchVoices: [...block.branchVoices], modulations: block.modulations.map((route) => ({ ...route })) })),
   voices: Object.fromEntries(Object.entries(patch.voices).map(([id, voice]) => [id, { ...voice, modulations: voice.modulations.map((route) => ({ ...route })), custom: { ...voice.custom } }])) as VoiceBank,
   effects: {
     ...patch.effects,
@@ -346,7 +349,13 @@ export function createPresetArrangement(id: string, volume = 72): Arrangement {
   const preset = DRUM_PRESETS.find((candidate) => candidate.id === id);
   if (!preset) throw new Error(`Unknown preset: ${id}`);
   const base = createPresetPatch(id, volume);
-  const patches = [base, createLiftVariation(base), createBreakVariation(base), createFillVariation(base, preset)];
+  const patches = id === "electro-backbeat"
+    ? [base, ...([1, 2, 3] as const).map((variation) => {
+      const patch = clonePatch(base);
+      refineElectroBackbeat(patch, variation);
+      return patch;
+    })]
+    : [base, createLiftVariation(base), createBreakVariation(base), createFillVariation(base, preset)];
   const repeats = [4, 4, 2, 2];
   const variations: Variation[] = patches.map((patch, index) => ({
     id: `preset-${id}-${index + 1}`,
