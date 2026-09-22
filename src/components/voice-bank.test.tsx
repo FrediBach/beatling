@@ -87,6 +87,7 @@ it.each([
   ["Clap", "Burst length", "40"], ["Rim", "Partial balance", "25"],
   ["Clap", "Tail filter", "700"], ["Clap", "Tail attack", "20"],
   ["Cowbell", "Partial balance", "75"], ["Closed hat", "Brightness", "6000"],
+  ["Cowbell", "High damping", "65"],
   ["Open hat", "Brightness", "7000"], ["Cymbal", "Brightness", "8000"],
   ["Low tom", "Overtone", "40"], ["Mid tom", "Overtone", "50"], ["Hi tom", "Overtone", "60"],
   ["Low tom", "Overtone ratio", "2.25"], ["Mid tom", "Overtone ratio", "1.75"], ["Hi tom", "Overtone ratio", "3"],

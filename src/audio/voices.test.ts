@@ -394,6 +394,88 @@ it.each(["rim", "cow"] as const)("isolates the low or high %s partial without ch
   }
 });
 
+it("damps only the cowbell's high oscillator ahead of its shared filter and envelope", () => {
+  const f = fixture("cow", { highDamping: 100, balance: 75, duration: 400 });
+  f.trigger();
+  expect(f.oscillators).toHaveLength(2);
+  expect(f.gains).toHaveLength(3);
+  expect(f.filters).toHaveLength(1);
+  const [envelope, low, high] = f.gains;
+  expect(low.gain.setValueAtTime).toHaveBeenCalledWith(0.5, 1);
+  expect(low.gain.exponentialRampToValueAtTime).not.toHaveBeenCalled();
+  expect(high.gain.setValueAtTime).toHaveBeenCalledWith(1.5, 1);
+  expect(high.gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0015, 1.4);
+  expect(low.connect).toHaveBeenCalledWith(f.filters[0]);
+  expect(high.connect).toHaveBeenCalledWith(f.filters[0]);
+  expect(f.filters[0].connect).toHaveBeenCalledWith(envelope);
+  expect(envelope.connect).toHaveBeenCalledOnce();
+  expect(envelope.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0.55, 1.003);
+  expect(envelope.gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.0001, 1.4);
+  for (const oscillator of f.oscillators) expect(oscillator.stop).toHaveBeenCalledWith(1.43);
+});
+
+it("increases cowbell damping gradually from zero without a jump in decay strength", () => {
+  const targets = [1, 25, 50, 100].map((highDamping) => {
+    const f = fixture("cow", { highDamping });
+    f.trigger();
+    return f.gains[2].gain.exponentialRampToValueAtTime.mock.calls[0][0] as number;
+  });
+  expect(targets[0]).toBeGreaterThan(0.93); // Near-unity endpoint at 1%.
+  expect(targets[0]).toBeLessThan(1);
+  expect(targets[1]).toBeCloseTo(0.177828, 5); // Additional 15 dB loss.
+  expect(targets[2]).toBeCloseTo(0.031623, 5); // Additional 30 dB loss.
+  expect(targets[3]).toBeCloseTo(0.001); // Additional 60 dB loss.
+});
+
+it.each(["custom", "808", "909"] as const)("preserves the %s cowbell's original partial gains when damping is off or unsupported", (machine) => {
+  const f = fixture("cow", { highDamping: machine === "custom" ? 0 : 100 });
+  f.patch.voices.cow.machine = machine;
+  f.trigger();
+  for (const partial of f.gains.slice(1)) {
+    expect(partial.gain.setValueAtTime).toHaveBeenCalledWith(1, 1);
+    expect(partial.gain.exponentialRampToValueAtTime).not.toHaveBeenCalled();
+  }
+  expect(f.gains[0].gain.exponentialRampToValueAtTime.mock.calls[0][0]).toBe(0.0001);
+  expect(f.gains[0].gain.exponentialRampToValueAtTime.mock.calls[0][1]).toBeCloseTo(1.36);
+});
+
+it("scales cowbell damping with Decay without retuning either oscillator", () => {
+  const f = fixture("cow", { highDamping: 100, duration: 1000 });
+  f.patch.voices.cow.tune = 12;
+  f.patch.voices.cow.decay = 100;
+  f.trigger("cow", 1, { decay: 1 }); // Maximum combined length multiplier = 2.4.
+  expect(f.gains[2].gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.001, 3.4);
+  expect(f.oscillators[0].frequency.setValueAtTime).toHaveBeenCalledWith(1080, 1);
+  expect(f.oscillators[1].frequency.setValueAtTime).toHaveBeenCalledWith(1600, 1);
+  for (const oscillator of f.oscillators) expect(oscillator.stop.mock.calls[0][0]).toBeCloseTo(3.43);
+});
+
+it("keeps zero cowbell layers silent with damping enabled", () => {
+  const lowOnly = fixture("cow", { highDamping: 100, balance: 0 });
+  lowOnly.trigger();
+  expect(lowOnly.gains[2].gain.setValueAtTime).toHaveBeenCalledWith(0, 1);
+  expect(lowOnly.gains[2].gain.exponentialRampToValueAtTime).not.toHaveBeenCalled();
+  const highOnly = fixture("cow", { highDamping: 100, balance: 100 });
+  highOnly.trigger();
+  expect(highOnly.gains[1].gain.setValueAtTime).toHaveBeenCalledWith(0, 1);
+  expect(highOnly.gains[2].gain.exponentialRampToValueAtTime.mock.calls[0][0]).toBe(0.002);
+  expect(highOnly.gains[2].gain.exponentialRampToValueAtTime.mock.calls[0][1]).toBeCloseTo(1.36);
+  const silent = fixture("cow", { highDamping: 100, toneLevel: 0 });
+  silent.trigger();
+  expect(silent.gains[0].gain.setValueAtTime).toHaveBeenLastCalledWith(0, 1);
+  expect(silent.gains[0].gain.linearRampToValueAtTime).not.toHaveBeenCalled();
+  expect(silent.gains[0].gain.exponentialRampToValueAtTime).not.toHaveBeenCalled();
+});
+
+it("bounds cowbell damping at the shortest modulated length", () => {
+  const f = fixture("cow", { highDamping: 100, duration: 40 });
+  f.patch.voices.cow.decay = 0;
+  f.trigger("cow", 1, { decay: -1 });
+  expect(f.gains[2].gain.exponentialRampToValueAtTime).toHaveBeenCalledWith(0.001, 1.01);
+  expect(f.gains[0].gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(0, 1.013);
+  for (const oscillator of f.oscillators) expect(oscillator.stop.mock.calls[0][0]).toBeGreaterThan(1.013);
+});
+
 it.each(["ch", "oh", "cym"] as const)("filters both layers of %s and bypasses brightness at its legacy default", (id) => {
   const f = fixture(id, { lowpass: 6000 });
   f.trigger();

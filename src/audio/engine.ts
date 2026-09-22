@@ -869,7 +869,14 @@ export class SequencerEngine {
     [custom ? value(p, "lowFrequency", 540) : 540, custom ? value(p, "highFrequency", 800) : 800].forEach((frequency, index) => {
       const oscillator = this.oscillator("square", frequency * 2 ** (p.tune / 12), time);
       const balance = custom ? value(p, "balance", 50) / 100 : 0.5;
-      oscillator.connect(this.gain(2 * (index ? balance : 1 - balance), time)).connect(filter);
+      const level = 2 * (index ? balance : 1 - balance);
+      const partial = this.gain(level, time);
+      const damping = custom ? value(p, "highDamping", 0) / 100 : 0;
+      if (index === 1 && level > 0 && damping > 0) {
+        // Up to 60 dB of additional high-partial decay; continuous at zero.
+        partial.gain.exponentialRampToValueAtTime(level * 10 ** (-3 * damping), time + Math.max(0.01, duration));
+      }
+      oscillator.connect(partial).connect(filter);
       oscillator.start(time);
       oscillator.stop(time + duration + 0.03);
     });

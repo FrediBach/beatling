@@ -172,7 +172,10 @@ export const VOICE_PARAMETER_SECTIONS: Record<VoiceId, VoiceParameterSection[]> 
       parameter("filterQ", "Filter resonance", 0.2, 8, 0.1, "Resonance of the cowbell body filter.", "Q"),
       parameter("toneLevel", "Tone level", 0, 100, 1, "Output level of the oscillator pair.", "%"),
     ),
-    envelope(parameter("duration", "Length", 40, 1200, 5, "Base length before the main Decay control is applied.", "ms")),
+    envelope(
+      parameter("duration", "Length", 40, 1200, 5, "Base length before the main Decay control is applied.", "ms"),
+      parameter("highDamping", "High damping", 0, 100, 1, "Fade the High oscillator faster through the tail. 0 preserves the original equal decay; higher values favor the Low oscillator as the sound fades. Follows Length and Decay.", "%"),
+    ),
   ],
   cym: [
     tone(
@@ -296,7 +299,7 @@ export const DEFAULT_CUSTOM_VOICE_SETTINGS: Record<VoiceId, CustomVoiceSettings>
   lt: { overtoneRatio: 1.5, overtoneDecay: 0, overtoneLevel: 0, bodyFrequency: 92, pitchAmount: 1.7, pitchDecay: 70, bodyLevel: 90, noiseLevel: 18, noiseFilter: 368, duration: 450 },
   mt: { overtoneRatio: 1.5, overtoneDecay: 0, overtoneLevel: 0, bodyFrequency: 138, pitchAmount: 1.7, pitchDecay: 70, bodyLevel: 90, noiseLevel: 18, noiseFilter: 552, duration: 450 },
   ht: { overtoneRatio: 1.5, overtoneDecay: 0, overtoneLevel: 0, bodyFrequency: 196, pitchAmount: 1.7, pitchDecay: 70, bodyLevel: 90, noiseLevel: 18, noiseFilter: 784, duration: 450 },
-  cow: { balance: 50, lowFrequency: 540, highFrequency: 800, filterFrequency: 2640, filterQ: 1.4, toneLevel: 55, duration: 360 },
+  cow: { highDamping: 0, balance: 50, lowFrequency: 540, highFrequency: 800, filterFrequency: 2640, filterQ: 1.4, toneLevel: 55, duration: 360 },
   cym: { bellLevel: 0, bellFrequency: 800, bellDecay: 500, metalDecay: 0, lowpass: 20000, metalBase: 40, metalLevel: 40, highpass: 4200, noiseLevel: 32, noiseHighpass: 5200, duration: 1400 },
   shk: { grainDepth: 0, grainRate: 60, noiseLevel: 50, filterFrequency: 6200, filterQ: 1.6, attack: 6, duration: 75 },
   bassline: { pulseWidth: 50, filterTracking: 0, playMode: 0, glide: 0, accentSource: 0, accentFilter: 0, accentDecay: 0, ampDecay: 0, root: 0, scale: 2, octave: 2, waveform: 0, cutoff: 700, resonance: 12, envelopeAmount: 82, filterDecay: 260, accent: 30 },
