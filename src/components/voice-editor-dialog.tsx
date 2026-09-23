@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { createCustomVoiceSettings } from "@/lib/voice-config";
 import { SYNTH_VOICE_IDS } from "@/lib/constants";
 import { VoiceSynthesisEditor } from "@/components/voice-synthesis-editor";
+import { VoicePresetSelect } from "@/components/voice-preset-select";
 import "./voice-editor.css";
 import { VoiceRange } from "@/components/voice-range";
 import type { EffectiveVoiceModulation, VoiceId, VoiceState } from "@/lib/types";
@@ -41,6 +42,7 @@ export function VoiceEditorDialog({ open, onOpenChange, voiceId, voiceName, valu
           </Button>}
         </header>
         <div className="voice-editor-sections">
+          {hasSynthControls && <VoicePresetSelect voiceId={voiceId} voiceName={voiceName} value={value} onChange={onChange} />}
           <fieldset className="voice-editor-section">
             <legend>Overall tuning &amp; decay</legend>
             <div className="voice-editor-controls voice-tone-controls">

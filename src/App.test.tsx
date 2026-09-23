@@ -210,6 +210,37 @@ describe("application shell", () => {
     expect(screen.getByLabelText("Kick Body frequency")).toHaveValue("64");
   });
 
+  it("applies voice presets as one undoable edit isolated to the active variation", () => {
+    vi.spyOn(window.localStorage.__proto__, "getItem").mockReturnValue(null);
+    render(<App />);
+    fireEvent.click(screen.getByRole("button", { name: "Use custom Kick" }));
+    fireEvent.click(screen.getByRole("button", { name: "Add variation" }));
+    const openVoice = () => fireEvent.click(screen.getByRole("button", { name: "Configure custom Kick" }));
+    const closeVoice = () => fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
+    openVoice();
+    fireEvent.change(screen.getByRole("combobox", { name: "Kick Sound preset" }), { target: { value: "punch" } });
+    expect(screen.getByRole("slider", { name: "Kick Body frequency" })).toHaveValue("60");
+    expect(screen.getByRole("slider", { name: "Kick Body length" })).toHaveValue("280");
+    closeVoice();
+    fireEvent.click(screen.getByRole("button", { name: "Undo last change" }));
+    openVoice();
+    expect(screen.getByRole("combobox", { name: "Kick Sound preset" })).toHaveValue("default");
+    expect(screen.getByRole("slider", { name: "Kick Body frequency" })).toHaveValue("50");
+    expect(screen.getByRole("slider", { name: "Kick Body length" })).toHaveValue("620");
+    closeVoice();
+    fireEvent.click(screen.getByRole("button", { name: "Redo last change" }));
+    openVoice();
+    expect(screen.getByRole("combobox", { name: "Kick Sound preset" })).toHaveValue("punch");
+    closeVoice();
+    fireEvent.click(screen.getByRole("tab", { name: "Variation A" }));
+    openVoice();
+    expect(screen.getByRole("combobox", { name: "Kick Sound preset" })).toHaveValue("default");
+    closeVoice();
+    fireEvent.click(screen.getByRole("tab", { name: "Variation B" }));
+    openVoice();
+    expect(screen.getByRole("combobox", { name: "Kick Sound preset" })).toHaveValue("punch");
+  });
+
   it("configures shared effects and independent voice sends as undoable changes", async () => {
     vi.spyOn(window.localStorage.__proto__, "getItem").mockReturnValue(null);
     render(<App />);

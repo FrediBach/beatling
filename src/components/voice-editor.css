@@ -31,6 +31,9 @@
 .voice-design-panel .effect-choices button { min-height: 34px; font-size: 11px; }
 .voice-select-field { display: grid; grid-template-columns: 90px minmax(0,1fr); gap: 10px; align-items: center; font-size: 11px; }
 .voice-select-field select { width: 100%; min-width: 0; height: 32px; background: var(--paper); }
+.voice-preset { padding: 14px; border: 1px solid var(--rule); border-radius: 4px; background: var(--paper); }
+.voice-preset .voice-select-field { max-width: 420px; }
+.voice-preset p { margin-top: 8px; color: var(--muted); font-size: 11px; line-height: 1.5; }
 .voice-blend-labels { display: flex; justify-content: space-between; margin-top: -3px; font: 9px var(--font-mono); color: var(--muted); }
 .voice-control-note { margin-top: 4px; font-size: 10px; line-height: 1.4; color: var(--muted); }
 .voice-control-guide { margin-top: 18px; border-top: 1px solid var(--rule-soft); padding-top: 10px; color: var(--muted); font-size: 10px; line-height: 1.5; }
