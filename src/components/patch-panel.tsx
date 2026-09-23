@@ -4,6 +4,7 @@ import type { BlockVisualState, VoiceState, ClockSource, SequencerBlock, VoiceId
 import { connectionsFor, type Connection } from "@/lib/routing";
 import { ModulationScope } from "./modulation-scope";
 import { ModulationEditor } from "./modulation-editor";
+import { QuantizerSettings } from "./quantizer-settings";
 import { cn } from "@/lib/utils";
 
 export function PatchPanel({ index, blocks, onChange, onSelect, onClose, visual, voice, embedded = false, connections: allConnections }: { index: number; blocks: SequencerBlock[]; onChange: (block: SequencerBlock) => void; onSelect: (index: number) => void; onClose: () => void; embedded?: boolean; visual?: BlockVisualState; voice?: VoiceState; connections?: Connection[] }) {
@@ -55,14 +56,14 @@ export function PatchPanel({ index, blocks, onChange, onSelect, onClose, visual,
             <PatchLabel>Gate</PatchLabel>
             <RangeWithOutput label="Gate length" min={5} max={200} step={5} value={block.gate} suffix="%" onChange={(value) => update("gate", value)} />
 
-            <PatchLabel>LFO out</PatchLabel>
+            {block.kind !== "quantizer" && <><PatchLabel>LFO out</PatchLabel>
             <select aria-label="LFO waveform" className="control" value={block.shape} onChange={(event) => update("shape", event.target.value as SequencerBlock["shape"])}>
               {LFO_SHAPES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-            </select>
+            </select></>}
 
           </div>
     </div>
-    <ModulationScope block={block} visual={visual} />
+    {block.kind === "quantizer" ? <QuantizerSettings index={index} blocks={blocks} visual={visual} onChange={onChange} /> : <ModulationScope block={block} visual={visual} />}
     <ModulationEditor index={index} blocks={blocks} visual={visual} voice={voice} onChange={onChange} />
     <div className="connection-heading"><span className="eyebrow">Signal flow</span><span>{connections.length} connections</span></div>
     <div className="connection-list">
@@ -72,7 +73,7 @@ export function PatchPanel({ index, blocks, onChange, onSelect, onClose, visual,
       </button>)}
     </div>
     {block.kind === "bernoulli" && <p className="patch-help">Every filled Euclidean step routes to A at the Chance percentage, or to B otherwise. No hit is discarded.</p>}
-    <p className="patch-help">Trigger → clock / reset<br />Gate → mute · LFO → modulation<br /><span>Select a connection to follow its signal.</span></p>
+    <p className="patch-help">Trigger → clock / reset<br />Gate → mute · LFO / CV → modulation<br /><span>Select a connection to follow its signal.</span></p>
   </section>;
 }
 

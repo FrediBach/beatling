@@ -16,7 +16,7 @@ interface SequencerRoutingProps {
   connections?: Connection[];
 }
 
-const ROUTING_FIELDS: Array<keyof SequencerBlock> = ["clk", "rst", "mut", "gate", "modulations", "shape"];
+const ROUTING_FIELDS: Array<keyof SequencerBlock> = ["clk", "rst", "mut", "gate", "modulations", "shape", "quantizerSource"];
 
 export function SequencerRouting({ index, block, blocks, patchOpen, changedFields, onPatchOpen, connections = connectionsFor(blocks) }: SequencerRoutingProps) {
   const incoming = connections.filter((connection) => connection.target === index);
@@ -47,7 +47,7 @@ export function RoutingPorts({ ownerLabel, connections, end, onOpen }: { ownerLa
     <span>{connections.length}</span>
     <span className="routing-sockets" aria-hidden="true">{[...groups].map(([port, routes]) => {
       const first = routes[0];
-      const color = input ? cableSignal(first).color : CABLE_SIGNALS[first.output === "LFO" ? 3 : first.output === "Gate" ? 2 : 0].color;
+      const color = input ? cableSignal(first).color : CABLE_SIGNALS[(first.output === "LFO" || first.output === "CV") ? 3 : first.output === "Gate" ? 2 : 0].color;
       return <i key={port} data-cable-port={port} style={{ "--port-color": color } as CSSProperties} title={routes.map(describeConnection).join("\n")} />;
     })}</span>
   </button>;

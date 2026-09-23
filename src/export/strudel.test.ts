@@ -10,7 +10,7 @@ describe("Strudel export", () => {
     expect(code).toContain(".degradeBy(0.08)");
     expect(code).toContain(".swingBy(0.12, 8)");
     expect(code).toContain('note("36").s("sawtooth")');
-    expect(code).toContain("Routing, resets, mute inputs, and modulation are not portable");
+    expect(code).toContain("Routing, resets, mute inputs, modulation, and Euclidean Quantizer CV are not portable");
   });
 
   it("uses arrange to preserve rhythm series and emits silence for an empty patch", () => {

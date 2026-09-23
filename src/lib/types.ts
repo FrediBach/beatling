@@ -1,6 +1,6 @@
 export const BLOCK_COUNT = 16;
-export const PATCH_FORMAT = "euclid-grid.v28";
-export const ARRANGEMENT_FORMAT = "euclid-grid.arrangement.v28";
+export const PATCH_FORMAT = "euclid-grid.v29";
+export const ARRANGEMENT_FORMAT = "euclid-grid.arrangement.v29";
 
 export type VoiceId =
   | "kick"
@@ -18,7 +18,7 @@ export type VoiceId =
   | "bassline"
   | "lead";
 
-export type BlockKind = "voice" | "modulator" | "bernoulli";
+export type BlockKind = "voice" | "modulator" | "bernoulli" | "quantizer";
 
 export type Machine = "808" | "909" | "custom";
 export type EffectId = "distortion" | "reverb" | "delay" | "karplus" | "compressor";
@@ -64,6 +64,7 @@ export interface SequencerBlock {
   kind: BlockKind;
   voice: VoiceId | "";
   branchVoices: [VoiceId, VoiceId];
+  quantizerSource: BlockSource;
   steps: number;
   pulses: number;
   rot: number;

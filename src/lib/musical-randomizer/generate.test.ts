@@ -20,6 +20,25 @@ function freeze(value: unknown) {
 }
 
 describe("musical generation", () => {
+  it("does not reshape a pitch LFO also used by a Quantizer", () => {
+    const source = createEmptyPatch();
+    Object.assign(source.blocks[0], { kind: "voice", voice: "bassline", pulses: 4 });
+    Object.assign(source.blocks[12], { steps: 7, pulses: 2, shape: "tri" });
+    Object.assign(source.blocks[13], { kind: "quantizer", quantizerSource: "12", steps: 12, pulses: 7 });
+    source.voices.bassline.modulations = [{ source: "12", destination: "vOct", amount: 1 }];
+    const patch = generate(source, { mode: "reshape", parts: ["bassline"], reshapeMelody: true });
+    expect(patch.blocks[12]).toEqual(source.blocks[12]);
+    expect(patch.blocks[13]).toEqual(source.blocks[13]);
+    expect(patch.voices.bassline.modulations).toEqual(source.voices.bassline.modulations);
+  });
+  it("keeps an external quantizer and its CV source when preserving a synth", () => {
+    const source = createDemoPatch();
+    Object.assign(source.blocks[12], { kind: "quantizer", voice: "", quantizerSource: "14", steps: 12, pulses: 7 });
+    source.voices.bassline.custom.quantizer = 0;
+    const patch = generate(source, { keep: ["bassline"] });
+    for (const slot of [7, 12, 14]) expect(patch.blocks[slot]).toEqual(source.blocks[slot]);
+    expect(patch.voices.bassline).toEqual(source.voices.bassline);
+  });
   it("is deterministic, immutable, normalized, and produces different ideas", () => {
     const source = createDemoPatch();
     const request = defaultRequest(source);

@@ -9,7 +9,7 @@ export const VOICE_MODULATION_TARGETS: Array<[VoiceModulationRoute["destination"
   ["tune", "Tune"],
   ["decay", "Decay"],
   ["level", "Level"],
-  ["vOct", "Quantized V/Oct"],
+  ["vOct", "V/Oct"],
 ];
 
 export const voiceModulationTargets = (id: VoiceId) => SYNTH_VOICE_IDS.has(id)

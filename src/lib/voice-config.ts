@@ -49,6 +49,7 @@ const synthArticulation = (): VoiceParameterSection => ({
   ],
 });
 const quantizerParameters = () => pitch(
+  optionParameter("quantizer", "Quantizer", ["Off", "On"], "Off passes V/Oct through without snapping, for external Quantizer blocks or continuous pitch. Root, octave and Tune still transpose."),
   optionParameter("root", "Root note", [...NOTE_NAMES], "Tonic used by the quantized V/Oct input."),
   optionParameter("scale", "Scale", SCALE_DEFS.map(({ name }) => name), "Allowed notes for incoming control voltage."),
   parameter("octave", "Base octave", 1, 6, 1, "Octave played at zero volts."),
@@ -323,8 +324,8 @@ export const DEFAULT_CUSTOM_VOICE_SETTINGS: Record<VoiceId, CustomVoiceSettings>
   cow: { highDamping: 0, balance: 50, lowFrequency: 540, highFrequency: 800, filterFrequency: 2640, filterQ: 1.4, toneLevel: 55, duration: 360 },
   cym: { metalFocus: 9000, metalQ: 0.9, stickLevel: 0, stickFilter: 4500, stickDecay: 15, bellLevel: 0, bellFrequency: 800, bellDecay: 500, metalDecay: 0, lowpass: 20000, metalBase: 40, metalLevel: 40, highpass: 4200, noiseLevel: 32, noiseHighpass: 5200, duration: 1400 },
   shk: { grainDepth: 0, grainRate: 60, noiseLevel: 50, filterFrequency: 6200, filterQ: 1.6, attack: 6, duration: 75 },
-  bassline: { pulseWidth: 50, filterTracking: 0, playMode: 0, glide: 0, accentSource: 0, accentFilter: 0, accentDecay: 0, ampDecay: 0, root: 0, scale: 2, octave: 2, waveform: 0, cutoff: 700, resonance: 12, envelopeAmount: 82, filterDecay: 260, accent: 30 },
-  lead: { companionInterval: 0, pulseWidth: 50, filterTracking: 0, playMode: 0, glide: 0, filterDecay: 0, subLevel: 0, root: 0, scale: 1, octave: 4, waveform: 0, pulseMix: 28, detune: 7, cutoff: 3200, resonance: 3.5, envelopeAmount: 38, attack: 8, release: 520 },
+  bassline: { quantizer: 1, pulseWidth: 50, filterTracking: 0, playMode: 0, glide: 0, accentSource: 0, accentFilter: 0, accentDecay: 0, ampDecay: 0, root: 0, scale: 2, octave: 2, waveform: 0, cutoff: 700, resonance: 12, envelopeAmount: 82, filterDecay: 260, accent: 30 },
+  lead: { quantizer: 1, companionInterval: 0, pulseWidth: 50, filterTracking: 0, playMode: 0, glide: 0, filterDecay: 0, subLevel: 0, root: 0, scale: 1, octave: 4, waveform: 0, pulseMix: 28, detune: 7, cutoff: 3200, resonance: 3.5, envelopeAmount: 38, attack: 8, release: 520 },
 };
 
 export function createCustomVoiceSettings(id: VoiceId): CustomVoiceSettings {

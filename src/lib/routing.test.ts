@@ -11,8 +11,8 @@ describe("signal routing", () => {
     expect(connections).toContainEqual({ source: 15, target: 4, output: "Gate", input: "Mute" });
     expect(connections).toContainEqual({ source: 12, target: 2, output: "LFO", input: "chance" });
     expect(connectionsFor(patch)).toEqual(expect.arrayContaining([
-      { source: 12, target: "bassline", output: "LFO", input: "Quantized V/Oct" },
-      { source: 13, target: "lead", output: "LFO", input: "Quantized V/Oct" },
+      { source: 12, target: "bassline", output: "LFO", input: "V/Oct" },
+      { source: 13, target: "lead", output: "LFO", input: "V/Oct" },
     ]));
     expect(connectionsFor(patch)).toHaveLength(8);
     expect(connectionsFor(createEmptyPatch().blocks)).toEqual([]);

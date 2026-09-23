@@ -1,6 +1,6 @@
 # Beatling Lua export: Luading implementation contract
 
-This is the handoff for implementing the Euclid Grid data consumer in Luading. It describes the exporter in [`src/export/lua.ts`](../src/export/lua.ts), checked against Beatling's `euclid-grid.v28` patch model and current sequencer engine on 2026-09-22.
+This is the handoff for implementing the Euclid Grid data consumer in Luading. It describes the exporter in [`src/export/lua.ts`](../src/export/lua.ts), checked against Beatling's `euclid-grid.v29` patch model and current sequencer engine on 2026-09-23.
 
 The file is a Lua chunk returning one table. It contains the **active patch's rhythm and control graph**: 16 sequencers, their clocks/resets/mutes, rhythm series, LFOs and rhythm modulation, plus output descriptors. Luading must supply the runtime and host output integration. The file contains no callbacks or instrument implementation.
 
@@ -18,7 +18,7 @@ The audit found the existing series, routing, numeric waveform IDs and Euclidean
 | Linear output allocation | Only nonzero, exported rhythm routes request an LFO output. Omitted voice routes no longer consume slots. |
 | Output exhaustion | Emit a comment naming LFO sources without a physical output; keep their internal routes. |
 
-`version=1` remains the Lua schema version. It is independent of JSON patch version 28. Existing field meanings and numeric IDs are unchanged; `swing` is an additive field. A consumer should use `data.swing or 0` for older files and tolerate unknown fields. Older consumers can ignore `swing`, but will play straight timing. Re-export older Bernoulli files to get corrected trigger probabilities: their data does not identify the block kind sufficiently to repair them reliably.
+`version=1` remains the Lua schema version. It is independent of JSON patch version 29. Existing field meanings and numeric IDs are unchanged; `swing` is an additive field. A consumer should use `data.swing or 0` for older files and tolerate unknown fields. Older consumers can ignore `swing`, but will play straight timing. Re-export older Bernoulli files to get corrected trigger probabilities: their data does not identify the block kind sufficiently to repair them reliably.
 
 Output numbers are allocated anew from each patch. Do not persist host assignments based only on an old `out`/`lout` number when loading a new export; allocation can change, including after this correction.
 
@@ -226,6 +226,7 @@ This block accepts global pulses and block 2 triggers, resets on bars, and is mu
 | Voice tune, decay, level, mute and solo | Omitted. Block gates can remain active when the corresponding browser voice is inaudible. |
 | Per-block Tune/Decay/Level routes | Omitted from `mods`, with a comment. |
 | Shared voice routing, including V/Oct | Omitted, with comments naming connected routes. No pitched CV output is generated. |
+| Euclidean Quantizer CV | Omitted, with a comment naming its input. The legacy rhythm/LFO projection does not reproduce the quantized pitch output. |
 | Bernoulli voice A/B selection | Omitted, with a comment. Export retains the combined Euclidean trigger stream with `prob=100`; neither the original branch probability nor its modulation is data. |
 | Master volume, effect processors and sends | Omitted. |
 | Variations, song order, history, editor locks | Omitted; only the active patch is passed to the exporter. |

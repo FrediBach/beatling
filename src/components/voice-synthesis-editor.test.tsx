@@ -7,6 +7,19 @@ import { VoiceSynthesisEditor } from "./voice-synthesis-editor";
 
 afterEach(cleanup);
 
+it.each(["bassline", "lead"] as const)("can bypass the %s quantizer without losing the saved scale", (id) => {
+  render(<Fixture id={id} />);
+  const scale = screen.getByLabelText("Test voice Scale");
+  fireEvent.change(scale, { target: { value: "3" } });
+  fireEvent.click(screen.getByRole("button", { name: "Test voice Quantizer: Off" }));
+  expect(screen.getByRole("button", { name: "Test voice Quantizer: Off" })).toHaveAttribute("aria-pressed", "true");
+  expect(scale).toHaveValue("3");
+  expect(scale).toHaveAccessibleDescription(/Saved while Quantizer is off/);
+  fireEvent.click(screen.getByRole("button", { name: "Test voice Quantizer: On" }));
+  expect(scale).toHaveValue("3");
+  expect(scale).not.toHaveAccessibleDescription(/Saved while Quantizer is off/);
+});
+
 function Fixture({ id = "rim", custom = true }: { id?: VoiceId; custom?: boolean }) {
   const [value, setValue] = useState(() => createCustomVoiceSettings(id));
   return <VoiceSynthesisEditor voiceId={id} voiceName="Test voice" value={value} custom={custom} onChange={(key, next) => setValue((current) => ({ ...current, [key]: next }))} />;

@@ -7,6 +7,7 @@ import type { CustomVoiceSettings, VoiceId } from "@/lib/types";
 
 function controlNote(voiceId: VoiceId, key: string, v: CustomVoiceSettings): string | undefined {
   if (voiceId === "rim" && ["noiseDecay", "noiseFilter", "noiseQ"].includes(key) && v.noiseMode === 0) return "Saved for Independent mode";
+  if (key === "scale" && v.quantizer === 0) return "Saved while Quantizer is off";
   if (key === "glide" && v.playMode === 0) return "Saved for Mono retrigger";
   if (key === "chokeRelease" && v.chokeMode === 0) return "Saved for Closed hat mode";
   if (key === "pulseWidth" && v.waveform !== 1 && !(voiceId === "lead" && v.pulseMix > 0)) return "Choose Square to hear pulse width";

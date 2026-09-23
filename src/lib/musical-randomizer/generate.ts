@@ -123,7 +123,7 @@ function reshapePitch(patch: Patch, request: MusicalRequest, constraints: Constr
     const route = patch.voices[voice].modulations.find((route) => route.destination === "vOct");
     const slot = route && route.source !== "" ? Number(route.source) : -1;
     const block = patch.blocks[slot];
-    const consumers = patch.blocks.some((candidate) => candidate.clk.includes(`${slot}`) || candidate.rst === `${slot}` || candidate.mut === `${slot}` || candidate.modulations.some((mod) => mod.source === `${slot}`)) || VOICE_DEFS.some(({ id }) => patch.voices[id].modulations.some((mod) => mod.source === `${slot}` && (id !== voice || mod.destination !== "vOct")));
+    const consumers = patch.blocks.some((candidate) => candidate.clk.includes(`${slot}`) || candidate.rst === `${slot}` || candidate.mut === `${slot}` || (candidate.kind === "quantizer" && candidate.quantizerSource === `${slot}`) || candidate.modulations.some((mod) => mod.source === `${slot}`)) || VOICE_DEFS.some(({ id }) => patch.voices[id].modulations.some((mod) => mod.source === `${slot}` && (id !== voice || mod.destination !== "vOct")));
     if (!route || !block || patch.rate !== 4 || block.kind !== "modulator" || !simpleClock(block) || block.series.length || block.shape === "rnd" || consumers || Object.values(locks[slot] ?? {}).some(Boolean)) {
       constraints.notices.add(`${voiceName(voice)} pitch routing was kept; its source is shared, locked, or uses a different configuration.`);
       continue;

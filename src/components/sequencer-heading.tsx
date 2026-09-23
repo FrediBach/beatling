@@ -18,7 +18,8 @@ export function SequencerHeading({ index, block, blockLocked, changedFields, onC
   const update = <K extends keyof SequencerBlock>(key: K, value: SequencerBlock[K]) => onChange({ ...block, [key]: value });
   const selection = block.kind === "voice" ? block.voice : block.kind;
   const selectKind = (value: string) => {
-    if (value === "modulator" || value === "bernoulli") onChange({ ...block, kind: value as BlockKind, voice: "" });
+    if (value === "quantizer") onChange({ ...block, kind: "quantizer", voice: "", steps: 12, pulses: 7, rot: 0, series: [] });
+    else if (value === "modulator" || value === "bernoulli") onChange({ ...block, kind: value as BlockKind, voice: "" });
     else onChange({ ...block, kind: "voice", voice: value as VoiceId });
   };
   return (
@@ -29,12 +30,13 @@ export function SequencerHeading({ index, block, blockLocked, changedFields, onC
             <optgroup label="Block types">
               <option value="modulator">Modulator</option>
               <option value="bernoulli">Bernoulli gate</option>
+              <option value="quantizer">Euclidean Quantizer</option>
             </optgroup>
             <optgroup label="Voices">
               {VOICE_DEFS.map((voice) => <option key={voice.id} value={voice.id}>{voice.name}</option>)}
             </optgroup>
           </select>
-          {block.kind !== "modulator" && <abbr className="voice-tag-badge" title={block.kind === "bernoulli" ? "Euclidean A/B voice router" : `Roland voice code for ${VOICE_DEFS.find((voice) => voice.id === block.voice)?.name}`}>{blockTag(block)}</abbr>}
+          {block.kind !== "modulator" && <abbr className="voice-tag-badge" title={block.kind === "quantizer" ? "Euclidean pitch quantizer" : block.kind === "bernoulli" ? "Euclidean A/B voice router" : `Roland voice code for ${VOICE_DEFS.find((voice) => voice.id === block.voice)?.name}`}>{blockTag(block)}</abbr>}
           <ChevronDown size={11} />
         </div>
         <div className="card-tools">

@@ -27,7 +27,7 @@ const formatName: Record<ExportFormat, string> = {
 
 const description: Record<ExportFormat, string> = {
   lua: "The Lua data table consumed by the Euclid Grid example in Luading.",
-  midi: "A multi-track MIDI loop with tempo, GM drum notes, synth notes, rhythm series, chance, gate length, and swing baked in.",
+  midi: "A multi-track MIDI loop with tempo, GM drum notes, synth base notes, rhythm series, chance, gate length, and swing baked in. Modulation and Euclidean Quantizer CV are not rendered.",
   strudel: "Playable Strudel code with Euclidean rhythms, rhythm series, tempo, swing, chance, voice levels, and drum-machine banks.",
   json: "The whole patch as JSON. Edit or paste another patch here, then load it.",
 };

@@ -15,7 +15,7 @@ const additions: Partial<Record<VoiceId, Record<string, number>>> = {
 
 afterEach(() => localStorage.clear());
 
-it("migrates v9 patch and arrangement storage with neutral voice defaults and saves v28", () => {
+it("migrates v9 patch and arrangement storage with neutral voice defaults and saves v29", () => {
   const patch = createEmptyPatch();
   patch.voices.snare.custom.noiseDecay = 400;
   patch.voices.lead.custom.release = 900;
@@ -27,19 +27,19 @@ it("migrates v9 patch and arrangement storage with neutral voice defaults and sa
   localStorage.setItem("egs.patch.v9", JSON.stringify(legacy));
   localStorage.setItem("egs.arrangement.v9", JSON.stringify({ ...createArrangement(patch), format: "euclid-grid.arrangement.v9", variations: [{ id: "variation-1", name: "A", patch: legacy }] }));
   const migrated = loadStoredPatch()!;
-  expect(migrated.format).toBe("euclid-grid.v28");
+  expect(migrated.format).toBe("euclid-grid.v29");
   for (const [id, fields] of Object.entries(additions)) expect(migrated.voices[id as VoiceId].custom).toMatchObject(fields);
   expect(migrated.voices.snare.custom.noiseDecay).toBe(400);
   expect(migrated.voices.lead.custom.release).toBe(900);
   expect(migrated.voices.lead.modulations).toEqual(patch.voices.lead.modulations);
   const arrangement = loadStoredArrangement(createEmptyPatch());
-  expect(arrangement.format).toBe("euclid-grid.arrangement.v28");
+  expect(arrangement.format).toBe("euclid-grid.arrangement.v29");
   expect(arrangement.variations[0].patch).toEqual(migrated);
   expect(arrangement.songParts[0].variationId).toBe("variation-1");
   savePatch(migrated);
   saveArrangement(arrangement);
-  expect(JSON.parse(localStorage.getItem("egs.patch.v28")!)).toEqual(migrated);
-  expect(JSON.parse(localStorage.getItem("egs.arrangement.v28")!)).toEqual(arrangement);
+  expect(JSON.parse(localStorage.getItem("egs.patch.v29")!)).toEqual(migrated);
+  expect(JSON.parse(localStorage.getItem("egs.arrangement.v29")!)).toEqual(arrangement);
 });
 
 it("round-trips edited voice controls through JSON normalization", () => {
@@ -210,7 +210,7 @@ it("migrates v11 synths to polyphonic playback while retaining accents and hat c
   localStorage.setItem("egs.patch.v11", JSON.stringify(legacy));
   localStorage.setItem("egs.arrangement.v11", JSON.stringify({ ...createArrangement(patch), format: "euclid-grid.arrangement.v11", variations: [{ id: "variation-1", name: "A", patch: legacy }] }));
   const migrated = loadStoredPatch()!;
-  expect(migrated.format).toBe("euclid-grid.v28");
+  expect(migrated.format).toBe("euclid-grid.v29");
   for (const id of ["bassline", "lead"] as const) expect(migrated.voices[id].custom).toMatchObject({ playMode: 0, glide: 0 });
   expect(migrated.voices.bassline.custom).toMatchObject({ accentSource: 1, accentFilter: 60, accentDecay: 30 });
   expect(migrated.voices.oh.custom).toMatchObject({ chokeMode: 1, chokeRelease: 20 });
@@ -229,7 +229,7 @@ it("migrates v12 percussion to linked envelopes and retains edited layers on sav
   localStorage.setItem("egs.patch.v12", JSON.stringify(legacy));
   localStorage.setItem("egs.arrangement.v12", JSON.stringify({ ...createArrangement(patch), format: "euclid-grid.arrangement.v12", variations: [{ id: "variation-1", name: "A", patch: legacy }] }));
   const migrated = loadStoredPatch()!;
-  expect(migrated.format).toBe("euclid-grid.v28");
+  expect(migrated.format).toBe("euclid-grid.v29");
   expect(migrated.voices.rim.custom).toMatchObject({ noiseMode: 0, noiseDecay: 20, toneLevel: 30, noiseLevel: 60, duration: 70 });
   for (const id of ["ch", "oh", "cym"] as const) expect(migrated.voices[id].custom.metalDecay).toBe(0);
   expect(migrated.voices.oh.custom).toMatchObject({ duration: 800, chokeMode: 1 });
@@ -254,7 +254,7 @@ it("migrates v13 cymbals with a disabled bell and retains bell edits in patch an
   localStorage.setItem("egs.patch.v13", JSON.stringify(legacy));
   localStorage.setItem("egs.arrangement.v13", JSON.stringify({ ...createArrangement(patch), format: "euclid-grid.arrangement.v13", variations: [{ id: "variation-1", name: "A", patch: legacy }] }));
   const migrated = loadStoredPatch()!;
-  expect(migrated.format).toBe("euclid-grid.v28");
+  expect(migrated.format).toBe("euclid-grid.v29");
   expect(migrated.voices.cym.custom).toMatchObject({ bellLevel: 0, bellFrequency: 800, bellDecay: 500, duration: 1800, metalDecay: 300, lowpass: 6500 });
   expect(migrated.voices.rim.custom).toMatchObject({ noiseMode: 1, noiseDecay: 90 });
   const arrangement = loadStoredArrangement(createEmptyPatch());
@@ -278,7 +278,7 @@ it("migrates v14 synths to fixed filters and retains tracking edits on save", ()
   localStorage.setItem("egs.patch.v14", JSON.stringify(legacy));
   localStorage.setItem("egs.arrangement.v14", JSON.stringify({ ...createArrangement(patch), format: "euclid-grid.arrangement.v14", variations: [{ id: "variation-1", name: "A", patch: legacy }] }));
   const migrated = loadStoredPatch()!;
-  expect(migrated.format).toBe("euclid-grid.v28");
+  expect(migrated.format).toBe("euclid-grid.v29");
   for (const id of ["bassline", "lead"] as const) expect(migrated.voices[id].custom).toMatchObject({ filterTracking: 0, playMode: 1, glide: 150, cutoff: 1000 });
   expect(migrated.voices.cym.custom).toMatchObject({ bellLevel: 35, bellFrequency: 1100, bellDecay: 900 });
   const arrangement = loadStoredArrangement(createEmptyPatch());
@@ -301,7 +301,7 @@ it("migrates v15 snares with neutral articulation and retains edits in patch and
   localStorage.setItem("egs.patch.v15", JSON.stringify(legacy));
   localStorage.setItem("egs.arrangement.v15", JSON.stringify({ ...createArrangement(patch), format: "euclid-grid.arrangement.v15", variations: [{ id: "variation-1", name: "A", patch: legacy }] }));
   const migrated = loadStoredPatch()!;
-  expect(migrated.format).toBe("euclid-grid.v28");
+  expect(migrated.format).toBe("euclid-grid.v29");
   expect(migrated.voices.snare.custom).toMatchObject({ pitchAmount: 1, pitchDecay: 30, noiseAttack: 0, toneFrequency: 240, toneSpread: 1.5, toneDecay: 200, noiseDecay: 400 });
   expect(migrated.voices.lead.custom.filterTracking).toBe(65);
   const arrangement = loadStoredArrangement(createEmptyPatch());
@@ -325,7 +325,7 @@ it("migrates v16 synths to native square widths and retains pulse edits on save"
   localStorage.setItem("egs.patch.v16", JSON.stringify(legacy));
   localStorage.setItem("egs.arrangement.v16", JSON.stringify({ ...createArrangement(patch), format: "euclid-grid.arrangement.v16", variations: [{ id: "variation-1", name: "A", patch: legacy }] }));
   const migrated = loadStoredPatch()!;
-  expect(migrated.format).toBe("euclid-grid.v28");
+  expect(migrated.format).toBe("euclid-grid.v29");
   for (const id of ["bassline", "lead"] as const) expect(migrated.voices[id].custom).toMatchObject({ pulseWidth: 50, waveform: 1, filterTracking: 65, playMode: 1, glide: 150 });
   expect(migrated.voices.snare.custom).toMatchObject({ pitchAmount: 1.5, pitchDecay: 25, noiseAttack: 5 });
   const arrangement = loadStoredArrangement(createEmptyPatch());
@@ -349,11 +349,11 @@ it("migrates v17 shakers with texture off and retains grain edits in patch and a
   localStorage.setItem("egs.patch.v17", JSON.stringify(legacy));
   localStorage.setItem("egs.arrangement.v17", JSON.stringify({ ...createArrangement(patch), format: "euclid-grid.arrangement.v17", variations: [{ id: "variation-1", name: "A", patch: legacy }] }));
   const migrated = loadStoredPatch()!;
-  expect(migrated.format).toBe("euclid-grid.v28");
+  expect(migrated.format).toBe("euclid-grid.v29");
   expect(migrated.voices.shk.custom).toMatchObject({ grainDepth: 0, grainRate: 60, attack: 25, duration: 200, filterFrequency: 6000, noiseLevel: 70 });
   expect(migrated.voices.lead.custom.pulseWidth).toBe(25);
   const arrangement = loadStoredArrangement(createEmptyPatch());
-  expect(arrangement.format).toBe("euclid-grid.arrangement.v28");
+  expect(arrangement.format).toBe("euclid-grid.arrangement.v29");
   expect(arrangement.variations[0].patch).toEqual(migrated);
   Object.assign(migrated.voices.shk.custom, { grainDepth: 65, grainRate: 90 });
   arrangement.variations[0].patch = migrated;
@@ -375,11 +375,11 @@ it("migrates v18 toms with their original shell tuning and damping and retains i
   localStorage.setItem("egs.patch.v18", JSON.stringify(legacy));
   localStorage.setItem("egs.arrangement.v18", JSON.stringify({ ...createArrangement(patch), format: "euclid-grid.arrangement.v18", variations: [{ id: "variation-1", name: "A", patch: legacy }] }));
   const migrated = loadStoredPatch()!;
-  expect(migrated.format).toBe("euclid-grid.v28");
+  expect(migrated.format).toBe("euclid-grid.v29");
   for (const id of ["lt", "mt", "ht"] as const) expect(migrated.voices[id].custom).toMatchObject({ overtoneRatio: 1.5, overtoneDecay: 0, overtoneLevel: 45, duration: 600, pitchAmount: 2, noiseLevel: 25 });
   expect(migrated.voices.shk.custom).toMatchObject({ grainDepth: 65, grainRate: 90 });
   const arrangement = loadStoredArrangement(createEmptyPatch());
-  expect(arrangement.format).toBe("euclid-grid.arrangement.v28");
+  expect(arrangement.format).toBe("euclid-grid.arrangement.v29");
   expect(arrangement.variations[0].patch).toEqual(migrated);
   Object.assign(migrated.voices.lt.custom, { overtoneRatio: 2.25, overtoneDecay: 80 });
   Object.assign(migrated.voices.mt.custom, { overtoneRatio: 1.75, overtoneDecay: 350 });
@@ -401,11 +401,11 @@ it("migrates v19 claps with a linked immediate tail and retains independent tail
   localStorage.setItem("egs.patch.v19", JSON.stringify(legacy));
   localStorage.setItem("egs.arrangement.v19", JSON.stringify({ ...createArrangement(patch), format: "euclid-grid.arrangement.v19", variations: [{ id: "variation-1", name: "A", patch: legacy }] }));
   const migrated = loadStoredPatch()!;
-  expect(migrated.format).toBe("euclid-grid.v28");
+  expect(migrated.format).toBe("euclid-grid.v29");
   expect(migrated.voices.clap.custom).toMatchObject({ tailFilter: 0, tailAttack: 0, burstCount: 5, burstSpacing: 15, burstDecay: 30, filterFrequency: 1600, filterQ: 2, tailDecay: 400, tailLevel: 60 });
   expect(migrated.voices.mt.custom).toMatchObject({ overtoneLevel: 40, overtoneRatio: 2.25, overtoneDecay: 800 });
   const arrangement = loadStoredArrangement(createEmptyPatch());
-  expect(arrangement.format).toBe("euclid-grid.arrangement.v28");
+  expect(arrangement.format).toBe("euclid-grid.arrangement.v29");
   expect(arrangement.variations[0].patch).toEqual(migrated);
   Object.assign(migrated.voices.clap.custom, { tailFilter: 700, tailAttack: 20 });
   arrangement.variations[0].patch = migrated;
@@ -424,11 +424,11 @@ it("migrates v20 cowbells with equal partial decay and retains damping edits", (
   localStorage.setItem("egs.patch.v20", JSON.stringify(legacy));
   localStorage.setItem("egs.arrangement.v20", JSON.stringify({ ...createArrangement(patch), format: "euclid-grid.arrangement.v20", variations: [{ id: "variation-1", name: "A", patch: legacy }] }));
   const migrated = loadStoredPatch()!;
-  expect(migrated.format).toBe("euclid-grid.v28");
+  expect(migrated.format).toBe("euclid-grid.v29");
   expect(migrated.voices.cow.custom).toMatchObject({ highDamping: 0, balance: 70, lowFrequency: 500, highFrequency: 900, filterFrequency: 3000, duration: 600, toneLevel: 40 });
   expect(migrated.voices.clap.custom).toMatchObject({ tailFilter: 700, tailAttack: 20 });
   const arrangement = loadStoredArrangement(createEmptyPatch());
-  expect(arrangement.format).toBe("euclid-grid.arrangement.v28");
+  expect(arrangement.format).toBe("euclid-grid.arrangement.v29");
   expect(arrangement.variations[0].patch).toEqual(migrated);
   migrated.voices.cow.custom.highDamping = 65;
   arrangement.variations[0].patch = migrated;
@@ -447,11 +447,11 @@ it("migrates v21 cymbals with stick noise off and retains stick edits", () => {
   localStorage.setItem("egs.patch.v21", JSON.stringify(legacy));
   localStorage.setItem("egs.arrangement.v21", JSON.stringify({ ...createArrangement(patch), format: "euclid-grid.arrangement.v21", variations: [{ id: "variation-1", name: "A", patch: legacy }] }));
   const migrated = loadStoredPatch()!;
-  expect(migrated.format).toBe("euclid-grid.v28");
+  expect(migrated.format).toBe("euclid-grid.v29");
   expect(migrated.voices.cym.custom).toMatchObject({ stickLevel: 0, stickFilter: 4500, stickDecay: 15, bellLevel: 35, bellFrequency: 1100, bellDecay: 900, metalDecay: 800, duration: 1800, noiseLevel: 25, lowpass: 6500 });
   expect(migrated.voices.cow.custom.highDamping).toBe(65);
   const arrangement = loadStoredArrangement(createEmptyPatch());
-  expect(arrangement.format).toBe("euclid-grid.arrangement.v28");
+  expect(arrangement.format).toBe("euclid-grid.arrangement.v29");
   expect(arrangement.variations[0].patch).toEqual(migrated);
   Object.assign(migrated.voices.cym.custom, { stickLevel: 40, stickFilter: 6000, stickDecay: 25 });
   arrangement.variations[0].patch = migrated;
@@ -471,18 +471,18 @@ it("migrates v23 kick envelopes with neutral defaults and retains layer edits", 
   localStorage.setItem("egs.patch.v23", JSON.stringify(legacy));
   localStorage.setItem("egs.arrangement.v23", JSON.stringify({ ...createArrangement(patch), format: "euclid-grid.arrangement.v23", variations: [{ id: "variation-1", name: "A", patch: legacy }] }));
   const migrated = loadStoredPatch()!;
-  expect(migrated.format).toBe("euclid-grid.v28");
+  expect(migrated.format).toBe("euclid-grid.v29");
   expect(migrated.voices.kick.custom).toMatchObject({ bodyLevel: 100, bodyAttack: 0, bodyTone: 40, bodyFrequency: 60, bodyDecay: 400, pitchAmount: 4, clickLevel: 50 });
   expect(migrated.voices.oh.custom).toMatchObject({ metalFocus: 4500, metalQ: 3, chokeMode: 1 });
   const arrangement = loadStoredArrangement(createEmptyPatch());
-  expect(arrangement.format).toBe("euclid-grid.arrangement.v28");
+  expect(arrangement.format).toBe("euclid-grid.arrangement.v29");
   expect(arrangement.variations[0].patch).toEqual(migrated);
   Object.assign(migrated.voices.kick.custom, { bodyLevel: 70, bodyAttack: 8 });
   arrangement.variations[0].patch = migrated;
   savePatch(migrated);
   saveArrangement(arrangement);
-  expect(JSON.parse(localStorage.getItem("egs.patch.v28")!)).toEqual(migrated);
-  expect(JSON.parse(localStorage.getItem("egs.arrangement.v28")!)).toEqual(arrangement);
+  expect(JSON.parse(localStorage.getItem("egs.patch.v29")!)).toEqual(migrated);
+  expect(JSON.parse(localStorage.getItem("egs.arrangement.v29")!)).toEqual(arrangement);
   expect(loadStoredPatch()).toEqual(migrated);
   expect(loadStoredArrangement(createEmptyPatch())).toEqual(arrangement);
 });
@@ -500,12 +500,12 @@ it("migrates v22 metallic voices with their original filters and retains focus e
   localStorage.setItem("egs.patch.v22", JSON.stringify(legacy));
   localStorage.setItem("egs.arrangement.v22", JSON.stringify({ ...createArrangement(patch), format: "euclid-grid.arrangement.v22", variations: [{ id: "variation-1", name: "A", patch: legacy }] }));
   const migrated = loadStoredPatch()!;
-  expect(migrated.format).toBe("euclid-grid.v28");
+  expect(migrated.format).toBe("euclid-grid.v29");
   for (const id of ["ch", "oh", "cym"] as const) expect(migrated.voices[id].custom).toMatchObject({ metalFocus: 9000, metalQ: 0.9, highpass: 4000, lowpass: 6500, metalBase: 50, metalDecay: 200, noiseLevel: 25 });
   expect(migrated.voices.oh.custom).toMatchObject({ chokeMode: 1, chokeRelease: 20 });
   expect(migrated.voices.cym.custom).toMatchObject({ bellLevel: 40, stickLevel: 30, stickFilter: 6000 });
   const arrangement = loadStoredArrangement(createEmptyPatch());
-  expect(arrangement.format).toBe("euclid-grid.arrangement.v28");
+  expect(arrangement.format).toBe("euclid-grid.arrangement.v29");
   expect(arrangement.variations[0].patch).toEqual(migrated);
   Object.assign(migrated.voices.ch.custom, { metalFocus: 4500, metalQ: 3.2 });
   Object.assign(migrated.voices.oh.custom, { metalFocus: 6500, metalQ: 1.5 });
@@ -527,18 +527,18 @@ it("migrates v24 rim noise with body-linked filtering and retains independent ed
   localStorage.setItem("egs.patch.v24", JSON.stringify(legacy));
   localStorage.setItem("egs.arrangement.v24", JSON.stringify({ ...createArrangement(patch), format: "euclid-grid.arrangement.v24", variations: [{ id: "variation-1", name: "A", patch: legacy }] }));
   const migrated = loadStoredPatch()!;
-  expect(migrated.format).toBe("euclid-grid.v28");
+  expect(migrated.format).toBe("euclid-grid.v29");
   expect(migrated.voices.rim.custom).toMatchObject({ noiseFilter: 0, noiseQ: 0, noiseMode: 1, noiseDecay: 90, filterFrequency: 2000, filterQ: 2, duration: 20, balance: 25, noiseLevel: 40 });
   expect(migrated.voices.kick.custom).toMatchObject({ bodyLevel: 70, bodyAttack: 8 });
   const arrangement = loadStoredArrangement(createEmptyPatch());
-  expect(arrangement.format).toBe("euclid-grid.arrangement.v28");
+  expect(arrangement.format).toBe("euclid-grid.arrangement.v29");
   expect(arrangement.variations[0].patch).toEqual(migrated);
   Object.assign(migrated.voices.rim.custom, { noiseFilter: 4500, noiseQ: 0.8 });
   arrangement.variations[0].patch = migrated;
   savePatch(migrated);
   saveArrangement(arrangement);
-  expect(JSON.parse(localStorage.getItem("egs.patch.v28")!)).toEqual(migrated);
-  expect(JSON.parse(localStorage.getItem("egs.arrangement.v28")!)).toEqual(arrangement);
+  expect(JSON.parse(localStorage.getItem("egs.patch.v29")!)).toEqual(migrated);
+  expect(JSON.parse(localStorage.getItem("egs.arrangement.v29")!)).toEqual(arrangement);
   expect(loadStoredPatch()).toEqual(migrated);
   expect(loadStoredArrangement(createEmptyPatch())).toEqual(arrangement);
 });
@@ -552,18 +552,18 @@ it("migrates v25 lead companions in unison and retains interval edits", () => {
   localStorage.setItem("egs.patch.v25", JSON.stringify(legacy));
   localStorage.setItem("egs.arrangement.v25", JSON.stringify({ ...createArrangement(patch), format: "euclid-grid.arrangement.v25", variations: [{ id: "variation-1", name: "A", patch: legacy }] }));
   const migrated = loadStoredPatch()!;
-  expect(migrated.format).toBe("euclid-grid.v28");
+  expect(migrated.format).toBe("euclid-grid.v29");
   expect(migrated.voices.lead.custom).toMatchObject({ companionInterval: 0, pulseMix: 50, detune: -15, pulseWidth: 30, subLevel: 40, playMode: 1, glide: 200, filterTracking: 65 });
   expect(migrated.voices.rim.custom).toMatchObject({ noiseMode: 1, noiseFilter: 4500, noiseQ: 0.8 });
   const arrangement = loadStoredArrangement(createEmptyPatch());
-  expect(arrangement.format).toBe("euclid-grid.arrangement.v28");
+  expect(arrangement.format).toBe("euclid-grid.arrangement.v29");
   expect(arrangement.variations[0].patch).toEqual(migrated);
   migrated.voices.lead.custom.companionInterval = -12;
   arrangement.variations[0].patch = migrated;
   savePatch(migrated);
   saveArrangement(arrangement);
-  expect(JSON.parse(localStorage.getItem("egs.patch.v28")!)).toEqual(migrated);
-  expect(JSON.parse(localStorage.getItem("egs.arrangement.v28")!)).toEqual(arrangement);
+  expect(JSON.parse(localStorage.getItem("egs.patch.v29")!)).toEqual(migrated);
+  expect(JSON.parse(localStorage.getItem("egs.arrangement.v29")!)).toEqual(arrangement);
   expect(loadStoredPatch()).toEqual(migrated);
   expect(loadStoredArrangement(createEmptyPatch())).toEqual(arrangement);
 });
@@ -578,23 +578,23 @@ it("migrates v26 snare shells with their original balance and linked length", ()
   localStorage.setItem("egs.patch.v26", JSON.stringify(legacy));
   localStorage.setItem("egs.arrangement.v26", JSON.stringify({ ...createArrangement(patch), format: "euclid-grid.arrangement.v26", variations: [{ id: "variation-1", name: "A", patch: legacy }] }));
   const migrated = loadStoredPatch()!;
-  expect(migrated.format).toBe("euclid-grid.v28");
+  expect(migrated.format).toBe("euclid-grid.v29");
   expect(migrated.voices.snare.custom).toMatchObject({ upperLevel: 67, upperDecay: 0, toneLevel: 60, toneDecay: 300, toneSpread: 1.5, pitchAmount: 2, pitchDecay: 30, noiseAttack: 8, noiseDecay: 400 });
   expect(migrated.voices.lead.custom.companionInterval).toBe(7);
   const arrangement = loadStoredArrangement(createEmptyPatch());
-  expect(arrangement.format).toBe("euclid-grid.arrangement.v28");
+  expect(arrangement.format).toBe("euclid-grid.arrangement.v29");
   expect(arrangement.variations[0].patch).toEqual(migrated);
   Object.assign(migrated.voices.snare.custom, { upperLevel: 40, upperDecay: 80 });
   arrangement.variations[0].patch = migrated;
   savePatch(migrated);
   saveArrangement(arrangement);
-  expect(JSON.parse(localStorage.getItem("egs.patch.v28")!)).toEqual(migrated);
-  expect(JSON.parse(localStorage.getItem("egs.arrangement.v28")!)).toEqual(arrangement);
+  expect(JSON.parse(localStorage.getItem("egs.patch.v29")!)).toEqual(migrated);
+  expect(JSON.parse(localStorage.getItem("egs.arrangement.v29")!)).toEqual(arrangement);
   expect(loadStoredPatch()).toEqual(migrated);
   expect(loadStoredArrangement(createEmptyPatch())).toEqual(arrangement);
 });
 
-it("migrates v27 voices with solo off and saves v28", () => {
+it("migrates v27 voices with solo off and saves v29", () => {
   const patch = createEmptyPatch();
   const legacyVoice = patch.voices.kick as Partial<typeof patch.voices.kick>;
   delete legacyVoice.solo;
@@ -604,14 +604,14 @@ it("migrates v27 voices with solo off and saves v28", () => {
 
   const migrated = loadStoredPatch()!;
   const arrangement = loadStoredArrangement(createEmptyPatch());
-  expect(migrated).toMatchObject({ format: "euclid-grid.v28", voices: { kick: { solo: false } } });
-  expect(arrangement.format).toBe("euclid-grid.arrangement.v28");
+  expect(migrated).toMatchObject({ format: "euclid-grid.v29", voices: { kick: { solo: false } } });
+  expect(arrangement.format).toBe("euclid-grid.arrangement.v29");
   expect(arrangement.variations[0].patch.voices.kick.solo).toBe(false);
 
   migrated.voices.kick.solo = true;
   arrangement.variations[0].patch = migrated;
   savePatch(migrated);
   saveArrangement(arrangement);
-  expect(JSON.parse(localStorage.getItem("egs.patch.v28")!).voices.kick.solo).toBe(true);
-  expect(JSON.parse(localStorage.getItem("egs.arrangement.v28")!).variations[0].patch.voices.kick.solo).toBe(true);
+  expect(JSON.parse(localStorage.getItem("egs.patch.v29")!).voices.kick.solo).toBe(true);
+  expect(JSON.parse(localStorage.getItem("egs.arrangement.v29")!).variations[0].patch.voices.kick.solo).toBe(true);
 });

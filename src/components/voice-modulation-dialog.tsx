@@ -25,7 +25,7 @@ export function VoiceModulationDialog({ open, onOpenChange, voiceName, voiceId, 
   return <Dialog open={open} onOpenChange={onOpenChange}>
     <DialogContent className="voice-routing-dialog" aria-describedby="voice-routing-description">
       <header className="voice-routing-header">
-        <div><span className="eyebrow">Voice patch bay</span><DialogTitle>{voiceName} modulation</DialogTitle><DialogDescription id="voice-routing-description">Route any block LFO directly to this shared voice. Every block that triggers {voiceName.toLowerCase()} uses the result.</DialogDescription></div>
+        <div><span className="eyebrow">Voice patch bay</span><DialogTitle>{voiceName} modulation</DialogTitle><DialogDescription id="voice-routing-description">Route any block LFO or Quantizer CV directly to this shared voice. Every block that triggers {voiceName.toLowerCase()} uses the result.</DialogDescription></div>
       </header>
       <section className="modulation-editor" aria-label={`${voiceName} modulation targets`}>
         <div className="modulation-heading"><span className="eyebrow">Modulation in</span><span>{value.modulations.length} / {targets.length} targets</span></div>
@@ -49,7 +49,7 @@ export function VoiceModulationDialog({ open, onOpenChange, voiceName, voiceId, 
           </fieldset>;
         })}
         <button type="button" className="add-modulation" disabled={available.length === 0} onClick={() => onChange({ ...value, modulations: [...value.modulations, { source: value.modulations[0]?.source ?? "", destination: available[0][0], amount: 0.5 }] })}><Plus size={12} />Add modulation target</button>
-        <p className="modulation-intro">At 100% depth, tune moves ±12 semitones, decay ±50 points, and level ±60% of its base.{targets.some(([destination]) => destination === "vOct") && " Quantized V/Oct maps 0–1 V to one octave, constrained to the root and scale in the synth controls."}</p>
+        <p className="modulation-intro">At 100% depth, tune moves ±12 semitones, decay ±50 points, and level ±60% of its base.{targets.some(([destination]) => destination === "vOct") && " V/Oct maps 0–1 V to one octave. Switch the voice Quantizer off to preserve an external Quantizer’s scale; use 100% depth to preserve its intervals. Root, octave and Tune still transpose."}</p>
       </section>
     </DialogContent>
   </Dialog>;

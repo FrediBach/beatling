@@ -41,7 +41,7 @@ export function resolveConstraints(patch: Patch, request: MusicalRequest, locks:
       if (blockVoices(block).some((voice) => protectedVoices.has(voice))) protectedSlots.add(index);
       if (!protectedSlots.has(index)) return;
       for (const voice of blockVoices(block)) protectedVoices.add(voice);
-      const sources = [...block.clk, block.rst, block.mut, ...block.modulations.map((route) => route.source)];
+      const sources = [...block.clk, block.rst, block.mut, ...(block.kind === "quantizer" ? [block.quantizerSource] : []), ...block.modulations.map((route) => route.source)];
       for (const voice of blockVoices(block)) sources.push(...patch.voices[voice].modulations.map((route) => route.source));
       for (const source of sources) if (/^\d+$/.test(source) && Number(source) < patch.blocks.length) protectedSlots.add(Number(source));
     });

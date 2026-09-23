@@ -70,9 +70,9 @@ export function buildStrudel(patch: Patch): string {
     return block.kind === "voice" && block.voice && isVoiceAudible(patch.voices, block.voice, soloActive);
   });
   const patterns = blocks.map((block) => blockPattern(patch, block));
-  const routingNote = patch.blocks.some((block) => block.clk.some((source) => source !== "G") || block.rst || block.mut || block.modulations.length)
+  const routingNote = patch.blocks.some((block) => block.kind === "quantizer" || block.clk.some((source) => source !== "G") || block.rst || block.mut || block.modulations.length)
     || Object.values(patch.voices).some((voice) => voice.modulations.length)
-    ? "// Routing, resets, mute inputs, and modulation are not portable to Strudel.\n"
+    ? "// Routing, resets, mute inputs, modulation, and Euclidean Quantizer CV are not portable to Strudel.\n"
     : "";
   const swing = patch.swing > 0 ? `\n  .swingBy(${number(patch.swing / 100)}, ${patch.rate * 2})` : "";
 

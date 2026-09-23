@@ -90,8 +90,8 @@ it("offers quantized V/Oct and musical scale controls for synth voices", () => {
   render(<Fixture />);
   fireEvent.click(screen.getByRole("button", { name: "Patch Bassline voice" }));
   fireEvent.click(screen.getByRole("button", { name: "Add modulation target" }));
-  expect(screen.getByRole("combobox", { name: "Modulation destination for Bassline Quantized V/Oct" })).toHaveValue("vOct");
-  fireEvent.change(screen.getByRole("combobox", { name: "Modulation source for Bassline Quantized V/Oct" }), { target: { value: "12" } });
+  expect(screen.getByRole("combobox", { name: "Modulation destination for Bassline V/Oct" })).toHaveValue("vOct");
+  fireEvent.change(screen.getByRole("combobox", { name: "Modulation source for Bassline V/Oct" }), { target: { value: "12" } });
   expect(screen.getByText("F2 · 0.50 V")).toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Close dialog" }));
   fireEvent.click(screen.getByRole("button", { name: "Configure Bassline synthesizer" }));

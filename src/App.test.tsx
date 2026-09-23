@@ -59,7 +59,7 @@ describe("application shell", () => {
     expect(screen.getAllByTestId(/^block-/)).toHaveLength(16);
     const blockTypeSelect = screen.getAllByLabelText("Block type or voice for block 01")[0];
     expect(Array.from(blockTypeSelect.querySelectorAll("optgroup"), (group) => group.label)).toEqual(["Block types", "Voices"]);
-    expect(Array.from(blockTypeSelect.querySelectorAll("optgroup")[0].querySelectorAll("option"), (option) => option.text)).toEqual(["Modulator", "Bernoulli gate"]);
+    expect(Array.from(blockTypeSelect.querySelectorAll("optgroup")[0].querySelectorAll("option"), (option) => option.text)).toEqual(["Modulator", "Bernoulli gate", "Euclidean Quantizer"]);
     expect(Array.from(blockTypeSelect.querySelectorAll("optgroup")[1].querySelectorAll("option"), (option) => option.text)).toEqual([
       "Kick", "Snare", "Clap", "Rim", "Closed hat", "Open hat", "Low tom", "Mid tom", "Hi tom", "Cowbell", "Cymbal", "Shaker", "Bassline", "Lead",
     ]);
@@ -140,7 +140,7 @@ describe("application shell", () => {
     await waitFor(() => expect(screen.getByLabelText("Beats per minute")).toHaveValue("137"));
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
-    await waitFor(() => expect(write).toHaveBeenCalledWith(expect.stringContaining('"format": "euclid-grid.arrangement.v28"')));
+    await waitFor(() => expect(write).toHaveBeenCalledWith(expect.stringContaining('"format": "euclid-grid.arrangement.v29"')));
     expect(close).toHaveBeenCalledOnce();
   });
 

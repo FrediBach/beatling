@@ -8,6 +8,7 @@ import { synthFilterSweep } from "@/lib/synth-filter";
 import { pulseWaveCoefficients } from "@/lib/pulse-wave";
 import { shakerTextureCurve } from "@/lib/shaker-texture";
 import { sampleLfo, type LfoFrame } from "@/lib/lfo";
+import { blockCvSampler } from "@/lib/block-cv";
 import { EFFECT_IDS, effectGain, waveguideDamping, waveguideFeedback, waveguideFrequency, delaySeconds, distortionSample, REVERB_SECONDS } from "@/lib/effects";
 import { rhythmAt, rhythmsFor } from "@/lib/rhythm-series";
 import { HatChoke } from "./hat-choke";
@@ -229,7 +230,7 @@ export class SequencerEngine {
     while (this.clockQueue.length && this.clockQueue[0].time <= now) {
       this.displayClockPulse = this.clockQueue.shift()!.pulse;
     }
-    const blocks = this.runtime.map((runtime, index) => {
+    this.runtime.forEach((runtime) => {
       while (runtime.queue.length && runtime.queue[0].time <= now) {
         const event = runtime.queue.shift()!;
         runtime.displayPosition = event.position;
@@ -238,13 +239,16 @@ export class SequencerEngine {
         runtime.displayPattern = event.effective;
         if (event.fire) runtime.fireUntil = now + 0.11;
       }
+    });
+    const sampleCv = blockCvSampler(patch.blocks, now, (index) => this.runtime[index]?.displayWave);
+    const blocks = this.runtime.map((runtime, index) => {
       const block = patch.blocks[index];
       const displayRhythmIndex = Math.min(runtime.displayRhythmIndex, rhythmsFor(block).length - 1);
       const lfo = runtime.displayWave ? sampleLfo(runtime.displayWave, now) : { value: block.kind === "voice" && block.voice ? 0 : 0.5, position: -1 };
       return {
         position: runtime.displayPosition,
         rhythmIndex: displayRhythmIndex,
-        lfo: lfo.value,
+        lfo: sampleCv(index),
         lfoPosition: lfo.position,
         fire: runtime.fireUntil > now,
         muted: block.mute || (block.mut !== "" && this.gateHigh(Number(block.mut), now)),
@@ -517,9 +521,7 @@ export class SequencerEngine {
   }
 
   private sourceLfo(source: number, time: number): number {
-    const wave = this.runtime[source]?.wave;
-    const sourceBlock = this.getPatch().blocks[source];
-    return wave ? sampleLfo(wave, time).value : sourceBlock?.kind === "voice" && sourceBlock.voice ? 0 : 0.5;
+    return blockCvSampler(this.getPatch().blocks, time, (index) => this.runtime[index]?.wave)(source);
   }
 
   private advance(index: number, time: number): boolean {

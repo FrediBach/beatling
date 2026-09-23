@@ -63,6 +63,7 @@ export function buildLua(patch: Patch): string {
     const voiceBlock = block.kind === "voice" && block.voice;
     const voiceTargets = block.modulations.filter((route) => ["tune", "decay", "level"].includes(route.destination));
     const browserNotes = [
+      block.kind === "quantizer" ? `Euclidean Quantizer CV (input ${block.quantizerSource === "" ? "none" : Number(block.quantizerSource) + 1})` : "",
       voiceTargets.length ? `voice mod (${voiceTargets.map((route) => route.destination).join(", ")})` : "",
       block.kind === "bernoulli" ? `Bernoulli voices ${block.branchVoices.join("/")} (branch chance and its modulation)` : "",
     ].filter(Boolean);

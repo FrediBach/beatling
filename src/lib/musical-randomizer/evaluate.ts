@@ -1,5 +1,6 @@
+import { blockCvSampler } from "@/lib/block-cv";
 import { clamp, euclidHit } from "@/lib/euclid";
-import { sampleLfo, type LfoFrame } from "@/lib/lfo";
+import type { LfoFrame } from "@/lib/lfo";
 import { effectiveVoiceModulation } from "@/lib/modulation";
 import { quantizeVoiceCv } from "@/lib/quantizer";
 import { rhythmsFor } from "@/lib/rhythm-series";
@@ -37,10 +38,7 @@ export function musicalEvents(patch: Patch, bars = 4): MusicalEvent[] {
       const event: MusicalEvent = { slot, voice: block.voice, pulse };
       if (block.voice === "bassline" || block.voice === "lead") {
         const voice = patch.voices[block.voice];
-        const modulation = effectiveVoiceModulation(voice, (source) => {
-          const frame = frames.get(source);
-          return frame ? sampleLfo(frame, time).value : 0.5;
-        });
+        const modulation = effectiveVoiceModulation(voice, blockCvSampler(patch.blocks, time, (source) => frames.get(source)));
         event.midi = quantizeVoiceCv(voice.custom, modulation.vOct, clamp(voice.tune + modulation.tune * 12, -24, 24)).midi;
       }
       events.push(event);

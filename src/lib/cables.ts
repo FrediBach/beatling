@@ -8,9 +8,9 @@ export const CABLE_SIGNALS = [
 ] as const;
 
 export function cableSignal(connection: Connection) {
-  return CABLE_SIGNALS[connection.output === "LFO" ? 3 : connection.input === "Mute" ? 2 : connection.input === "Reset" ? 1 : 0];
+  return CABLE_SIGNALS[(connection.output === "LFO" || connection.output === "CV") ? 3 : connection.input === "Mute" ? 2 : connection.input === "Reset" ? 1 : 0];
 }
 
 export function cablePort(connection: Connection, end: "source" | "target") {
-  return end === "source" ? `out-${connection.output}` : `in-${connection.output === "LFO" ? "Mod-" : ""}${connection.input}`;
+  return end === "source" ? `out-${connection.output}` : `in-${(connection.output === "LFO" || connection.output === "CV") ? "Mod-" : ""}${connection.input}`;
 }

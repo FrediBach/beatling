@@ -43,10 +43,10 @@ it("replaces the complete sound in one immutable update while retaining voice co
 
 it.each(["bassline", "lead"] as const)("keeps the %s quantizer and matches sound independently of key, scale and octave", (id) => {
   const voice = createEmptyPatch().voices[id];
-  Object.assign(voice.custom, { root: 7, scale: 5, octave: 3 });
+  Object.assign(voice.custom, { quantizer: 0, root: 7, scale: 5, octave: 3 });
   for (const preset of VOICE_PRESETS[id]) {
     const applied = applyVoicePreset(id, voice, preset.id);
-    expect(applied.custom).toMatchObject({ root: 7, scale: 5, octave: 3 });
+    expect(applied.custom).toMatchObject({ quantizer: 0, root: 7, scale: 5, octave: 3 });
     expect(matchingVoicePreset(id, applied.custom)?.id).toBe(preset.id);
     applied.custom.cutoff += 100;
     expect(matchingVoicePreset(id, applied.custom)).toBeUndefined();

@@ -69,5 +69,5 @@ export const padBlock = (index: number) => String(index + 1).padStart(2, "0");
 export const voiceName = (id: VoiceId | "") => VOICE_DEFS.find((voice) => voice.id === id)?.name ?? "";
 export const voiceTag = (id: VoiceId | "") => VOICE_DEFS.find((voice) => voice.id === id)?.tag ?? "lfo";
 
-export const blockName = (block: SequencerBlock) => block.kind === "bernoulli" ? "Bernoulli gate" : block.kind === "modulator" ? "Modulator" : voiceName(block.voice);
-export const blockTag = (block: SequencerBlock) => block.kind === "bernoulli" ? "A/B" : block.kind === "modulator" ? "LFO" : voiceTag(block.voice);
+export const blockName = (block: SequencerBlock) => block.kind === "quantizer" ? "Quantizer" : block.kind === "bernoulli" ? "Bernoulli gate" : block.kind === "modulator" ? "Modulator" : voiceName(block.voice);
+export const blockTag = (block: SequencerBlock) => block.kind === "quantizer" ? "QNT" : block.kind === "bernoulli" ? "A/B" : block.kind === "modulator" ? "LFO" : voiceTag(block.voice);

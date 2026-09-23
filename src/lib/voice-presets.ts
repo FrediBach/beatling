@@ -82,7 +82,7 @@ const RECIPES: Record<VoiceId, readonly PresetRecipe[]> = {
 
 // Quantizer choices belong to the composition, so sound presets neither replace
 // them nor use them to determine whether the current sound matches a preset.
-const QUANTIZER_KEYS = new Set(["root", "scale", "octave"]);
+const QUANTIZER_KEYS = new Set(["quantizer", "root", "scale", "octave"]);
 
 function createPresets(voiceId: VoiceId): readonly VoicePreset[] {
   const recipes: readonly PresetRecipe[] = [

@@ -12,7 +12,7 @@ export interface VoiceEditorPanel {
 
 const panel = (title: string, description: string, keys: string[], diagram?: VoiceDiagramKind, dial?: string): VoiceEditorPanel => ({ title, description, keys, diagram, dial });
 const articulation: VoiceEditorPanel = panel("Playback & glide", "Let notes overlap, or replace each note and slide into the next pitch. Glide applies while a previous mono note is still sounding.", ["playMode", "glide"]);
-const quantizer = panel("Notes & scale", "Choose the notes available to the quantized V/Oct input. Tune offsets the result in semitones.", ["root", "scale", "octave"]);
+const quantizer = panel("Notes & scale", "Choose a scale, or switch Quantizer off to use an external Quantizer block or continuous pitch. Root, octave and Tune still transpose.", ["quantizer", "root", "scale", "octave"]);
 const synthFilter = panel("Filter movement", "Cutoff sets the resting brightness. The envelope opens the filter on each hit, then falls back; resonance emphasizes its edge.", ["cutoff", "resonance", "envelopeAmount", "filterDecay", "filterTracking"], undefined, "cutoff");
 const choke: VoiceEditorPanel = { ...panel("Closed-hat interaction", "Let the open hat ring freely, or have closed-hat hits cut it short. Choke release softens that cut; effect tails keep ringing.", ["chokeMode", "chokeRelease"]), allMachines: true };
 const metal = panel("Metallic body", "Six differently tuned square waves make the metallic ring. Focus selects a frequency band; resonance narrows it. High-pass removes the lows.", ["metalLevel", "metalBase", "metalFocus", "metalQ", "highpass", "metalDecay"], "metal");
